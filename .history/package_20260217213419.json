@@ -1,0 +1,37 @@
+{
+  "name": "mine-chess",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A strategic turn-based game featuring mines, evolution, and capture-the-flag mechanics",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20 <21"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:node20",
+    "build:node20": "npx -y node@20 node_modules/vite/bin/vite.js build",
+    "typecheck": "tsc --noEmit",
+    "test:ai": "vitest run src/ai/__tests__/regression.test.ts",
+    "preview": "vite preview",
+    "serve": "vite preview --port 3000"
+  },
+  "dependencies": {
+    "lucide-react": "^0.400.0",
+    "peerjs": "^1.5.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "autoprefixer": "^10.4.14",
+    "peer": "^1.0.2",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5.0.0",
+    "vite": "^4.4.0",
+    "vitest": "^1.6.1"
+  }
+}

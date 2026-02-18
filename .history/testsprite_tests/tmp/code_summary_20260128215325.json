@@ -1,0 +1,121 @@
+{
+    "tech_stack": [
+        "TypeScript",
+        "React",
+        "Vite",
+        "TailwindCSS",
+        "Lucide Icons"
+    ],
+    "features": [
+        {
+            "name": "遊戲初始化",
+            "description": "建立初始遊戲狀態，包含玩家、單位、地圖配置",
+            "files": [
+                "src/gameInit.ts",
+                "src/types.ts",
+                "src/constants.ts"
+            ]
+        },
+        {
+            "name": "遊戲引擎",
+            "description": "核心遊戲邏輯，包含戰鬥計算、地雷爆炸、能量檢查",
+            "files": [
+                "src/gameEngine.ts"
+            ]
+        },
+        {
+            "name": "遊戲輔助函數",
+            "description": "提供單位名稱、能量消耗計算等輔助功能",
+            "files": [
+                "src/gameHelpers.tsx"
+            ]
+        },
+        {
+            "name": "玩家操作",
+            "description": "處理玩家的移動、攻擊、放置地雷等操作",
+            "files": [
+                "src/hooks/usePlayerActions.ts"
+            ]
+        },
+        {
+            "name": "AI 邏輯",
+            "description": "電腦對手的自動決策系統",
+            "files": [
+                "src/hooks/useGameAI.ts"
+            ]
+        },
+        {
+            "name": "遊戲循環",
+            "description": "管理回合計時器和階段轉換",
+            "files": [
+                "src/hooks/useGameLoop.ts"
+            ]
+        },
+        {
+            "name": "控制面板",
+            "description": "顯示單位操作按鈕、商店、進化樹等 UI",
+            "files": [
+                "src/components/ControlPanel.tsx"
+            ]
+        },
+        {
+            "name": "遊戲場地",
+            "description": "渲染遊戲網格和單位",
+            "files": [
+                "src/components/GameField.tsx",
+                "src/components/GridCell.tsx",
+                "src/components/GridCell.css"
+            ]
+        },
+        {
+            "name": "遊戲標題列",
+            "description": "顯示計時器、能量條、暫停按鈕",
+            "files": [
+                "src/components/GameHeader.tsx"
+            ]
+        },
+        {
+            "name": "單位資訊面板",
+            "description": "顯示選中單位的詳細資訊",
+            "files": [
+                "src/components/UnitInfoPanel.tsx"
+            ]
+        },
+        {
+            "name": "進化樹",
+            "description": "單位升級系統的 UI",
+            "files": [
+                "src/components/EvolutionTree.tsx"
+            ]
+        },
+        {
+            "name": "沙盒面板",
+            "description": "開發者模式的除錯工具",
+            "files": [
+                "src/components/SandboxPanel.tsx"
+            ]
+        },
+        {
+            "name": "大廳與彈窗",
+            "description": "遊戲開始畫面、遊戲結束畫面、暫停選單",
+            "files": [
+                "src/components/Lobby.tsx",
+                "src/components/GameModals.tsx"
+            ]
+        },
+        {
+            "name": "多語言支援",
+            "description": "繁體中文、簡體中文、英文的翻譯系統",
+            "files": [
+                "src/i18n.ts"
+            ]
+        },
+        {
+            "name": "圖示系統",
+            "description": "集中管理 Lucide 圖示",
+            "files": [
+                "src/icons.ts"
+            ]
+        }
+    ]
+}
