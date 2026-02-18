@@ -2964,7 +2964,9 @@ export default function App() {
             gameState.phase === 'thinking' ||
             localNetworkPlayer === gameState.currentPlayer
         )
-        : (gameState.currentPlayer === PlayerID.P1);
+        : gameState.gameMode === 'sandbox'
+            ? true
+            : (gameState.currentPlayer === PlayerID.P1);
 
     return (
         <div className="w-full h-screen bg-slate-950 text-white flex flex-col overflow-hidden font-sans select-none">
@@ -2976,17 +2978,17 @@ export default function App() {
             />
 
             {/* Modals & Lobby System */}
-                <GameModals
-                    view={view}
-                    gameState={gameState}
-                    language={language}
-                    setLanguage={setLanguage}
-                    musicVolume={musicVolume}
-                    setMusicVolume={setMusicVolume}
-                    aiDifficulty={aiDifficulty}
-                    setAiDifficulty={setAiDifficulty}
-                    onStartGame={handleStartGame}
-                    onExitGame={handleExitGame}
+            <GameModals
+                view={view}
+                gameState={gameState}
+                language={language}
+                setLanguage={setLanguage}
+                musicVolume={musicVolume}
+                setMusicVolume={setMusicVolume}
+                aiDifficulty={aiDifficulty}
+                setAiDifficulty={setAiDifficulty}
+                onStartGame={handleStartGame}
+                onExitGame={handleExitGame}
                 onRestart={handleRestart}
                 onPauseToggle={handlePause}
                 isHost={isHost}
