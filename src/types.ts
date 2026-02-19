@@ -59,6 +59,7 @@ export interface Unit {
   respawnTimer: number;
   hasFlag: boolean;
   carriedMine?: Mine | null;
+  carriedMineRevealed?: boolean; // true until the Ranger moves after pickup
   status: UnitStatus;
   stats: {
     kills: number;

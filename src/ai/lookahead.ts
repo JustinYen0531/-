@@ -17,7 +17,8 @@ const cloneUnit = (unit: Unit): Unit => ({
     ...unit,
     status: { ...unit.status },
     stats: { ...unit.stats },
-    carriedMine: unit.carriedMine ? { ...unit.carriedMine } : unit.carriedMine
+    carriedMine: unit.carriedMine ? { ...unit.carriedMine } : unit.carriedMine,
+    carriedMineRevealed: unit.carriedMineRevealed ?? false
 });
 
 const cloneMine = (mine: Mine): Mine => ({

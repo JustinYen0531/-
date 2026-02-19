@@ -842,26 +842,32 @@ export default function App() {
     // Swap the display order of units in the squad panel (not board positions)
     const swapUnitDisplayOrder = (id1: string, id2: string) => {
         setGameState(prev => {
-            const p = prev.players[prev.currentPlayer];
+            const findOwner = (unitId: string) => {
+                if (prev.players[PlayerID.P1].units.some(u => u.id === unitId)) return PlayerID.P1;
+                if (prev.players[PlayerID.P2].units.some(u => u.id === unitId)) return PlayerID.P2;
+                return null;
+            };
+            const owner = findOwner(id1) ?? findOwner(id2);
+            if (!owner) return prev;
+
+            const p = prev.players[owner];
             const order = [...p.unitDisplayOrder];
             const idx1 = order.indexOf(id1);
             const idx2 = order.indexOf(id2);
 
             if (idx1 === -1 || idx2 === -1) return prev;
 
-            // Swap positions in the display order array
             [order[idx1], order[idx2]] = [order[idx2], order[idx1]];
 
             return {
                 ...prev,
                 players: {
                     ...prev.players,
-                    [prev.currentPlayer]: { ...p, unitDisplayOrder: order }
+                    [owner]: { ...p, unitDisplayOrder: order }
                 }
             };
         });
 
-        // Sync order change immediately so opponent preview updates without lag.
         if (!applyingRemoteActionRef.current && roomId && isNetworkConnected) {
             sendGameStateDeferred('swap_display_order');
         }
@@ -1167,7 +1173,7 @@ export default function App() {
                 qStats.rangerMinesMovedThisRound.add(mine.id);
             }
 
-            const newUnits = p.units.map(u => u.id === liveUnit.id ? { ...u, carriedMine: mine } : u);
+            const newUnits = p.units.map(u => u.id === liveUnit.id ? { ...u, carriedMine: mine, carriedMineRevealed: true } : u);
 
             return {
                 ...prev,

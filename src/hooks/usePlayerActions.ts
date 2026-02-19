@@ -851,7 +851,7 @@ export const usePlayerActions = ({
 
             const pId = unit.owner;
             const movingPlayerState = pId === PlayerID.P1 ? finalP1 : finalP2;
-            const finalPState = {
+            let finalPState = {
                 ...movingPlayerState,
                 energy: prevPlayerState.energy - totalCost,
                 questStats: pId === PlayerID.P1 ? finalP1.questStats : finalP2.questStats, // Use current stats if updated above
@@ -865,6 +865,15 @@ export const usePlayerActions = ({
             finalPState.questStats = {
                 ...finalPState.questStats,
                 ...qStats // Includes rangerSteps, generalFlagSteps, defuserMinesSoaked
+            };
+
+            // Clear carriedMineRevealed after the first move post-pickup
+            finalPState = {
+                ...finalPState,
+                units: finalPState.units.map((u: Unit) =>
+                    u.id === unit.id
+                        ? { ...u, r, c, energyUsedThisTurn: u.energyUsedThisTurn + totalCost, carriedMineRevealed: false }
+                        : u)
             };
 
             if (pId === PlayerID.P1) finalP1 = finalPState;

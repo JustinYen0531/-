@@ -337,6 +337,12 @@ const GridCell: React.FC<GridCellProps> = ({
     Math.abs(cell.c - b.c) <= 1
   );
   const isInsideTowerRange = !!towerBuilding;
+  const friendlyTowerInRange = buildings.some(b =>
+    b.type === 'tower' &&
+    b.owner === currentPlayer &&
+    Math.abs(cell.r - b.r) <= 1 &&
+    Math.abs(cell.c - b.c) <= 1
+  );
 
   if (isInsideTowerRange && !cell.isObstacle) {
     bgColor = `${bgColor} border-2 border-dotted ${towerBuilding!.owner === PlayerID.P1
@@ -349,10 +355,17 @@ const GridCell: React.FC<GridCellProps> = ({
   // Mine Visibility Logic - strict check including smoke
   // When in Sandbox "Normal" mode, we filter strictly based on who the user currently "is" (currentPlayer)
   const isMineVisible = forceShowMines || (!!mine &&
-    (mine.owner === currentPlayer || mine.revealedTo.includes(currentPlayer)) &&
+    ((mine.owner === currentPlayer || mine.revealedTo.includes(currentPlayer) || friendlyTowerInRange)) &&
     !((isSmoked && smokeOwner !== currentPlayer) || (isHub31Smoke && hubSmokeBuilding?.owner !== currentPlayer))
   );
-  const mineIsRevealedToViewer = !!mine && mine.revealedTo.includes(currentPlayer);
+  const enemyPlayer = currentPlayer === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
+  const mineIsRevealedToViewer = !!mine && (forceShowMines || mine.revealedTo.includes(currentPlayer));
+  const mineIsKnownByEnemy = !!mine && mine.revealedTo.includes(enemyPlayer);
+  const shouldShowEye =
+    mine && isMineVisible && !unit &&
+    (mineIsRevealedToViewer || (mine.owner === currentPlayer && mineIsKnownByEnemy));
+  const showCarriedMineIndicator = unit && unit.type === UnitType.RANGER && unit.carriedMine &&
+    (unit.owner === currentPlayer || unit.carriedMineRevealed || friendlyTowerInRange);
 
   const getUnitIcon = (type: UnitType) => {
     // Color mapping for each unit type
@@ -539,7 +552,7 @@ const GridCell: React.FC<GridCellProps> = ({
                 style={{ transform: 'scale(1.2)', zIndex: 100 }}
               />
             )}
-            {mineIsRevealedToViewer && mine.owner !== currentPlayer && !unit && (
+            {shouldShowEye && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-slate-900 border border-white/60 flex items-center justify-center shadow-lg shadow-black/50 z-[120]">
                 <Eye size={11} className="text-white drop-shadow-md" />
               </div>
@@ -1108,7 +1121,7 @@ const GridCell: React.FC<GridCellProps> = ({
             )}
 
             {/* Carrying Mine Indicator (Ranger) */}
-            {unit.type === UnitType.RANGER && unit.carriedMine && (
+            {showCarriedMineIndicator && (
               <div className="absolute -bottom-2 -left-2 bg-slate-900/90 rounded-full p-0.5 border border-amber-300 shadow-lg shadow-amber-500/30 z-30">
                 {unit.carriedMine.type === MineType.NORMAL && <Bomb size={10} className="text-white" />}
                 {unit.carriedMine.type === MineType.SMOKE && <Cloud size={10} className="text-slate-200" />}

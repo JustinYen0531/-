@@ -119,6 +119,7 @@ export const createInitialState = (mode: 'pvp' | 'pve' | 'sandbox'): GameState =
             c: positions[i].c,
             hasFlag: false,
             carriedMine: null,
+            carriedMineRevealed: false,
             energyUsedThisTurn: 0,
             startOfActionEnergy: INITIAL_ENERGY,
             isDead: false,
