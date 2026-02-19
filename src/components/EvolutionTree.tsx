@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { GameState, UnitType } from '../types';
 import { EVOLUTION_CONFIG } from '../constants';
 import { getUnitTypeAbbr, getUnitIcon } from '../gameHelpers';
@@ -9,6 +9,38 @@ interface EvolutionTreeProps {
     onClose: () => void;
     t: (key: string, params?: any) => string;
 }
+
+interface FlippedCardDetailProps {
+    text: string;
+    textClassName: string;
+}
+
+const FlippedCardDetail: React.FC<FlippedCardDetailProps> = ({ text, textClassName }) => {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [isOverflowing, setIsOverflowing] = useState(false);
+
+    useLayoutEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const updateOverflow = () => {
+            setIsOverflowing(container.scrollHeight > container.clientHeight + 1);
+        };
+
+        updateOverflow();
+        window.addEventListener('resize', updateOverflow);
+        return () => window.removeEventListener('resize', updateOverflow);
+    }, [text]);
+
+    return (
+        <div
+            ref={containerRef}
+            className={`h-full pr-1 text-[11px] leading-relaxed whitespace-pre-wrap ${isOverflowing ? 'overflow-y-auto py-1' : 'overflow-hidden flex items-center py-0.5'}`}
+        >
+            <div className={textClassName}>{text}</div>
+        </div>
+    );
+};
 
 const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) => {
     const [flippedCardId, setFlippedCardId] = useState<string | null>(null);
@@ -27,6 +59,22 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
             default: return 0;
         }
     };
+
+    const translateWithFallback = (primaryKey: string, fallbackKeys: string[] = []) => {
+        const primaryText = t(primaryKey);
+        if (primaryText !== primaryKey) return primaryText;
+
+        for (const key of fallbackKeys) {
+            const fallbackText = t(key);
+            if (fallbackText !== key) return fallbackText;
+        }
+
+        return primaryText;
+    };
+
+    const getEvolutionKeyBase = (unitType: UnitType, branch: 'a' | 'b') => `evol_${getUnitTypeAbbr(unitType)}_${branch}`;
+    const rewardTextClampClass = "overflow-hidden break-words [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]";
+    const flippedCardShellClass = "scale-105 !h-[148px] !z-50 overflow-hidden";
 
     return (
         <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center pointer-events-auto">
@@ -54,6 +102,7 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                             const currentLevel = levels[type][branch];
                                             const variantKey = branch === 'a' ? 'aVariant' : 'bVariant';
                                             const selectedVariant = levels[type][variantKey];
+                                            const evolutionKeyBase = getEvolutionKeyBase(type, branch);
 
                                             let barColor = 'bg-gray-600';
                                             if (currentLevel === 1) barColor = 'bg-blue-500';
@@ -66,7 +115,7 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                         <div className="text-sm text-gray-300 font-bold flex items-center gap-2">
                                                             <span className={`w-2.5 h-2.5 rounded-full ${branch === 'a' ? 'bg-blue-500' : 'bg-orange-500'}`}></span>
                                                             <span>{t(branch === 'a' ? 'path_a' : 'path_b')}</span>
-                                                            <span className="text-xs text-gray-400 font-normal">{t(`evol_${getUnitTypeAbbr(type)}_${branch}_subtitle`)}</span>
+                                                            <span className="text-xs text-gray-400 font-normal">{translateWithFallback(`${evolutionKeyBase}_subtitle`, [config[branch].description])}</span>
                                                             {currentLevel < 3 && currentVal >= config[branch].thresholds[currentLevel] && (
                                                                 <span className="text-[10px] text-green-400 font-bold animate-pulse flex items-center gap-1">READY <Check size={10} strokeWidth={4} /></span>
                                                             )}
@@ -106,19 +155,22 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                 const isFlipped = flippedCardId === cardId;
                                                                 const isUnlocked = currentLevel >= 1;
                                                                 return (
-                                                                    <div onClick={() => setFlippedCardId(isFlipped ? null : cardId)}
-                                                                        className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? 'scale-110 !h-auto min-h-[140px] !z-50 bg-[#0a0f1a] border-indigo-400 shadow-2xl overflow-visible' : `h-full ${isUnlocked ? 'bg-blue-950/40 border-blue-600/80 text-blue-100' : 'bg-gray-800/50 border-gray-600 text-gray-500 opacity-60'}`}`}>
+                                                                        <div onClick={() => setFlippedCardId(isFlipped ? null : cardId)}
+                                                                        className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? `${flippedCardShellClass} bg-[#0a0f1a] border-indigo-400 shadow-2xl` : `h-full ${isUnlocked ? 'bg-blue-950/40 border-blue-600/80 text-blue-100' : 'bg-gray-800/50 border-gray-600 text-gray-500 opacity-60'}`}`}>
                                                                         {isFlipped ? (
-                                                                            <div className="text-[11px] leading-relaxed whitespace-pre-wrap py-1 text-blue-50">{t(`evol_${getUnitTypeAbbr(type)}_${branch}_r1_detail`)}</div>
+                                                                            <FlippedCardDetail
+                                                                                text={translateWithFallback(`${evolutionKeyBase}_r1_detail`, [config[branch].rewardText[0], `${evolutionKeyBase}_detail`])}
+                                                                                textClassName="text-blue-50"
+                                                                            />
                                                                         ) : (
-                                                                            <div className="flex justify-between items-center w-full">
+                                                                            <div className="grid grid-cols-[1fr_auto] gap-1 items-center w-full">
                                                                                 <div className="flex flex-col min-w-0">
                                                                                     <div className="font-bold mb-0.5 opacity-70">LV1</div>
-                                                                                    <div className="text-[11px] leading-tight font-black truncate">{t(config[branch].rewardText[0])}</div>
+                                                                                    <div className={`text-[10px] leading-tight font-black ${rewardTextClampClass}`}>{t(config[branch].rewardText[0])}</div>
                                                                                 </div>
-                                                                                <div className="text-[10px] text-gray-300 font-bold flex items-center gap-1 shrink-0 ml-2">
+                                                                                <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 ml-1 text-right">
                                                                                     {isUnlocked && <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>}
-                                                                                    <span className="opacity-80">{t(`evol_${getUnitTypeAbbr(type)}_${branch}_r1_req`)}</span>
+                                                                                    <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r1_req`, [`${evolutionKeyBase}_req`])}</span>
                                                                                 </div>
                                                                             </div>
                                                                         )}
@@ -138,18 +190,21 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                 const isUnlocked = currentLevel >= 2;
                                                                 return (
                                                                     <div onClick={() => setFlippedCardId(isFlipped ? null : cardId)}
-                                                                        className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? 'scale-110 !h-auto min-h-[140px] !z-50 bg-[#1a0a1f] border-indigo-400 shadow-2xl' : `h-full ${isUnlocked ? 'bg-purple-950/40 border-purple-600/80 text-purple-100' : 'bg-gray-800/50 border-gray-600 text-gray-500 opacity-60'}`}`}>
+                                                                        className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? `${flippedCardShellClass} bg-[#1a0a1f] border-indigo-400 shadow-2xl` : `h-full ${isUnlocked ? 'bg-purple-950/40 border-purple-600/80 text-purple-100' : 'bg-gray-800/50 border-gray-600 text-gray-500 opacity-60'}`}`}>
                                                                         {isFlipped ? (
-                                                                            <div className="text-[11px] leading-relaxed whitespace-pre-wrap py-1 text-purple-50">{t(`evol_${getUnitTypeAbbr(type)}_${branch}_r2_detail`)}</div>
+                                                                            <FlippedCardDetail
+                                                                                text={translateWithFallback(`${evolutionKeyBase}_r2_detail`, [config[branch].rewardText[1], `${evolutionKeyBase}_detail`])}
+                                                                                textClassName="text-purple-50"
+                                                                            />
                                                                         ) : (
-                                                                            <div className="flex justify-between items-center w-full">
+                                                                            <div className="grid grid-cols-[1fr_auto] gap-1 items-center w-full">
                                                                                 <div className="flex flex-col min-w-0">
                                                                                     <div className="font-bold mb-0.5 opacity-70">LV2</div>
-                                                                                    <div className="text-[11px] leading-tight font-black truncate">{t(config[branch].rewardText[1])}</div>
+                                                                                    <div className={`text-[10px] leading-tight font-black ${rewardTextClampClass}`}>{t(config[branch].rewardText[1])}</div>
                                                                                 </div>
-                                                                                <div className="text-[10px] text-gray-300 font-bold flex items-center gap-1 shrink-0 ml-2">
+                                                                                <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 ml-1 text-right">
                                                                                     {isUnlocked && <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>}
-                                                                                    <span className="opacity-80">{t(`evol_${getUnitTypeAbbr(type)}_${branch}_r2_req`)}</span>
+                                                                                    <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r2_req`, [`${evolutionKeyBase}_req`])}</span>
                                                                                 </div>
                                                                             </div>
                                                                         )}
@@ -171,18 +226,21 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                             const cardIdx = (selectedVariant + 1);
                                                                             return (
                                                                                 <div onClick={() => setFlippedCardId(isFlipped ? null : cardId)}
-                                                                                    className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? 'scale-110 !h-auto min-h-[140px] !z-50 bg-[#1f100a] border-indigo-400 shadow-2xl' : 'h-full bg-orange-950/40 border-orange-500 text-orange-100 shadow-[0_0_12px_rgba(249,115,22,0.15)]'}`}>
+                                                                                    className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? `${flippedCardShellClass} bg-[#1f100a] border-indigo-400 shadow-2xl` : 'h-full bg-orange-950/40 border-orange-500 text-orange-100 shadow-[0_0_12px_rgba(249,115,22,0.15)]'}`}>
                                                                                     {isFlipped ? (
-                                                                                        <div className="text-[11px] leading-relaxed whitespace-pre-wrap py-1 text-orange-50">{t(`evol_${getUnitTypeAbbr(type)}_${branch}_r3_${subLevel}_detail`)}</div>
+                                                                                        <FlippedCardDetail
+                                                                                            text={translateWithFallback(`${evolutionKeyBase}_r3_${subLevel}_detail`, [config[branch].rewardText[cardIdx], `${evolutionKeyBase}_detail`])}
+                                                                                            textClassName="text-orange-50"
+                                                                                        />
                                                                                     ) : (
-                                                                                        <div className="flex justify-between items-center w-full">
+                                                                                        <div className="grid grid-cols-[1fr_auto] gap-1 items-center w-full">
                                                                                             <div className="flex flex-col min-w-0">
                                                                                                 <div className="font-bold mb-0.5 opacity-70">LV3-{subLevel}</div>
-                                                                                                <div className="text-[11px] leading-tight font-black truncate">{t(config[branch].rewardText[cardIdx])}</div>
+                                                                                                <div className={`text-[10px] leading-tight font-black ${rewardTextClampClass}`}>{t(config[branch].rewardText[cardIdx])}</div>
                                                                                             </div>
-                                                                                            <div className="text-[10px] text-gray-300 font-bold flex items-center gap-1 shrink-0 ml-2">
+                                                                                            <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 ml-1 text-right">
                                                                                                 <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>
-                                                                                                <span className="opacity-80">{t(`evol_${getUnitTypeAbbr(type)}_${branch}_r3_req`)}</span>
+                                                                                                <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r3_req`, [`${evolutionKeyBase}_req`])}</span>
                                                                                             </div>
                                                                                         </div>
                                                                                     )}
@@ -212,20 +270,23 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                                     <div onClick={() => {
                                                                                         if (isOtherVariantSelected) return;
                                                                                         setFlippedCardId(isFlipped ? null : cardId);
-                                                                                    }} className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? 'scale-110 !h-auto min-h-[140px] !z-50 bg-[#1a1a1a] border-indigo-400 shadow-2xl' : `h-full ${isUnlocked ? 'bg-orange-950/40 border-orange-500 text-orange-100 shadow-[0_0_12px_rgba(249,115,22,0.2)]' : isOtherVariantSelected ? 'bg-transparent border-gray-800 text-gray-700 opacity-20 grayscale pointer-events-none' : 'bg-gray-800/40 border-gray-600/50 text-gray-500 hover:border-gray-500'}`}`}>
+                                                                                    }} className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? `${flippedCardShellClass} bg-[#1a1a1a] border-indigo-400 shadow-2xl` : `h-full ${isUnlocked ? 'bg-orange-950/40 border-orange-500 text-orange-100 shadow-[0_0_12px_rgba(249,115,22,0.2)]' : isOtherVariantSelected ? 'bg-transparent border-gray-800 text-gray-700 opacity-20 grayscale pointer-events-none' : 'bg-gray-800/40 border-gray-600/50 text-gray-500 hover:border-gray-500'}`}`}>
                                                                                         {isFlipped ? (
-                                                                                            <div className="text-[11px] leading-relaxed whitespace-pre-wrap py-1 text-gray-100">{t(`evol_${getUnitTypeAbbr(type)}_${branch}_r3_${subLevel}_detail`)}</div>
+                                                                                            <FlippedCardDetail
+                                                                                                text={translateWithFallback(`${evolutionKeyBase}_r3_${subLevel}_detail`, [config[branch].rewardText[idx], `${evolutionKeyBase}_detail`])}
+                                                                                                textClassName="text-gray-100"
+                                                                                            />
                                                                                         ) : (
-                                                                                            <div className="flex justify-between items-center h-full">
+                                                                                            <div className="grid grid-cols-[1fr_auto] gap-1 items-center h-full">
                                                                                                 <div className="flex flex-col justify-center min-w-0">
                                                                                                     <div className="flex items-center gap-1.5 mb-0.5">
                                                                                                         <span className={`text-[9px] ${isUnlocked ? 'text-orange-400' : 'text-gray-500'} font-bold`}>LV3-{subLevel}</span>
                                                                                                         {isUnlocked && <span className="text-[7px] px-1 bg-orange-600 text-white rounded-sm font-black animate-pulse">ACTIVED</span>}
                                                                                                     </div>
-                                                                                                    <div className="text-[10px] leading-tight truncate font-bold">{t(config[branch].rewardText[idx])}</div>
+                                                                                                    <div className={`text-[9px] leading-tight font-bold ${rewardTextClampClass}`}>{t(config[branch].rewardText[idx])}</div>
                                                                                                 </div>
-                                                                                                <div className="text-[10px] text-gray-400 font-bold italic shrink-0 ml-2 text-right leading-tight">
-                                                                                                    {t(`evol_${getUnitTypeAbbr(type)}_${branch}_r3_req`)}
+                                                                                                <div className="text-[9px] text-gray-400 font-bold italic shrink-0 ml-1 text-right leading-tight">
+                                                                                                    {translateWithFallback(`${evolutionKeyBase}_r3_req`, [`${evolutionKeyBase}_req`])}
                                                                                                     {!selectedVariant && currentLevel === 2 && currentVal >= config[branch].thresholds[2] && <div className="text-green-400 font-black animate-bounce mt-0.5 text-[8px]">SELECT</div>}
                                                                                                 </div>
                                                                                             </div>
