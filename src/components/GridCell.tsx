@@ -352,6 +352,7 @@ const GridCell: React.FC<GridCellProps> = ({
     (mine.owner === currentPlayer || mine.revealedTo.includes(currentPlayer)) &&
     !((isSmoked && smokeOwner !== currentPlayer) || (isHub31Smoke && hubSmokeBuilding?.owner !== currentPlayer))
   );
+  const mineIsRevealedToViewer = !!mine && mine.revealedTo.includes(currentPlayer);
 
   const getUnitIcon = (type: UnitType) => {
     // Color mapping for each unit type
@@ -537,6 +538,11 @@ const GridCell: React.FC<GridCellProps> = ({
                 className={`absolute inset-0 rounded-full border-2 ${mine.owner === PlayerID.P1 ? 'border-cyan-400/50 shadow-[0_0_8px_rgba(34,211,238,0.4)]' : 'border-red-400/50 shadow-[0_0_8px_rgba(239,68,68,0.4)]'}`}
                 style={{ transform: 'scale(1.2)', zIndex: 100 }}
               />
+            )}
+            {mineIsRevealedToViewer && mine.owner !== currentPlayer && !unit && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-slate-900 border border-white/60 flex items-center justify-center shadow-lg shadow-black/50 z-[120]">
+                <Eye size={11} className="text-white drop-shadow-md" />
+              </div>
             )}
 
             <div className={`text-[11px] font-black text-center ${unit ? 'hidden' : 'absolute -top-4 left-0 right-0'} text-white`}>

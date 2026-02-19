@@ -151,7 +151,13 @@ const serializeSet = (value: unknown): string[] => {
     return [];
 };
 
-const ENEMY_MINE_LOG_KEYS = new Set(['log_place_mine', 'log_pickup_mine']);
+const ENEMY_MINE_LOG_KEYS = new Set([
+    'log_place_mine',      // Ranger active placement (with coords)
+    'log_pickup_mine',     // Ranger pickup (with coords)
+    'log_mine_placed',     // Maker mine placement (with coords)
+    'log_mine_limit',      // Limit reached (implies enemy placing)
+    'log_mine_zone'        // Placement zone violation reveals intent
+]);
 
 const toSerializableGameState = (state: GameState): unknown => {
     const serializePlayer = (player: GameState['players'][PlayerID]) => ({
@@ -467,7 +473,7 @@ export default function App() {
         setGameState(prev => {
             const currentPlayerState = prev.players[localPlayer];
 
-            // Get placed mines for this player
+            // Get placed mines for this player (only log for PvP; hide in PvE)
             const playerMines = prev.mines.filter(m => m.owner === localPlayer);
             const minePositions = playerMines.map(m => `(${m.r + 1},${m.c + 1})`).join(', ');
 
@@ -489,7 +495,7 @@ export default function App() {
                 });
             }
 
-            if (minePositions) {
+            if (minePositions && prev.gameMode === 'pvp') {
                 newLogs.unshift({
                     turn: 1,
                     messageKey: 'log_placement_mines',
