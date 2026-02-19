@@ -19,7 +19,8 @@ const PREVIEW_HIDE_ANIMATION_MS = 180;
 
 const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId, t, onUnitClick, language, onSwapUnits }) => {
     const isPvp = gameState.gameMode === 'pvp';
-    const localPlayer = isPvp ? localPlayerId : gameState.currentPlayer;
+    const canShowEnemyPreview = true;
+    const localPlayer = isPvp ? localPlayerId : PlayerID.P1;
     const enemyPlayer = localPlayer === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
     const isPlacement = gameState.phase === 'placement';
     const [isPreviewMounted, setIsPreviewMounted] = useState(false);
@@ -61,14 +62,14 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
     }, []);
 
     useEffect(() => {
-        if (!isPvp) {
+        if (!canShowEnemyPreview) {
             setIsPreviewVisible(false);
             setIsPreviewMounted(false);
         }
-    }, [isPvp]);
+    }, [canShowEnemyPreview]);
 
     const openPreview = () => {
-        if (!isPvp) return;
+        if (!canShowEnemyPreview) return;
         if (previewHideTimerRef.current) {
             clearTimeout(previewHideTimerRef.current);
             previewHideTimerRef.current = null;
@@ -82,7 +83,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
     };
 
     const handlePanelMouseEnter = () => {
-        if (!isPvp) return;
+        if (!canShowEnemyPreview) return;
         if (previewShowTimerRef.current) {
             clearTimeout(previewShowTimerRef.current);
         }
@@ -148,7 +149,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
             onMouseEnter={handlePanelMouseEnter}
             onMouseLeave={handlePanelMouseLeave}
         >
-            {isPvp && isPreviewMounted && (
+            {canShowEnemyPreview && isPreviewMounted && (
                 <div
                     className={`absolute left-1/2 -translate-x-1/2 bottom-full mb-[-56px] z-30 transition-all duration-200 ease-out ${isPreviewVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}
                 >

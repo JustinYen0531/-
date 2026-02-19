@@ -77,7 +77,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     handleRangerAction, swapUnits, isLocalPlayerTurn, localPlayerId
 }) => {
     // Flipped card state moved to EvolutionTree component
-    const player = gameState.gameMode === 'pvp' ? gameState.players[localPlayerId] : gameState.players[gameState.currentPlayer];
+    const player = gameState.gameMode === 'pvp' ? gameState.players[localPlayerId] : gameState.players[PlayerID.P1];
     const isThinking = gameState.phase === 'thinking';
     const isPlacement = gameState.phase === 'placement';
     const isAiTurnLocked =

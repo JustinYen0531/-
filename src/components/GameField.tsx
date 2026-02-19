@@ -104,12 +104,12 @@ const GameField: React.FC<GameFieldProps> = ({
                     const unit = isVisible ? realUnit : undefined;
 
                     const minesAtCell = gameState.mines.filter(m => m.r === r && m.c === c);
-                    const realMine =
-                        // If both sides have mines in one cell, show current player's mine first.
-                        minesAtCell.find(m => m.owner === viewerPlayer) ||
-                        minesAtCell.find(m => m.revealedTo.includes(viewerPlayer)) ||
-                        minesAtCell[0];
-                    const mine = realMine;
+                    const visibleMine = gameState.sandboxShowAllMines
+                        ? minesAtCell[0]
+                        : minesAtCell.find(m => m.owner === viewerPlayer) ||
+                          minesAtCell.find(m => m.revealedTo.includes(viewerPlayer)) ||
+                          undefined;
+                    const mine = visibleMine;
 
                     const building = gameState.buildings.find(b => b.r === r && b.c === c);
 

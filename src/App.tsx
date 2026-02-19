@@ -151,6 +151,8 @@ const serializeSet = (value: unknown): string[] => {
     return [];
 };
 
+const ENEMY_MINE_LOG_KEYS = new Set(['log_place_mine', 'log_pickup_mine']);
+
 const toSerializableGameState = (state: GameState): unknown => {
     const serializePlayer = (player: GameState['players'][PlayerID]) => ({
         ...player,
@@ -2967,7 +2969,14 @@ export default function App() {
     };
 
     const localNetworkPlayer = getLocalNetworkPlayer();
+    const logViewerPlayerId = gameState.gameMode === 'pvp'
+        ? (localNetworkPlayer ?? PlayerID.P1)
+        : PlayerID.P1;
+    const shouldHideEnemyMineLogs = gameState.gameMode === 'pvp' || gameState.gameMode === 'pve';
     const shouldFlipBoard = gameState.gameMode === 'pvp' && localNetworkPlayer === PlayerID.P2;
+    const viewerPlayerId = gameState.gameMode === 'pvp'
+        ? (localNetworkPlayer ?? gameState.currentPlayer)
+        : PlayerID.P1;
 
     useGameLoop({
         gameStateRef,
@@ -3025,6 +3034,12 @@ export default function App() {
         : gameState.gameMode === 'sandbox'
             ? true
             : (gameState.currentPlayer === PlayerID.P1);
+    const filteredLogs = gameState.logs.filter((log) => {
+        if (!shouldHideEnemyMineLogs) return true;
+        if (!log.owner) return true;
+        if (!ENEMY_MINE_LOG_KEYS.has(log.messageKey)) return true;
+        return log.owner === logViewerPlayerId;
+    });
 
     return (
         <div className="w-full h-screen bg-slate-950 text-white flex flex-col overflow-hidden font-sans select-none">
@@ -3221,7 +3236,7 @@ export default function App() {
                                     onDismissMiss={clearMissMarksImmediatelyAt}
                                     onDismissCount={clearCountMarkersImmediatelyAt}
                                     isFlipped={shouldFlipBoard}
-                                    viewerPlayerId={localNetworkPlayer ?? gameState.currentPlayer}
+                                    viewerPlayerId={viewerPlayerId}
                                 />
 
                                 {/* Timer Bar Below Board */}
@@ -3289,7 +3304,7 @@ export default function App() {
                                     </div>
 
                                     <div className="flex-1 overflow-y-auto p-2 space-y-2 text-sm scrollbar-thin scrollbar-thumb-white/30">
-                                        {gameState.logs.map((log, i) => {
+                                        {filteredLogs.map((log, i) => {
                                             // Determine color based on type and owner
                                             // Blue = P1 (always viewer), Red = P2 (always enemy)
                                             let bgColor = 'bg-slate-800/50 border-white text-white';
