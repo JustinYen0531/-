@@ -35,13 +35,6 @@ interface UsePlayerActionsProps {
 }
 
 
-export const usePlayerActions = ({
-    setGameState,
-    gameStateRef,
-    setTargetMode,
-    setSelectedMineType,
-    setShowEvolutionTree,
-    addVFX,
 }: UsePlayerActionsProps) => {
 
     const addLog = useCallback((messageKey: string, type: GameLog['type'] = 'info', params?: Record<string, any>, owner?: PlayerID) => {

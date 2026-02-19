@@ -57,6 +57,17 @@ export const getUnitName = (type: UnitType): string => {
     }
 };
 
+export const getUnitNameKey = (type: UnitType): string => {
+    switch (type) {
+        case UnitType.GENERAL: return 'unit_general';
+        case UnitType.MINESWEEPER: return 'unit_minesweeper';
+        case UnitType.RANGER: return 'unit_ranger';
+        case UnitType.MAKER: return 'unit_maker';
+        case UnitType.DEFUSER: return 'unit_defuser';
+        default: return 'select_unit';
+    }
+};
+
 // --- Helper: Calculate cost increase for enemy territory ---
 export const getEnemyTerritoryEnergyCost = (unit: Unit, baseCost: number): number => {
     const isP1 = unit.owner === PlayerID.P1;

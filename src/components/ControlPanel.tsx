@@ -16,7 +16,7 @@ import {
 } from '../constants';
 import {
     getMineBaseCost,
-    getUnitName
+    getUnitNameKey
 } from '../gameHelpers';
 import UnitInfoPanel from './UnitInfoPanel';
 import EvolutionTree from './EvolutionTree';
@@ -999,12 +999,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                     if (isAiTurnLocked) {
                                                         const decisionUnit = aiDecision?.unitId ? helpers.getUnit(aiDecision.unitId) : null;
                                                         const decisionLabel = aiDecision
-                                                            ? `${decisionUnit ? getUnitName(decisionUnit.type) : aiDecision.unitId} · ${aiDecision.action.toUpperCase()}`
+                                                            ? `${decisionUnit ? t(getUnitNameKey(decisionUnit.type)) : aiDecision.unitId} · ${aiDecision.action.toUpperCase()}`
                                                             : t('ai_thinking');
                                                         const targetText = aiDecision?.target?.kind === 'cell'
                                                             ? `(${aiDecision.target.r + 1},${aiDecision.target.c + 1})`
                                                             : aiDecision?.target?.kind === 'unit'
-                                                                ? getUnitName(aiDecision.target.unit.type)
+                                                                ? t(getUnitNameKey(aiDecision.target.unit.type))
                                                                 : '';
                                                         const scoreParts = aiDecision?.breakdown
                                                             ? [

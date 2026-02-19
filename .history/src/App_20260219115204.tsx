@@ -472,7 +472,7 @@ export default function App() {
 
             // Get unit positions for this player
             const unitPositions = currentPlayerState.units
-                .map(u => `${getUnitNameKey(u.type)}(${u.r + 1},${u.c + 1})`)
+                .map(u => `${t(getUnitNameKey(u.type))}(${u.r + 1},${u.c + 1})`)
                 .join(', ');
 
             // Create logs
@@ -1211,7 +1211,7 @@ export default function App() {
                 isTimeFrozen: true
             };
         });
-        addLog('log_evolved', 'move', { unit: getUnitNameKey(unit.type), branch: 'B', level: 2 }, unit.owner);
+        addLog('log_evolved', 'move', { unit: t(getUnitNameKey(unit.type)), branch: 'B', level: 2 }, unit.owner);
     };
 
 
@@ -1357,7 +1357,7 @@ export default function App() {
             };
         });
 
-        addLog('log_evolved', 'move', { unit: getUnitNameKey(unit.type), branch: 'A', level: 2 }, unit.owner);
+        addLog('log_evolved', 'move', { unit: t(getUnitNameKey(unit.type)), branch: 'A', level: 2 }, unit.owner);
         setTargetMode(null);
     };
 
@@ -1429,7 +1429,7 @@ export default function App() {
                         return u;
                     });
                     newState.players[targetPId] = { ...targetP, units: damagedUnits };
-                    addLog('log_hit_mine', 'mine', { unit: getUnitNameKey(tu.type), dmg }, unit.owner);
+                    addLog('log_hit_mine', 'mine', { unit: t(getUnitNameKey(tu.type)), dmg }, unit.owner);
                 });
             } else {
                 const newMine: Mine = {

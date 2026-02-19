@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { GameState, PlayerID, Unit, UnitType, GameLog, Mine, MineType, TargetMode } from '../types';
 import { EVOLUTION_COSTS, EVOLUTION_CONFIG, UNIT_STATS, GRID_ROWS, GRID_COLS } from '../constants';
-import { getUnitName, getDisplayCost } from '../gameHelpers';
+import { getDisplayCost } from '../gameHelpers';
 
 export interface GameLoopActions {
     handleActionComplete: (actedUnitId: string | null) => void;
@@ -24,6 +24,7 @@ export interface GameLoopActions {
     handlePlaceMineAction: (unit: Unit, r: number, c: number, mineType: MineType) => void;
     addLog: (messageKey: string, type?: GameLog['type'], params?: Record<string, any>, owner?: PlayerID) => void;
     setShowEvolutionTree: React.Dispatch<React.SetStateAction<boolean>>;
+    getLocalizedUnitName: (type: UnitType) => string;
 }
 
 export interface UseGameLoopProps {
@@ -129,7 +130,7 @@ export const useGameLoop = ({
                                 selectedUnitId: null, // Deselect when skipping
                             };
                         });
-                        actions.addLog('log_pass_turn', 'move', { unit: getUnitName(nextUnit.type) }, nextUnit.owner);
+                        actions.addLog('log_pass_turn', 'move', { unit: actions.getLocalizedUnitName(nextUnit.type) }, nextUnit.owner);
                         actions.handleActionComplete(nextUnit.id);
                     }
                 }

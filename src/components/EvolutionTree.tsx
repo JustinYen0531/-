@@ -18,24 +18,44 @@ interface FlippedCardDetailProps {
 const FlippedCardDetail: React.FC<FlippedCardDetailProps> = ({ text, textClassName }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [isOverflowing, setIsOverflowing] = useState(false);
+    const OVERFLOW_TOLERANCE_PX = 6;
 
     useLayoutEffect(() => {
         const container = containerRef.current;
         if (!container) return;
 
         const updateOverflow = () => {
-            setIsOverflowing(container.scrollHeight > container.clientHeight + 1);
+            const overflowAmount = container.scrollHeight - container.clientHeight;
+            setIsOverflowing(overflowAmount > OVERFLOW_TOLERANCE_PX);
         };
 
         updateOverflow();
+        const rafId = window.requestAnimationFrame(updateOverflow);
+        const timeoutId = window.setTimeout(updateOverflow, 120);
+        const resizeObserver = new ResizeObserver(updateOverflow);
+        resizeObserver.observe(container);
+
+        let fontsCancelled = false;
+        if ('fonts' in document) {
+            document.fonts.ready.then(() => {
+                if (!fontsCancelled) updateOverflow();
+            });
+        }
+
         window.addEventListener('resize', updateOverflow);
-        return () => window.removeEventListener('resize', updateOverflow);
+        return () => {
+            fontsCancelled = true;
+            window.cancelAnimationFrame(rafId);
+            window.clearTimeout(timeoutId);
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', updateOverflow);
+        };
     }, [text]);
 
     return (
         <div
             ref={containerRef}
-            className={`h-full pr-1 text-[11px] leading-relaxed whitespace-pre-wrap ${isOverflowing ? 'overflow-y-auto py-1' : 'overflow-hidden flex items-center py-0.5'}`}
+            className={`h-full pr-1 text-[11px] leading-relaxed whitespace-pre-wrap ${isOverflowing ? 'overflow-y-auto py-0.5' : 'overflow-hidden flex items-center py-0.5'}`}
         >
             <div className={textClassName}>{text}</div>
         </div>

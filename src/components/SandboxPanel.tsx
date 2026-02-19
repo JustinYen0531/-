@@ -1,8 +1,8 @@
 import React from 'react';
 import { GameState, PlayerID } from '../types';
-import { Language } from '../i18n';
+import { Language, TRANSLATIONS } from '../i18n';
 import { FlaskConical, X, Zap, Shield, ShieldAlert, RefreshCw, Play, Pause, Hand } from '../icons';
-import { getUnitName } from '../gameHelpers';
+import { getUnitNameKey } from '../gameHelpers';
 
 interface SandboxPanelProps {
     gameState: GameState;
@@ -29,6 +29,8 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
     targetMode,
     setTargetMode
 }) => {
+    const t = (key: string) => (TRANSLATIONS[language] as any)?.[key] ?? key;
+
     // Helper functions
     const getUnit = (id: string, state: GameState = gameState) => {
         const p1Unit = state.players[PlayerID.P1].units.find(u => u.id === id);
@@ -74,7 +76,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                     ...prev.players,
                     [unit.owner]: { ...p, evolutionLevels: newLevels }
                 },
-                logs: [{ turn: prev.turnCount, messageKey: 'log_evolved', params: { unit: getUnitName(unit.type), branch: branch.toUpperCase() + (variant ? `-${variant}` : ''), level: newLevels[unit.type][branch] }, type: 'evolution' as const }, ...prev.logs]
+                logs: [{ turn: prev.turnCount, messageKey: 'log_evolved', params: { unit: t(getUnitNameKey(unit.type)), branch: branch.toUpperCase() + (variant ? `-${variant}` : ''), level: newLevels[unit.type][branch] }, type: 'evolution' as const }, ...prev.logs]
             };
         });
     };

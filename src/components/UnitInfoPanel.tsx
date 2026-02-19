@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PlayerID, GameState, Unit, UnitType } from '../types';
 import { Star, Skull, Zap } from '../icons';
-import { getUnitIcon, getUnitName } from '../gameHelpers';
+import { getUnitIcon, getUnitNameKey } from '../gameHelpers';
 import { ENERGY_CAP_RATIO } from '../constants';
 import { Language } from '../i18n';
 
@@ -244,7 +244,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                                             <div className="text-[8px] font-black text-white/90 font-mono">HP:{u.hp}</div>
                                         </div>
                                         <div className="text-[9px] font-black text-slate-300 pb-0.5 leading-none">
-                                            {getUnitName(u.type)}
+                                            {t(getUnitNameKey(u.type))}
                                         </div>
                                         {u.isDead && (
                                             <div className="absolute inset-0 flex items-center justify-center">
@@ -449,7 +449,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
 
                                     {/* Unit Name */}
                                     <div className="text-[9px] font-black text-slate-300 pb-0.5">
-                                        {getUnitName(u.type)}
+                                        {t(getUnitNameKey(u.type))}
                                     </div>
 
                                     {/* Resurrection Timer Display */}

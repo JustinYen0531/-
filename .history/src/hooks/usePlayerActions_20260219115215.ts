@@ -42,6 +42,7 @@ export const usePlayerActions = ({
     setSelectedMineType,
     setShowEvolutionTree,
     addVFX,
+    t,
 }: UsePlayerActionsProps) => {
 
     const addLog = useCallback((messageKey: string, type: GameLog['type'] = 'info', params?: Record<string, any>, owner?: PlayerID) => {
