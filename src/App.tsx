@@ -8,8 +8,7 @@ import {
 import {
     UNIT_STATS, ENERGY_CAP_RATIO, MINE_DAMAGE,
     TURN_TIMER, THINKING_TIMER,
-    PLACEMENT_MINE_LIMIT,
-    MAX_MINES_ON_BOARD
+    PLACEMENT_MINE_LIMIT
 } from './constants';
 
 import {
@@ -659,6 +658,18 @@ export default function App() {
         });
     };
 
+    const clearCountMarkersImmediatelyAt = (targetR: number, targetC: number, owner: PlayerID) => {
+        flushSync(() => {
+            setGameState(prev => {
+                const filtered = prev.sensorResults.filter(
+                    sr => !((sr.kind ?? 'count') === 'count' && sr.owner === owner && sr.r === targetR && sr.c === targetC)
+                );
+                if (filtered.length === prev.sensorResults.length) return prev;
+                return { ...prev, sensorResults: filtered };
+            });
+        });
+    };
+
     const handleUnitClick = (unit: Unit) => {
         const state = gameStateRef.current;
         if (state.gameOver || state.isPaused) return;
@@ -917,7 +928,8 @@ export default function App() {
                 logs: [
                     {
                         turn: prev.turnCount, messageKey: 'log_placed_building', params: {
-                            type: '偵測塔'
+                            unit: getUnitNameKey(unit.type),
+                            type: 'building_tower'
                         }, owner: unit.owner, type: 'move' as const
                     },
                     ...prev.logs
@@ -1082,11 +1094,6 @@ export default function App() {
                 return;
             }
 
-            if (gameState.mines.filter(m => m.owner === unit.owner).length >= MAX_MINES_ON_BOARD) {
-                addLog('log_max_mines', 'error');
-                return;
-            }
-
             setGameState(prev => {
                 const p = prev.players[unit.owner];
                 const newUnits = p.units.map(u => u.id === unit.id ? { ...u, carriedMine: null } : u);
@@ -1211,7 +1218,6 @@ export default function App() {
                 isTimeFrozen: true
             };
         });
-        addLog('log_evolved', 'move', { unit: getUnitNameKey(unit.type), branch: 'B', level: 2 }, unit.owner);
     };
 
 
@@ -1261,7 +1267,7 @@ export default function App() {
                     }
                 },
                 logs: [
-                    { turn: prev.turnCount, messageKey: 'log_placed_building', params: { type: '傳送道標' }, owner: unit.owner, type: 'move' as const },
+                    { turn: prev.turnCount, messageKey: 'log_placed_building', params: { unit: getUnitNameKey(unit.type), type: 'building_hub' }, owner: unit.owner, type: 'move' as const },
                     ...prev.logs
                 ],
                 lastActionTime: Date.now(),
@@ -1357,7 +1363,6 @@ export default function App() {
             };
         });
 
-        addLog('log_evolved', 'move', { unit: getUnitNameKey(unit.type), branch: 'A', level: 2 }, unit.owner);
         setTargetMode(null);
     };
 
@@ -1501,7 +1506,7 @@ export default function App() {
                     }
                 },
                 logs: [
-                    { turn: prev.turnCount, messageKey: 'log_placed_building', params: { type: '自律工坊' }, owner: unit.owner, type: 'move' as const },
+                    { turn: prev.turnCount, messageKey: 'log_placed_building', params: { unit: getUnitNameKey(unit.type), type: 'building_factory' }, owner: unit.owner, type: 'move' as const },
                     ...prev.logs
                 ],
                 lastActionTime: Date.now(),
@@ -2391,6 +2396,27 @@ export default function App() {
     ) => {
         const state = gameStateRef.current;
         const shouldBroadcast = origin === 'local' && canBroadcastAction() && !!roomId;
+        const isTimedOut = state.phase === 'action' && state.timeLeft <= 0;
+        let shouldDeferComplete = false;
+
+        if (origin === 'local' && isTimedOut && targetMode === 'move_mine_end' && selectedMineId) {
+            const actingUnitId = actedUnitId || state.selectedUnitId || state.activeUnitId;
+            const actingUnit = actingUnitId ? getUnit(actingUnitId, state) : null;
+            const selectedMine = state.mines.find(m => m.id === selectedMineId);
+
+            if (
+                actingUnit &&
+                actingUnit.type === UnitType.DEFUSER &&
+                actingUnit.owner === state.currentPlayer &&
+                selectedMine
+            ) {
+                handleMoveEnemyMineAction(actingUnit, selectedMine.r, selectedMine.c, actingUnit.r, actingUnit.c);
+                shouldDeferComplete = true;
+            }
+
+            setSelectedMineId(null);
+            setTargetMode(null);
+        }
 
         if (shouldBroadcast && roomId) {
             sendActionPacket({
@@ -2403,12 +2429,33 @@ export default function App() {
             });
         }
 
+        if (shouldDeferComplete) {
+            setTimeout(() => {
+                playerActions.handleActionComplete(actedUnitId);
+                if (shouldBroadcast) {
+                    sendGameStateDeferred('end_turn');
+                }
+            }, 0);
+            return;
+        }
+
         playerActions.handleActionComplete(actedUnitId);
 
         if (shouldBroadcast) {
             sendGameStateDeferred('end_turn');
         }
-    }, [canBroadcastAction, playerActions.handleActionComplete, roomId, sendActionPacket, sendGameStateDeferred]);
+    }, [
+        canBroadcastAction,
+        getUnit,
+        handleMoveEnemyMineAction,
+        playerActions.handleActionComplete,
+        roomId,
+        selectedMineId,
+        sendActionPacket,
+        sendGameStateDeferred,
+        setTargetMode,
+        targetMode
+    ]);
 
     const executeSkipTurnAction = useCallback((
         origin: 'local' | 'remote' = 'local'
@@ -3172,6 +3219,7 @@ export default function App() {
                                     handleCellClick={handleCellClick}
                                     handleUnitClick={handleUnitClick}
                                     onDismissMiss={clearMissMarksImmediatelyAt}
+                                    onDismissCount={clearCountMarkersImmediatelyAt}
                                     isFlipped={shouldFlipBoard}
                                     viewerPlayerId={localNetworkPlayer ?? gameState.currentPlayer}
                                 />

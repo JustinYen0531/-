@@ -471,7 +471,7 @@ export const evaluateActionCandidate = (
         if (mineType === MineType.SLOW) typeBonus = minDistToEnemy <= 2 ? 6 : 2;
         if (mineType === MineType.SMOKE) typeBonus = minDistToEnemy <= 3 ? 4 : 1;
         if (mineType === MineType.CHAIN) typeBonus = nearEnemyFlag >= 8 ? 6 : 3;
-        if (mineType === MineType.NUKE) typeBonus = enemyUnits.filter(u => Math.abs(u.r - target.r) <= 2 && Math.abs(u.c - target.c) <= 2).length >= 2 ? 10 : 4;
+        if (mineType === MineType.NUKE) typeBonus = enemyUnits.filter(u => manhattan(u.r, u.c, target.r, target.c) <= 2).length >= 2 ? 10 : 4;
         utility = nearEnemyFlag + unitPressure + typeBonus + hotspotPressure * 0.75;
         safety = Math.max(0, 14 - evaluateTargetCellRisk(state, unit, target.r, target.c, context?.threatMap));
     } else if (actionType === 'place_tower' && target?.kind === 'cell') {

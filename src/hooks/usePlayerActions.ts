@@ -724,11 +724,14 @@ export const usePlayerActions = ({
                     if (unit.type !== UnitType.DEFUSER) qStats.triggeredMineThisRound = true;
                     if (result.isNukeTriggered) {
                         const nukeBlastDamage = 12;
-                        newMines = newMines.filter(m => !(Math.abs(m.r - mine.r) <= 1 && Math.abs(m.c - mine.c) <= 1));
-                        currentBuildings = currentBuildings.filter(b => !(Math.abs(b.r - mine.r) <= 1 && Math.abs(b.c - mine.c) <= 1));
+                        const inNukeBlastRange = (targetR: number, targetC: number) =>
+                            (Math.abs(targetR - mine.r) + Math.abs(targetC - mine.c)) <= 2;
+
+                        newMines = newMines.filter(m => !inNukeBlastRange(m.r, m.c));
+                        currentBuildings = currentBuildings.filter(b => !inNukeBlastRange(b.r, b.c));
                         const allUnits = [...state.players[PlayerID.P1].units, ...state.players[PlayerID.P2].units];
                         allUnits.forEach(targetUnit => {
-                            if (!targetUnit.isDead && Math.abs(targetUnit.r - mine.r) <= 1 && Math.abs(targetUnit.c - mine.c) <= 1) {
+                            if (!targetUnit.isDead && inNukeBlastRange(targetUnit.r, targetUnit.c)) {
                                 if (targetUnit.id === unit.id) return;
 
                                 let damageToApply = nukeBlastDamage;
@@ -1148,13 +1151,11 @@ export const usePlayerActions = ({
             }
             return Math.max(Math.abs(f.r - targetR), Math.abs(f.c - targetC)) <= 1;
         });
-        // Range Check: Maker can place mines in cardinal directions (up, down, left, right) + self
+        // Range Check: Maker can place mines in cardinal directions (up, down, left, right) + self.
+        // Keep Factory remote placement rules unchanged.
         const manhattanDist = Math.abs(unit.r - targetR) + Math.abs(unit.c - targetC);
-        const chebyshevDist = Math.max(Math.abs(unit.r - targetR), Math.abs(unit.c - targetC));
 
-        let isTargetable = false;
-        if (manhattanDist <= 1) isTargetable = true; // Base cardinal + self
-        if (mkrLevelB >= 1 && chebyshevDist <= 1) isTargetable = true; // Path B1: Expaned to 3x3 square
+        let isTargetable = manhattanDist <= 1; // Base cardinal + self
         if (isInFactoryRange) isTargetable = true; // Remote placement via Factory
 
         if (!isTargetable) {
@@ -1177,7 +1178,11 @@ export const usePlayerActions = ({
             m.revealedTo.includes(unit.owner)
         );
 
-        if (cell.isObstacle || unitInCell) {
+        const isSelfCell = unit.r === targetR && unit.c === targetC;
+        const blockedByObstacle = cell.isObstacle && !isSelfCell;
+        const blockedByOtherUnit = !!unitInCell && unitInCell.id !== unit.id;
+
+        if (blockedByObstacle || blockedByOtherUnit) {
             addLog('log_obstacle', 'error');
             return;
         }
@@ -1198,8 +1203,9 @@ export const usePlayerActions = ({
         if (effectiveMineType === MineType.CHAIN && (mkrLevelA < 3 || mkrVariantA !== 1)) { addLog('log_low_energy_evolve', 'error'); return; }
         if (effectiveMineType === MineType.NUKE && (mkrLevelA < 3 || mkrVariantA !== 2)) { addLog('log_low_energy_evolve', 'error'); return; }
 
-        const isFree = mkrLevelB === 3 && mkrVariantB === 1 && isInFactoryRange;
-        const cost = getEnemyTerritoryEnergyCost(unit, isFree ? 0 : getMineBaseCost(effectiveMineType));
+        const hasWorkshopDiscount = mkrLevelB === 3 && mkrVariantB === 1 && isInFactoryRange;
+        const baseMineCost = hasWorkshopDiscount ? 3 : getMineBaseCost(effectiveMineType);
+        const cost = getEnemyTerritoryEnergyCost(unit, baseMineCost);
 
         if (player.energy < cost) { addLog('log_low_energy', 'info', { cost }); return; }
         if (!checkEnergyCap(unit, player, cost)) return;
@@ -1557,7 +1563,7 @@ export const usePlayerActions = ({
         });
 
         addVFX('scan', r, c, 'small');
-        addLog('log_action_sensor_scan', 'move', { unit: '掃雷者', r, c }, unit.owner);
+        addLog('log_action_sensor_scan', 'move', { unit: getLocalizedUnitName(unit.type), r, c }, unit.owner);
         setTargetMode(null);
     }, [gameStateRef, getUnit, checkEnergyCap, addLog, setGameState, addVFX, setTargetMode]);
 

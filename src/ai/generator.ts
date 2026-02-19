@@ -190,6 +190,7 @@ export const generateActionCandidatesForUnit = (
     if (unit.type === UnitType.MAKER) {
         const mkrLevelA = player.evolutionLevels[UnitType.MAKER].a;
         const mkrVariantA = player.evolutionLevels[UnitType.MAKER].aVariant;
+        const mineDirs = [...dirs, { r: 0, c: 0 }];
         const availableTypes = [
             { type: MineType.NORMAL, ok: true },
             { type: MineType.SLOW, ok: mkrLevelA >= 1 },
@@ -199,10 +200,11 @@ export const generateActionCandidatesForUnit = (
         ].filter(t => t.ok).map(t => t.type);
 
         const mineCandidates: AICandidateAction[] = [];
-        for (const dir of dirs) {
+        for (const dir of mineDirs) {
             const nr = unit.r + dir.r;
             const nc = unit.c + dir.c;
-            if (!canOccupy(state, nr, nc)) continue;
+            const isSelfCell = nr === unit.r && nc === unit.c;
+            if (!isSelfCell && !canOccupy(state, nr, nc)) continue;
             const ownMineInCell = state.mines.some(m => m.r === nr && m.c === nc && m.owner === unit.owner);
             const revealedEnemyMineInCell = state.mines.some(m =>
                 m.r === nr &&

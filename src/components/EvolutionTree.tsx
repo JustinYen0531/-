@@ -93,7 +93,7 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
     };
 
     const getEvolutionKeyBase = (unitType: UnitType, branch: 'a' | 'b') => `evol_${getUnitTypeAbbr(unitType)}_${branch}`;
-    const rewardTextClampClass = "overflow-hidden break-words [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]";
+    const rewardTextClampClass = "whitespace-normal break-words";
     const flippedCardShellClass = "scale-105 !h-[148px] !z-50 overflow-hidden";
 
     return (
@@ -183,15 +183,15 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                                 textClassName="text-blue-50"
                                                                             />
                                                                         ) : (
-                                                                            <div className="grid grid-cols-[1fr_auto] gap-1 items-center w-full">
-                                                                                <div className="flex flex-col min-w-0">
+                                                                            <div className="flex h-full flex-col justify-center min-w-0">
+                                                                                <div className="flex items-center justify-between gap-1">
                                                                                     <div className="font-bold mb-0.5 opacity-70">LV1</div>
-                                                                                    <div className={`text-[10px] leading-tight font-black ${rewardTextClampClass}`}>{t(config[branch].rewardText[0])}</div>
+                                                                                    <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 text-right">
+                                                                                        {isUnlocked && <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>}
+                                                                                        <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r1_req`, [`${evolutionKeyBase}_req`])}</span>
+                                                                                    </div>
                                                                                 </div>
-                                                                                <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 ml-1 text-right">
-                                                                                    {isUnlocked && <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>}
-                                                                                    <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r1_req`, [`${evolutionKeyBase}_req`])}</span>
-                                                                                </div>
+                                                                                <div className={`text-[10px] leading-tight font-black ${rewardTextClampClass}`}>{t(config[branch].rewardText[0])}</div>
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -217,15 +217,15 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                                 textClassName="text-purple-50"
                                                                             />
                                                                         ) : (
-                                                                            <div className="grid grid-cols-[1fr_auto] gap-1 items-center w-full">
-                                                                                <div className="flex flex-col min-w-0">
+                                                                            <div className="flex h-full flex-col justify-center min-w-0">
+                                                                                <div className="flex items-center justify-between gap-1">
                                                                                     <div className="font-bold mb-0.5 opacity-70">LV2</div>
-                                                                                    <div className={`text-[10px] leading-tight font-black ${rewardTextClampClass}`}>{t(config[branch].rewardText[1])}</div>
+                                                                                    <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 text-right">
+                                                                                        {isUnlocked && <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>}
+                                                                                        <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r2_req`, [`${evolutionKeyBase}_req`])}</span>
+                                                                                    </div>
                                                                                 </div>
-                                                                                <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 ml-1 text-right">
-                                                                                    {isUnlocked && <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>}
-                                                                                    <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r2_req`, [`${evolutionKeyBase}_req`])}</span>
-                                                                                </div>
+                                                                                <div className={`text-[10px] leading-tight font-black ${rewardTextClampClass}`}>{t(config[branch].rewardText[1])}</div>
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -253,15 +253,15 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                                             textClassName="text-orange-50"
                                                                                         />
                                                                                     ) : (
-                                                                                        <div className="grid grid-cols-[1fr_auto] gap-1 items-center w-full">
-                                                                                            <div className="flex flex-col min-w-0">
+                                                                                        <div className="flex h-full flex-col justify-center min-w-0">
+                                                                                            <div className="flex items-center justify-between gap-1">
                                                                                                 <div className="font-bold mb-0.5 opacity-70">LV3-{subLevel}</div>
-                                                                                                <div className={`text-[10px] leading-tight font-black ${rewardTextClampClass}`}>{t(config[branch].rewardText[cardIdx])}</div>
+                                                                                                <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 text-right">
+                                                                                                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>
+                                                                                                    <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r3_req`, [`${evolutionKeyBase}_req`])}</span>
+                                                                                                </div>
                                                                                             </div>
-                                                                                            <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 ml-1 text-right">
-                                                                                                <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>
-                                                                                                <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r3_req`, [`${evolutionKeyBase}_req`])}</span>
-                                                                                            </div>
+                                                                                            <div className={`text-[10px] leading-tight font-black ${rewardTextClampClass}`}>{t(config[branch].rewardText[cardIdx])}</div>
                                                                                         </div>
                                                                                     )}
                                                                                 </div>

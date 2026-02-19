@@ -230,21 +230,12 @@ const GridCell: React.FC<GridCellProps> = ({
       }
     } else if (targetMode === 'place_mine') {
       // Updated Place Mine Highlighting Logic
-      const mkrLevelB = selectedUnitLevelB;
       const factories = buildings.filter(b => b.owner === selectedUnit.owner && b.type === 'factory');
 
-      // Check mines outside of factory range to see if wild placement limit is reached
-      let allowed = false;
+      // Self placement is always '+' range (Manhattan <= 1).
+      // Factory placement range is handled separately below.
       const manhattanDist = Math.abs(selectedUnit.r - cell.r) + Math.abs(selectedUnit.c - cell.c);
-
-      // Base Range: 1
-      if (manhattanDist <= 1) allowed = true;
-
-      // B1+: Range 1 Chebyshev (3x3)
-      if (mkrLevelB >= 1) {
-        const chebyshevDist = Math.max(Math.abs(selectedUnit.r - cell.r), Math.abs(selectedUnit.c - cell.c));
-        if (chebyshevDist <= 1) allowed = true;
-      }
+      let allowed = manhattanDist <= 1;
 
       // Factory Range Extension
       const isInFactoryRange = factories.some(f =>

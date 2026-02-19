@@ -8,6 +8,7 @@ interface GameFieldProps {
     handleCellClick: (r: number, c: number) => void;
     handleUnitClick: (unit: Unit) => void;
     onDismissMiss?: (r: number, c: number) => void;
+    onDismissCount?: (r: number, c: number, owner: PlayerID) => void;
     isFlipped?: boolean;
     viewerPlayerId?: PlayerID;
 }
@@ -18,6 +19,7 @@ const GameField: React.FC<GameFieldProps> = ({
     handleCellClick,
     handleUnitClick,
     onDismissMiss,
+    onDismissCount,
     isFlipped = false,
     viewerPlayerId
 }) => {
@@ -181,6 +183,23 @@ const GameField: React.FC<GameFieldProps> = ({
                                     <div className="relative mb-6 animate-float-pin flex flex-col items-center opacity-85">
                                         {/* Pin Body (SVG) */}
                                         <div className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]">
+                                            <button
+                                                type="button"
+                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-900/85 border border-cyan-200/80 text-cyan-100 text-[10px] leading-none font-black flex items-center justify-center pointer-events-auto hover:bg-slate-800"
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                }}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    onDismissCount?.(r, c, viewerPlayer);
+                                                }}
+                                                aria-label="Dismiss marker"
+                                                title="Dismiss marker"
+                                            >
+                                                x
+                                            </button>
                                             <svg width="28" height="36" viewBox="0 0 384 512" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                 <path d="M172.268 501.67C26.97 291.031 0 269.413 0 192C0 85.961 85.961 0 192 0C298.039 0 384 85.961 384 192C384 269.413 357.03 291.031 211.732 501.67C191.95 530.41 152.48 530.41 172.268 501.67Z" fill="#22d3ee" fillOpacity="0.8" />
                                                 <circle cx="192" cy="192" r="120" fill="white" fillOpacity="0.9" />

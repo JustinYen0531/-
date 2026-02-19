@@ -342,7 +342,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                             const isRB3 = u?.type === UnitType.RANGER &&
                                                                 gameState.players[u.owner].evolutionLevels[UnitType.RANGER].b >= 3 &&
                                                                 gameState.players[u.owner].evolutionLevels[UnitType.RANGER].bVariant === 1;
-                                                            return isRB3 ? '幽靈步伐' : t('move');
+                                                            return isRB3 ? t('evol_rng_b_r2') : t('move');
                                                         })()}</span>
                                                     </button>
                                                     <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white">
@@ -384,7 +384,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                     className={`w-[82px] h-[74px] rounded flex flex-col items-center justify-center gap-1 transition-all relative font-bold border-2 ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-500' : 'bg-orange-900/40 hover:bg-orange-800/60 border-orange-800/50 text-orange-100/70 hover:border-orange-400 hover:text-white'}`}
                                                                 >
                                                                     <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('place_tower', unit)}</div>
-                                                                    <Radio size={28} /> <span className="text-xs">設置塔</span>
+                                                                    <Radio size={28} /> <span className="text-xs">{t('place_tower')}</span>
                                                                 </button>
                                                                 <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {helpers.getDisplayCost(unit, towerBaseCost, gameState, 'place_tower')}</div>
                                                             </div>
@@ -410,7 +410,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                         }`}
                                                                 >
                                                                     <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('place_factory', unit)}</div>
-                                                                    <FlaskConical size={28} /> <span className="text-xs">設置工廠</span>
+                                                                    <FlaskConical size={28} /> <span className="text-xs">{t('place_factory')}</span>
                                                                 </button>
                                                                 <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {helpers.getDisplayCost(unit, 6, gameState, 'place_factory')}</div>
                                                             </div>
@@ -428,7 +428,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                     className={`w-[82px] h-[74px] rounded flex flex-col items-center justify-center gap-1 transition-all relative font-bold border-2 ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-500' : 'bg-indigo-900/40 hover:bg-indigo-800/60 border-indigo-800/50 text-indigo-100/70'}`}
                                                                 >
                                                                     <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('place_hub', unit)}</div>
-                                                                    <Cpu size={28} /> <span className="text-xs">設置樞紐</span>
+                                                                    <Cpu size={28} /> <span className="text-xs">{t('place_hub')}</span>
                                                                 </button>
                                                                 <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {helpers.getDisplayCost(unit, 4, gameState, 'place_hub')}</div>
                                                             </div>
@@ -626,7 +626,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                         className={`w-[82px] h-[74px] rounded flex flex-col items-center justify-center gap-1 transition-all relative font-bold border-2 ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-500' : 'bg-yellow-900/40 hover:bg-yellow-800/60 border-yellow-800/50 text-yellow-100/70'}`}
                                                                     >
                                                                         <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('pickup_mine', unit)}</div>
-                                                                        <Bomb size={28} /> <span className="text-xs">拾取地雷</span>
+                                                                        <Bomb size={28} /> <span className="text-xs">{t('take_mine')}</span>
                                                                     </button>
                                                                     <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> 0</div>
                                                                 </div>
@@ -653,7 +653,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                     >
                                                                         <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('stealth', unit)}</div>
                                                                         <Ghost size={28} />
-                                                                        <span className="text-xs">{unit.status.isStealthed ? '取消' : '幽靈步伐'}</span>
+                                                                        <span className="text-xs">{unit.status.isStealthed ? t('cancel') : t('evol_rng_b_r2')}</span>
                                                                     </button>
                                                                     <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {unit.status.isStealthed ? 3 : 0}</div>
                                                                 </div>
@@ -675,7 +675,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                                 : 'bg-purple-900/40 hover:bg-purple-800/60 border-purple-800/50 text-purple-100/70')}`}
                                                                         >
                                                                             <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('throw_mine', unit)}</div>
-                                                                            <Bomb size={28} /> <span className="text-xs">投擲地雷</span>
+                                                                            <Bomb size={28} /> <span className="text-xs">{t('throw_mine')}</span>
                                                                         </button>
                                                                         <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {helpers.getDisplayCost(unit, 5, gameState, 'throw_mine')}</div>
                                                                     </div>
@@ -727,7 +727,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                         className={`w-[82px] h-[74px] rounded flex flex-col items-center justify-center gap-1 transition-all relative font-bold border-2 ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-500' : ((targetMode === 'move_mine_start' || targetMode === 'move_mine_end') && !endTurnConfirm ? 'bg-rose-600 shadow-lg shadow-rose-500/50 scale-105 border-rose-400 text-white font-bold' : 'bg-rose-900/40 hover:bg-rose-800/60 border-rose-800/50 text-rose-100/70')}`}
                                                                     >
                                                                         <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('move_mine', unit)}</div>
-                                                                        <Magnet size={28} /> <span className="text-xs">{isDamageMode ? '苦痛轉嫁' : '空間置換'}</span>
+                                                                        <Magnet size={28} /> <span className="text-xs">{isDamageMode ? t('evol_def_b_r3_2') : t('evol_def_b_r2')}</span>
                                                                     </button>
                                                                     <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {isDamageMode ? 5 : 2}</div>
                                                                 </div>
@@ -747,7 +747,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                         className={`w-[82px] h-[74px] rounded flex flex-col items-center justify-center gap-1 transition-all relative font-bold border-2 ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-500' : (targetMode === 'convert_mine' && !endTurnConfirm ? 'bg-indigo-600 shadow-lg shadow-indigo-500/50 scale-105 border-indigo-400 text-white font-bold' : 'bg-indigo-900/40 hover:bg-indigo-800/60 border-indigo-800/50 text-indigo-100/70')}`}
                                                                     >
                                                                         <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('convert_mine', unit)}</div>
-                                                                        <Brain size={28} /> <span className="text-xs">意志侵奪</span>
+                                                                        <Brain size={28} /> <span className="text-xs">{t('evol_def_b_r3_1')}</span>
                                                                     </button>
                                                                     <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> 5</div>
                                                                 </div>
@@ -798,7 +798,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                             <div key="teleport" className="flex flex-col items-center gap-1">
                                                                 <button onClick={() => { handleTeleportToHubAction(unit); setEndTurnConfirm(false); }} className={`w-[82px] h-[74px] rounded flex flex-col items-center justify-center gap-1 transition-all relative font-bold border-2 ${targetMode === 'teleport' && !endTurnConfirm ? 'bg-amber-600 border-amber-400 scale-105 shadow-lg shadow-amber-500/50 text-white' : 'bg-amber-500/20 hover:bg-amber-500/40 border-amber-500/50 text-amber-100/90 hover:border-amber-400 hover:text-white'}`}>
                                                                     <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('teleport', unit)}</div>
-                                                                    <Zap size={28} /> <span className="text-xs">傳送</span>
+                                                                    <Zap size={28} /> <span className="text-xs">{t('teleport')}</span>
                                                                 </button>
                                                                 <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {helpers.getDisplayCost(unit, unit.type === UnitType.RANGER ? ((rangerLevelA === 3 && rangerVariantA === 2) ? 3 : 0) : 5, gameState, 'teleport')}</div>
                                                             </div>
@@ -828,7 +828,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                     >
                                                         <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('end_turn', helpers.getUnit(gameState.selectedUnitId))}</div>
                                                         <CheckCircle size={28} />
-                                                        <span className="text-xs">{isInteractionDisabled ? t('wait_turn') : (endTurnConfirm ? '確認' : t('end_turn'))}</span>
+                                                        <span className="text-xs">{isInteractionDisabled ? t('wait_turn') : (endTurnConfirm ? t('confirm') : t('end_turn'))}</span>
                                                     </button>
                                                     {/* Spacer or Heal Indicator */}
                                                     {(() => {
@@ -913,7 +913,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                             className={`relative w-[82px] h-[74px] rounded flex flex-col items-center justify-center font-bold border-2 text-white overflow-hidden transition-all group active:scale-95 leading-tight ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40' : v.color}`}>
                                                                             <Dna size={28} className="mb-0.5 drop-shadow-md group-hover:scale-110 transition-transform" />
                                                                             <div className="flex flex-col items-center text-center">
-                                                                                <span className="text-[9px] opacity-80 font-medium">路徑A</span>
+                                                                                <span className="text-[9px] opacity-80 font-medium">{t('path_a')}</span>
                                                                                 <span className="text-[10px] tracking-tighter">LV2→{v.label}</span>
                                                                             </div>
                                                                         </button>
@@ -933,7 +933,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                         className={`relative w-[82px] h-[74px] rounded flex flex-col items-center justify-center font-bold border-2 text-white overflow-hidden transition-all group active:scale-95 leading-tight ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40' : 'bg-blue-600 hover:bg-blue-500 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.6)]'}`}>
                                                                         <Dna size={28} className="mb-0.5 drop-shadow-md group-hover:scale-110 transition-transform" />
                                                                         <div className="flex flex-col items-center text-center">
-                                                                            <span className="text-[10px] opacity-80 font-medium">路徑A</span>
+                                                                            <span className="text-[10px] opacity-80 font-medium">{t('path_a')}</span>
                                                                             <span className="text-xs tracking-tighter">LV{pLevels.a}→{pLevels.a + 1}</span>
                                                                         </div>
                                                                     </button>
@@ -961,7 +961,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                             className={`relative w-[82px] h-[74px] rounded flex flex-col items-center justify-center font-bold border-2 text-white overflow-hidden transition-all group active:scale-95 leading-tight ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40' : v.color}`}>
                                                                             <Dna size={28} className="mb-0.5 drop-shadow-md group-hover:scale-110 transition-transform" />
                                                                             <div className="flex flex-col items-center text-center">
-                                                                                <span className="text-[9px] opacity-80 font-medium">路徑B</span>
+                                                                                <span className="text-[9px] opacity-80 font-medium">{t('path_b')}</span>
                                                                                 <span className="text-[10px] tracking-tighter">LV2→{v.label}</span>
                                                                             </div>
                                                                         </button>
@@ -981,7 +981,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                         className={`relative w-[82px] h-[74px] rounded flex flex-col items-center justify-center font-bold border-2 text-white overflow-hidden transition-all group active:scale-95 leading-tight ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40' : 'bg-red-600 hover:bg-red-500 border-red-400 shadow-[0_0_20px_rgba(220,38,38,0.6)]'}`}>
                                                                         <Dna size={28} className="mb-0.5 drop-shadow-md group-hover:scale-110 transition-transform" />
                                                                         <div className="flex flex-col items-center text-center">
-                                                                            <span className="text-[10px] opacity-80 font-medium">路徑B</span>
+                                                                            <span className="text-[10px] opacity-80 font-medium">{t('path_b')}</span>
                                                                             <span className="text-xs tracking-tighter">LV{pLevels.b}→{pLevels.b + 1}</span>
                                                                         </div>
                                                                     </button>

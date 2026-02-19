@@ -142,11 +142,13 @@ const addUnitActionRejections = (
     }
 
     if (unit.type === UnitType.MAKER) {
-        const hasOpenAdjacentCell = directions.some(dir => {
+        const makerDirections = [...directions, { r: 0, c: 0 }];
+        const hasOpenAdjacentCell = makerDirections.some(dir => {
             const nr = unit.r + dir.r;
             const nc = unit.c + dir.c;
+            const isSelfCell = nr === unit.r && nc === unit.c;
             if (!inBounds(nr, nc)) return false;
-            if (state.cells[nr][nc].isObstacle) return false;
+            if (state.cells[nr][nc].isObstacle && !isSelfCell) return false;
             return !isOccupied(state, nr, nc, unit.id);
         });
         if (!hasOpenAdjacentCell) {
