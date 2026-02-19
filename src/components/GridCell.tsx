@@ -361,9 +361,11 @@ const GridCell: React.FC<GridCellProps> = ({
   const enemyPlayer = currentPlayer === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
   const mineIsRevealedToViewer = !!mine && (forceShowMines || mine.revealedTo.includes(currentPlayer));
   const mineIsKnownByEnemy = !!mine && mine.revealedTo.includes(enemyPlayer);
+  // Eye icon: show only on my mines that are known by the enemy (to warn they are revealed)
   const shouldShowEye =
     mine && isMineVisible && !unit &&
-    (mineIsRevealedToViewer || (mine.owner === currentPlayer && mineIsKnownByEnemy));
+    mine.owner === currentPlayer &&
+    mineIsKnownByEnemy;
   const showCarriedMineIndicator = unit && unit.type === UnitType.RANGER && unit.carriedMine &&
     (unit.owner === currentPlayer || unit.carriedMineRevealed || friendlyTowerInRange);
 

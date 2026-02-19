@@ -41,7 +41,6 @@ import {
     PlaceMinePayload,
     ScanPayload,
     SensorScanPayload,
-    StartGamePayload,
     StateSyncPayload,
     ReadyPayload
 } from './network/protocol';
@@ -161,70 +160,6 @@ const ENEMY_MINE_LOG_KEYS = new Set([
     'log_mine_zone'        // Placement zone violation reveals intent
 ]);
 
-const PRIVATE_HINT_LOG_KEYS = new Set([
-    'log_energy_cap',
-    'log_low_energy',
-    'log_low_energy_attack',
-    'log_low_energy_evolve',
-    'log_out_of_range',
-    'log_unit_acted',
-    'log_committed',
-    'log_scan_range',
-    'log_disarm_range',
-    'log_no_mine',
-    'log_space_has_mine',
-    'log_obstacle',
-    'log_maker_range',
-    'log_mine_limit',
-    'log_mine_zone',
-    'log_own_mine',
-    'log_mine_not_revealed',
-    'log_general_flag_move_limit',
-    'log_flag_move_limit',
-    'log_hidden_mine',
-    'log_max_mines',
-    'log_max_buildings',
-    'log_unit_on_hub',
-    'log_scan_smoke_blocked'
-]);
-
-const serializeLogParams = (params?: Record<string, any>) => JSON.stringify(params ?? {});
-
-const upsertPlacementLogs = (logs: GameLog[], state: GameState, playerId: PlayerID): GameLog[] => {
-    const nextLogs = [...logs];
-    const alreadyHas = (messageKey: string) =>
-        nextLogs.some(log => log.messageKey === messageKey && log.owner === playerId);
-
-    const playerState = state.players[playerId];
-    const unitPositions = playerState.units
-        .map(u => `${getUnitNameKey(u.type)}(${u.r + 1},${u.c + 1})`)
-        .join(', ');
-    const playerMines = state.mines.filter(m => m.owner === playerId);
-    const minePositions = playerMines.map(m => `(${m.r + 1},${m.c + 1})`).join(', ');
-
-    if (unitPositions && !alreadyHas('log_placement_units')) {
-        nextLogs.unshift({
-            turn: 1,
-            messageKey: 'log_placement_units',
-            params: { units: unitPositions },
-            type: 'move',
-            owner: playerId
-        });
-    }
-
-    if (minePositions && state.gameMode === 'pvp' && !alreadyHas('log_placement_mines')) {
-        nextLogs.unshift({
-            turn: 1,
-            messageKey: 'log_placement_mines',
-            params: { mines: minePositions },
-            type: 'move',
-            owner: playerId
-        });
-    }
-
-    return nextLogs;
-};
-
 const toSerializableGameState = (state: GameState): unknown => {
     const serializePlayer = (player: GameState['players'][PlayerID]) => ({
         ...player,
@@ -306,7 +241,6 @@ export default function App() {
     const [sandboxPos, setSandboxPos] = useState({ x: 0, y: 0 });
     const [isSandboxCollapsed, setIsSandboxCollapsed] = useState(false);
     const [showDevTools, setShowDevTools] = useState(false);
-    const [allowDevToolsInPvp, setAllowDevToolsInPvp] = useState(false);
     const sandboxDragRef = useRef({ isDragging: false, startX: 0, startY: 0 });
     const clampSandboxPos = useCallback((pos: { x: number; y: number }) => {
         if (typeof window === 'undefined') {
@@ -364,15 +298,6 @@ export default function App() {
         return () => window.removeEventListener('resize', onResize);
     }, [view, clampSandboxPos]);
 
-    const isDevToolsAllowedInCurrentMatch = gameState.gameMode !== 'pvp' || allowDevToolsInPvp;
-    const isSandboxToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox' || (gameState.gameMode === 'pvp' && allowDevToolsInPvp);
-
-    useEffect(() => {
-        if (!isDevToolsAllowedInCurrentMatch && showDevTools) {
-            setShowDevTools(false);
-        }
-    }, [isDevToolsAllowedInCurrentMatch, showDevTools]);
-
     // Safety: entering Planning (thinking) should not carry previous selections/active units
     useEffect(() => {
         if (gameState.phase === 'thinking' && (gameState.selectedUnitId || gameState.activeUnitId || targetMode)) {
@@ -386,31 +311,17 @@ export default function App() {
 
 
     const t = useCallback((key: string, params?: Record<string, any>) => {
-        const translations = (TRANSLATIONS[language] || {}) as any;
-        const fallbackEn = TRANSLATIONS.en as any;
-        const fallbackZhTw = TRANSLATIONS.zh_tw as any;
-        const fallbackZhCn = TRANSLATIONS.zh_cn as any;
-        let text = translations[key]
-            ?? fallbackEn[key]
-            ?? fallbackZhTw[key]
-            ?? fallbackZhCn[key]
-            ?? key;
+        const translations = TRANSLATIONS[language] as any;
+        let text = translations[key] || key;
         if (params) {
             Object.entries(params).forEach(([k, v]) => {
                 let strVal = String(v);
                 // Auto-translate: if the whole value is a known translation key
-                if (translations[strVal] || fallbackEn[strVal] || fallbackZhTw[strVal] || fallbackZhCn[strVal]) {
-                    strVal = translations[strVal]
-                        ?? fallbackEn[strVal]
-                        ?? fallbackZhTw[strVal]
-                        ?? fallbackZhCn[strVal]
-                        ?? strVal;
+                if (translations[strVal]) {
+                    strVal = translations[strVal];
                 } else {
                     // Translate embedded keys like "unit_general(2,1), unit_maker(1,3)"
-                    strVal = strVal.replace(
-                        /unit_\w+/g,
-                        (match) => translations[match] ?? fallbackEn[match] ?? fallbackZhTw[match] ?? fallbackZhCn[match] ?? match
-                    );
+                    strVal = strVal.replace(/unit_\w+/g, (match) => translations[match] || match);
                 }
                 text = text.replace(`{{${k}}}`, strVal);
             });
@@ -441,37 +352,10 @@ export default function App() {
 
 
     const addLog = (messageKey: string, type: GameLog['type'] = 'info', params?: Record<string, any>, owner?: PlayerID) => {
-        // Private hint logs should only be generated for local actions, never while replaying remote packets.
-        if (applyingRemoteActionRef.current && PRIVATE_HINT_LOG_KEYS.has(messageKey)) {
-            return;
-        }
-        const localActor = (() => {
-            const state = gameStateRef.current;
-            if (state.gameMode === 'pvp') {
-                return isHost ? PlayerID.P1 : PlayerID.P2;
-            }
-            return state.currentPlayer;
-        })();
-        const resolvedOwner = owner ?? (PRIVATE_HINT_LOG_KEYS.has(messageKey) ? localActor : undefined);
-        setGameState(prev => {
-            if (PRIVATE_HINT_LOG_KEYS.has(messageKey)) {
-                const targetParams = serializeLogParams(params);
-                const existsInCurrentTurn = prev.logs.some(log =>
-                    log.turn === prev.turnCount &&
-                    log.messageKey === messageKey &&
-                    log.owner === resolvedOwner &&
-                    serializeLogParams(log.params) === targetParams
-                );
-                if (existsInCurrentTurn) {
-                    return prev;
-                }
-            }
-
-            return {
-                ...prev,
-                logs: [{ turn: prev.turnCount, messageKey, params, type, owner: resolvedOwner }, ...prev.logs].slice(0, 100)
-            };
-        });
+        setGameState(prev => ({
+            ...prev,
+            logs: [{ turn: prev.turnCount, messageKey, params, type, owner }, ...prev.logs].slice(0, 100)
+        }));
     };
 
     const addVFX = (type: VFXEffect['type'], r: number, c: number, size: VFXEffect['size'] = 'medium') => {
@@ -525,8 +409,7 @@ export default function App() {
                 turn: 1,
                 payload: {
                     mode: 'pvp',
-                    initialState: toSerializableGameState(initialState),
-                    allowDevTools: allowDevToolsInPvp
+                    initialState: toSerializableGameState(initialState)
                 }
             });
         }
@@ -535,11 +418,10 @@ export default function App() {
         setTimeout(() => {
             setShowGameStartAnimation(false);
         }, 3000);
-    }, [allowDevToolsInPvp, isHost, roomId, sendActionPacket]);
+    }, [isHost, roomId, sendActionPacket]);
 
     const handleExitGame = () => {
         setPvpPerspectivePlayer(null);
-        setShowDevTools(false);
         setView('lobby');
     };
 
@@ -550,7 +432,6 @@ export default function App() {
         setAiDecision(null);
         setSandboxPos({ x: 0, y: 0 });
         setIsSandboxCollapsed(false);
-        setShowDevTools(false);
     };
 
     const selectUnitForAI = useCallback((unitId: string) => {
@@ -592,7 +473,7 @@ export default function App() {
     };
 
     const resolveLocalPlayer = (state: GameState): PlayerID => {
-        if (state.gameMode === 'pvp') {
+        if (state.gameMode === 'pvp' && roomId) {
             return isHost ? PlayerID.P1 : PlayerID.P2;
         }
         return state.currentPlayer;
@@ -1871,9 +1752,6 @@ export default function App() {
 
         addLog('log_evol_def_move_mine', 'move', undefined, unit.owner);
         setTargetMode(null);
-        if (!applyingRemoteActionRef.current && roomId && isNetworkConnected) {
-            sendGameStateDeferred('move_enemy_mine');
-        }
     };
 
     const handleConvertEnemyMineAction = (unit: Unit, r: number, c: number) => {
@@ -1929,9 +1807,6 @@ export default function App() {
 
         addLog('log_evol_def_convert_mine', 'mine', { r: r + 1, c: c + 1 }, unit.owner);
         setTargetMode(null);
-        if (!applyingRemoteActionRef.current && roomId && isNetworkConnected) {
-            sendGameStateDeferred('convert_enemy_mine');
-        }
     };
 
 
@@ -2661,8 +2536,7 @@ export default function App() {
 
         if (lastIncomingPacket.type === 'START_GAME') {
             if (!isHost && view === 'lobby') {
-                const payload = lastIncomingPacket.payload as StartGamePayload;
-                setAllowDevToolsInPvp(payload.allowDevTools === true);
+                const payload = lastIncomingPacket.payload as any;
                 const syncedInitialState = payload.initialState ? fromSerializableGameState(payload.initialState) : null;
                 handleStartGame('pvp', syncedInitialState || undefined);
             }
@@ -2697,15 +2571,8 @@ export default function App() {
                 // CRITICAL: Merge synced state with local UI state to prevent "weird jumps"
                 // This keeps the player's current selection and perspective while updating global board state.
                 setGameState(prev => {
-                    const localPlayer = resolveLocalPlayer(prev);
-                    const preservedLocalPrivateLogs = prev.logs.filter(
-                        log => PRIVATE_HINT_LOG_KEYS.has(log.messageKey) && log.owner === localPlayer
-                    );
-
-                    const mergedLogs = [...preservedLocalPrivateLogs, ...syncedState.logs].slice(0, 100);
                     return {
                         ...syncedState,
-                        logs: mergedLogs,
                         // Preserve LOCAL UI state
                         selectedUnitId: prev.selectedUnitId,
                         activeUnitId: prev.activeUnitId,
@@ -2734,9 +2601,6 @@ export default function App() {
 
                 // Mark remote player as ready
                 setGameState(prev => {
-                    const logsWithRemotePlacement = payload.phase === 'placement'
-                        ? upsertPlacementLogs(prev.logs, prev, payload.playerId)
-                        : prev.logs;
                     const newReadyState = {
                         [PlayerID.P1]: prev.pvpReadyState?.[PlayerID.P1] ?? false,
                         [PlayerID.P2]: prev.pvpReadyState?.[PlayerID.P2] ?? false,
@@ -2757,7 +2621,7 @@ export default function App() {
                                 phase: 'thinking',
                                 timeLeft: THINKING_TIMER,
                                 pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
-                                logs: [{ turn: 1, messageKey: 'log_planning_phase', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
+                                logs: [{ turn: 1, messageKey: 'log_planning_phase', params: { round: 1 }, type: 'info' as const }, ...prev.logs]
                             };
                         } else {
                             const updatedMines = applyRadarScans(prev);
@@ -2780,15 +2644,14 @@ export default function App() {
                                         units: prev.players[PlayerID.P2].units.map(u => ({ ...u, startOfActionEnergy: prev.players[PlayerID.P2].energy }))
                                     }
                                 },
-                                logs: [{ turn: prev.turnCount, messageKey: 'log_action_phase', type: 'info' as const }, ...logsWithRemotePlacement]
+                                logs: [{ turn: prev.turnCount, messageKey: 'log_action_phase', type: 'info' as const }, ...prev.logs]
                             }
                         }
                     }
 
                     return {
                         ...prev,
-                        pvpReadyState: newReadyState,
-                        logs: logsWithRemotePlacement
+                        pvpReadyState: newReadyState
                     };
                 });
                 return;
@@ -3169,13 +3032,13 @@ export default function App() {
         getLocalizedUnitName: (type: UnitType) => t(getUnitNameKey(type)),
     };
 
-
+    const localNetworkPlayer = getLocalNetworkPlayer();
     // Visual perspective should be stable from room role, independent of socket ready timing.
     const localPerspectivePlayer = (gameState.gameMode === 'pvp')
         ? (pvpPerspectivePlayer ?? (isHost ? PlayerID.P1 : PlayerID.P2))
         : null;
-    const localLogOwnerPlayerId = gameState.gameMode === 'pvp'
-        ? (isHost ? PlayerID.P1 : PlayerID.P2)
+    const logViewerPlayerId = gameState.gameMode === 'pvp'
+        ? (localPerspectivePlayer ?? PlayerID.P1)
         : PlayerID.P1;
     const shouldHideEnemyMineLogs = gameState.gameMode === 'pvp' || gameState.gameMode === 'pve';
     const shouldFlipBoard = gameState.gameMode === 'pvp' && localPerspectivePlayer === PlayerID.P2;
@@ -3240,14 +3103,10 @@ export default function App() {
             ? true
             : (gameState.currentPlayer === PlayerID.P1);
     const filteredLogs = gameState.logs.filter((log) => {
-        if (gameState.gameMode === 'sandbox') return true;
-        if (PRIVATE_HINT_LOG_KEYS.has(log.messageKey)) {
-            return !!log.owner && log.owner === localLogOwnerPlayerId;
-        }
         if (!shouldHideEnemyMineLogs) return true;
         if (!log.owner) return true;
         if (!ENEMY_MINE_LOG_KEYS.has(log.messageKey)) return true;
-        return log.owner === localLogOwnerPlayerId;
+        return log.owner === logViewerPlayerId;
     });
 
     return (
@@ -3277,8 +3136,6 @@ export default function App() {
                 setIsHost={setIsHost}
                 roomId={roomId}
                 setRoomId={setRoomId}
-                allowDevToolsInPvp={allowDevToolsInPvp}
-                setAllowDevToolsInPvp={setAllowDevToolsInPvp}
                 t={t}
             />
 
@@ -3604,7 +3461,7 @@ export default function App() {
                         handleRangerAction={handleRangerAction}
                         swapUnits={swapUnitDisplayOrder}
                     />
-                    {view === 'game' && isDevToolsAllowedInCurrentMatch && (
+                    {view === 'game' && (
                         <DevToolsPanel
                             open={showDevTools}
                             onToggle={() => setShowDevTools(prev => !prev)}
@@ -3619,7 +3476,7 @@ export default function App() {
                     {/* Sandbox Panel moved to global overlay */}
 
                     {/* Sandbox Panel - Only visible in Sandbox Mode */}
-                    {view === 'game' && isSandboxToolsAllowedInCurrentMatch && (
+                    {view === 'game' && (
                         <SandboxPanel
                             gameState={gameState}
                             setGameState={setGameState}

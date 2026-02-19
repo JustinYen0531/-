@@ -41,7 +41,6 @@ import {
     PlaceMinePayload,
     ScanPayload,
     SensorScanPayload,
-    StartGamePayload,
     StateSyncPayload,
     ReadyPayload
 } from './network/protocol';
@@ -188,8 +187,6 @@ const PRIVATE_HINT_LOG_KEYS = new Set([
     'log_scan_smoke_blocked'
 ]);
 
-const serializeLogParams = (params?: Record<string, any>) => JSON.stringify(params ?? {});
-
 const upsertPlacementLogs = (logs: GameLog[], state: GameState, playerId: PlayerID): GameLog[] => {
     const nextLogs = [...logs];
     const alreadyHas = (messageKey: string) =>
@@ -306,7 +303,6 @@ export default function App() {
     const [sandboxPos, setSandboxPos] = useState({ x: 0, y: 0 });
     const [isSandboxCollapsed, setIsSandboxCollapsed] = useState(false);
     const [showDevTools, setShowDevTools] = useState(false);
-    const [allowDevToolsInPvp, setAllowDevToolsInPvp] = useState(false);
     const sandboxDragRef = useRef({ isDragging: false, startX: 0, startY: 0 });
     const clampSandboxPos = useCallback((pos: { x: number; y: number }) => {
         if (typeof window === 'undefined') {
@@ -364,15 +360,6 @@ export default function App() {
         return () => window.removeEventListener('resize', onResize);
     }, [view, clampSandboxPos]);
 
-    const isDevToolsAllowedInCurrentMatch = gameState.gameMode !== 'pvp' || allowDevToolsInPvp;
-    const isSandboxToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox' || (gameState.gameMode === 'pvp' && allowDevToolsInPvp);
-
-    useEffect(() => {
-        if (!isDevToolsAllowedInCurrentMatch && showDevTools) {
-            setShowDevTools(false);
-        }
-    }, [isDevToolsAllowedInCurrentMatch, showDevTools]);
-
     // Safety: entering Planning (thinking) should not carry previous selections/active units
     useEffect(() => {
         if (gameState.phase === 'thinking' && (gameState.selectedUnitId || gameState.activeUnitId || targetMode)) {
@@ -386,31 +373,17 @@ export default function App() {
 
 
     const t = useCallback((key: string, params?: Record<string, any>) => {
-        const translations = (TRANSLATIONS[language] || {}) as any;
-        const fallbackEn = TRANSLATIONS.en as any;
-        const fallbackZhTw = TRANSLATIONS.zh_tw as any;
-        const fallbackZhCn = TRANSLATIONS.zh_cn as any;
-        let text = translations[key]
-            ?? fallbackEn[key]
-            ?? fallbackZhTw[key]
-            ?? fallbackZhCn[key]
-            ?? key;
+        const translations = TRANSLATIONS[language] as any;
+        let text = translations[key] || key;
         if (params) {
             Object.entries(params).forEach(([k, v]) => {
                 let strVal = String(v);
                 // Auto-translate: if the whole value is a known translation key
-                if (translations[strVal] || fallbackEn[strVal] || fallbackZhTw[strVal] || fallbackZhCn[strVal]) {
-                    strVal = translations[strVal]
-                        ?? fallbackEn[strVal]
-                        ?? fallbackZhTw[strVal]
-                        ?? fallbackZhCn[strVal]
-                        ?? strVal;
+                if (translations[strVal]) {
+                    strVal = translations[strVal];
                 } else {
                     // Translate embedded keys like "unit_general(2,1), unit_maker(1,3)"
-                    strVal = strVal.replace(
-                        /unit_\w+/g,
-                        (match) => translations[match] ?? fallbackEn[match] ?? fallbackZhTw[match] ?? fallbackZhCn[match] ?? match
-                    );
+                    strVal = strVal.replace(/unit_\w+/g, (match) => translations[match] || match);
                 }
                 text = text.replace(`{{${k}}}`, strVal);
             });
@@ -441,37 +414,18 @@ export default function App() {
 
 
     const addLog = (messageKey: string, type: GameLog['type'] = 'info', params?: Record<string, any>, owner?: PlayerID) => {
-        // Private hint logs should only be generated for local actions, never while replaying remote packets.
-        if (applyingRemoteActionRef.current && PRIVATE_HINT_LOG_KEYS.has(messageKey)) {
-            return;
-        }
         const localActor = (() => {
             const state = gameStateRef.current;
-            if (state.gameMode === 'pvp') {
+            if (state.gameMode === 'pvp' && roomId) {
                 return isHost ? PlayerID.P1 : PlayerID.P2;
             }
             return state.currentPlayer;
         })();
         const resolvedOwner = owner ?? (PRIVATE_HINT_LOG_KEYS.has(messageKey) ? localActor : undefined);
-        setGameState(prev => {
-            if (PRIVATE_HINT_LOG_KEYS.has(messageKey)) {
-                const targetParams = serializeLogParams(params);
-                const existsInCurrentTurn = prev.logs.some(log =>
-                    log.turn === prev.turnCount &&
-                    log.messageKey === messageKey &&
-                    log.owner === resolvedOwner &&
-                    serializeLogParams(log.params) === targetParams
-                );
-                if (existsInCurrentTurn) {
-                    return prev;
-                }
-            }
-
-            return {
-                ...prev,
-                logs: [{ turn: prev.turnCount, messageKey, params, type, owner: resolvedOwner }, ...prev.logs].slice(0, 100)
-            };
-        });
+        setGameState(prev => ({
+            ...prev,
+            logs: [{ turn: prev.turnCount, messageKey, params, type, owner: resolvedOwner }, ...prev.logs].slice(0, 100)
+        }));
     };
 
     const addVFX = (type: VFXEffect['type'], r: number, c: number, size: VFXEffect['size'] = 'medium') => {
@@ -525,8 +479,7 @@ export default function App() {
                 turn: 1,
                 payload: {
                     mode: 'pvp',
-                    initialState: toSerializableGameState(initialState),
-                    allowDevTools: allowDevToolsInPvp
+                    initialState: toSerializableGameState(initialState)
                 }
             });
         }
@@ -535,11 +488,10 @@ export default function App() {
         setTimeout(() => {
             setShowGameStartAnimation(false);
         }, 3000);
-    }, [allowDevToolsInPvp, isHost, roomId, sendActionPacket]);
+    }, [isHost, roomId, sendActionPacket]);
 
     const handleExitGame = () => {
         setPvpPerspectivePlayer(null);
-        setShowDevTools(false);
         setView('lobby');
     };
 
@@ -550,7 +502,6 @@ export default function App() {
         setAiDecision(null);
         setSandboxPos({ x: 0, y: 0 });
         setIsSandboxCollapsed(false);
-        setShowDevTools(false);
     };
 
     const selectUnitForAI = useCallback((unitId: string) => {
@@ -592,7 +543,7 @@ export default function App() {
     };
 
     const resolveLocalPlayer = (state: GameState): PlayerID => {
-        if (state.gameMode === 'pvp') {
+        if (state.gameMode === 'pvp' && roomId) {
             return isHost ? PlayerID.P1 : PlayerID.P2;
         }
         return state.currentPlayer;
@@ -2661,8 +2612,7 @@ export default function App() {
 
         if (lastIncomingPacket.type === 'START_GAME') {
             if (!isHost && view === 'lobby') {
-                const payload = lastIncomingPacket.payload as StartGamePayload;
-                setAllowDevToolsInPvp(payload.allowDevTools === true);
+                const payload = lastIncomingPacket.payload as any;
                 const syncedInitialState = payload.initialState ? fromSerializableGameState(payload.initialState) : null;
                 handleStartGame('pvp', syncedInitialState || undefined);
             }
@@ -2689,660 +2639,870 @@ export default function App() {
                 if (!isStateSyncPayload(payload)) {
                     return;
                 }
-                const syncedState = fromSerializableGameState(payload.state);
-                if (!syncedState) {
-                    return;
-                }
+                const executePlaceMineAction = useCallback((
+                    unit: Unit,
+                    r: number,
+                    c: number,
+                    mineType: MineType,
+                    origin: 'local' | 'remote' = 'local'
+                ) => {
+                    const state = gameStateRef.current;
+                    const shouldBroadcast = origin === 'local' && canBroadcastAction(unit.owner) && !!roomId;
 
-                // CRITICAL: Merge synced state with local UI state to prevent "weird jumps"
-                // This keeps the player's current selection and perspective while updating global board state.
-                setGameState(prev => {
-                    const localPlayer = resolveLocalPlayer(prev);
-                    const preservedLocalPrivateLogs = prev.logs.filter(
-                        log => PRIVATE_HINT_LOG_KEYS.has(log.messageKey) && log.owner === localPlayer
-                    );
-
-                    const mergedLogs = [...preservedLocalPrivateLogs, ...syncedState.logs].slice(0, 100);
-                    return {
-                        ...syncedState,
-                        logs: mergedLogs,
-                        // Preserve LOCAL UI state
-                        selectedUnitId: prev.selectedUnitId,
-                        activeUnitId: prev.activeUnitId,
-                        isPaused: prev.isPaused,
-                        isSandboxTimerPaused: prev.isSandboxTimerPaused,
-
-                        // Preserve UI animation state
-                        vfx: prev.vfx,
-                    };
-                });
-                return;
-            }
-
-
-            if (type === 'PLAYER_READY') {
-                if (!isReadyPayload(payload)) return;
-                if (payload.playerId !== expectedRemoteOwner) {
-                    return;
-                }
-                if (state.phase !== payload.phase) {
-                    if (isHost) {
-                        sendGameStateDeferred('ready_phase_mismatch');
-                    }
-                    return;
-                }
-
-                // Mark remote player as ready
-                setGameState(prev => {
-                    const logsWithRemotePlacement = payload.phase === 'placement'
-                        ? upsertPlacementLogs(prev.logs, prev, payload.playerId)
-                        : prev.logs;
-                    const newReadyState = {
-                        [PlayerID.P1]: prev.pvpReadyState?.[PlayerID.P1] ?? false,
-                        [PlayerID.P2]: prev.pvpReadyState?.[PlayerID.P2] ?? false,
-                        [payload.playerId]: true
-                    };
-
-                    const bothReady = newReadyState[PlayerID.P1] && newReadyState[PlayerID.P2];
-
-                    if (prev.phase !== payload.phase) {
-                        return prev;
+                    if (shouldBroadcast && roomId) {
+                        sendActionPacket({
+                            type: 'PLACE_MINE',
+                            matchId: roomId,
+                            turn: state.turnCount,
+                            payload: {
+                                unitId: unit.id,
+                                r,
+                                c,
+                                mineType
+                            }
+                        });
                     }
 
-                    // Check if phase transition is needed
-                    if (bothReady) {
-                        if (payload.phase === 'placement') {
-                            return {
-                                ...prev,
-                                phase: 'thinking',
-                                timeLeft: THINKING_TIMER,
-                                pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
-                                logs: [{ turn: 1, messageKey: 'log_planning_phase', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
-                            };
-                        } else {
-                            const updatedMines = applyRadarScans(prev);
-                            return {
-                                ...prev,
-                                phase: 'action',
-                                timeLeft: TURN_TIMER,
-                                mines: updatedMines,
-                                pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false }, // Reset but won't be used in action phase
-                                players: {
-                                    ...prev.players,
-                                    [PlayerID.P1]: {
-                                        ...prev.players[PlayerID.P1],
-                                        startOfActionEnergy: prev.players[PlayerID.P1].energy,
-                                        units: prev.players[PlayerID.P1].units.map(u => ({ ...u, startOfActionEnergy: prev.players[PlayerID.P1].energy }))
-                                    },
-                                    [PlayerID.P2]: {
-                                        ...prev.players[PlayerID.P2],
-                                        startOfActionEnergy: prev.players[PlayerID.P2].energy,
-                                        units: prev.players[PlayerID.P2].units.map(u => ({ ...u, startOfActionEnergy: prev.players[PlayerID.P2].energy }))
+                    playerActions.handleMinePlacement(unit, r, c, mineType);
+
+                    if (shouldBroadcast) {
+                        sendGameStateDeferred('place_mine');
+                    }
+                }, [canBroadcastAction, playerActions.handleMinePlacement, roomId, sendActionPacket, sendGameStateDeferred]);
+
+                const executeEvolveAction = useCallback((
+                    unitType: UnitType,
+                    branch: 'a' | 'b',
+                    variant?: number,
+                    origin: 'local' | 'remote' = 'local'
+                ) => {
+                    const state = gameStateRef.current;
+                    const shouldBroadcast = origin === 'local' && canBroadcastAction() && !!roomId;
+
+                    if (shouldBroadcast && roomId) {
+                        sendActionPacket({
+                            type: 'EVOLVE',
+                            matchId: roomId,
+                            turn: state.turnCount,
+                            payload: {
+                                unitType,
+                                branch,
+                                variant
+                            }
+                        });
+                    }
+                    if (origin === 'local') {
+                        flushSync(() => {
+                            playerActions.handleEvolution(unitType, branch, variant);
+                        });
+                        if (shouldBroadcast) {
+                            sendGameState('evolve');
+                        }
+                        return;
+                    }
+
+                    playerActions.handleEvolution(unitType, branch, variant);
+                }, [canBroadcastAction, playerActions.handleEvolution, roomId, sendActionPacket, sendGameState]);
+
+                const executeEndTurnAction = useCallback((
+                    actedUnitId: string | null,
+                    origin: 'local' | 'remote' = 'local'
+                ) => {
+                    const state = gameStateRef.current;
+                    const shouldBroadcast = origin === 'local' && canBroadcastAction() && !!roomId;
+                    const isTimedOut = state.phase === 'action' && state.timeLeft <= 0;
+                    let shouldDeferComplete = false;
+
+                    if (origin === 'local' && isTimedOut && targetMode === 'move_mine_end' && selectedMineId) {
+                        const actingUnitId = actedUnitId || state.selectedUnitId || state.activeUnitId;
+                        const actingUnit = actingUnitId ? getUnit(actingUnitId, state) : null;
+                        const selectedMine = state.mines.find(m => m.id === selectedMineId);
+
+                        if (
+                            actingUnit &&
+                            actingUnit.type === UnitType.DEFUSER &&
+                            actingUnit.owner === state.currentPlayer &&
+                            selectedMine
+                        ) {
+                            handleMoveEnemyMineAction(actingUnit, selectedMine.r, selectedMine.c, actingUnit.r, actingUnit.c);
+                            shouldDeferComplete = true;
+                        }
+
+                        setSelectedMineId(null);
+                        setTargetMode(null);
+                    }
+
+                    if (shouldBroadcast && roomId) {
+                        sendActionPacket({
+                            type: 'END_TURN',
+                            matchId: roomId,
+                            turn: state.turnCount,
+                            payload: {
+                                actedUnitId
+                            }
+                        });
+                    }
+
+                    if (shouldDeferComplete) {
+                        setTimeout(() => {
+                            playerActions.handleActionComplete(actedUnitId);
+                            if (shouldBroadcast) {
+                                sendGameStateDeferred('end_turn');
+                            }
+                        }, 0);
+                        return;
+                    }
+
+                    playerActions.handleActionComplete(actedUnitId);
+
+                    if (shouldBroadcast) {
+                        sendGameStateDeferred('end_turn');
+                    }
+                }, [
+                    canBroadcastAction,
+                    getUnit,
+                    handleMoveEnemyMineAction,
+                    playerActions.handleActionComplete,
+                    roomId,
+                    selectedMineId,
+                    sendActionPacket,
+                    sendGameStateDeferred,
+                    setTargetMode,
+                    targetMode
+                ]);
+
+                const executeSkipTurnAction = useCallback((
+                    origin: 'local' | 'remote' = 'local'
+                ) => {
+                    const state = gameStateRef.current;
+                    const shouldBroadcast = origin === 'local' && canBroadcastAction() && !!roomId;
+
+                    if (shouldBroadcast && roomId) {
+                        sendActionPacket({
+                            type: 'SKIP_TURN',
+                            matchId: roomId,
+                            turn: state.turnCount,
+                            payload: {
+                                actedUnitId: null
+                            }
+                        });
+                    }
+
+                    playerActions.handleSkipTurn();
+
+                    if (shouldBroadcast) {
+                        sendGameStateDeferred('skip_turn');
+                    }
+                }, [canBroadcastAction, playerActions.handleSkipTurn, roomId, sendActionPacket, sendGameStateDeferred]);
+
+                useEffect(() => {
+                    if (!lastIncomingPacket) return;
+                    if (lastHandledPacketSeqRef.current === lastIncomingPacket.seq) return;
+                    lastHandledPacketSeqRef.current = lastIncomingPacket.seq;
+
+                    if (roomId && lastIncomingPacket.matchId !== roomId) {
+                        return;
+                    }
+
+                    if (lastIncomingPacket.type === 'START_GAME') {
+                        if (!isHost && view === 'lobby') {
+                            const payload = lastIncomingPacket.payload as any;
+                            const syncedInitialState = payload.initialState ? fromSerializableGameState(payload.initialState) : null;
+                            handleStartGame('pvp', syncedInitialState || undefined);
+                        }
+                        return;
+                    }
+
+
+                    if (view !== 'game') {
+                        return;
+                    }
+
+                    const state = gameStateRef.current;
+                    if (state.gameMode !== 'pvp') {
+                        return;
+                    }
+
+                    const expectedRemoteOwner = isHost ? PlayerID.P2 : PlayerID.P1;
+
+                    applyingRemoteActionRef.current = true;
+                    try {
+                        const { type, payload } = lastIncomingPacket;
+
+                        if (type === 'STATE_SYNC') {
+                            if (!isStateSyncPayload(payload)) {
+                                return;
+                            }
+                            const syncedState = fromSerializableGameState(payload.state);
+                            if (!syncedState) {
+                                return;
+                            }
+
+                            // CRITICAL: Merge synced state with local UI state to prevent "weird jumps"
+                            // This keeps the player's current selection and perspective while updating global board state.
+                            const myId = isHost ? PlayerID.P1 : PlayerID.P2;
+                            setGameState(prev => {
+                                // Collect my private hint logs that are not in the synced state
+                                const myPrivateHints = prev.logs.filter(log =>
+                                    log.owner === myId && PRIVATE_HINT_LOG_KEYS.has(log.messageKey)
+                                );
+
+                                // Simple merge: keep synced logs, but if our private hints aren't there, keep them too.
+                                // To keep it simple and avoid duplicates, we can prepend our hints if they are newer.
+                                // But usually, they should just stay in the list.
+                                const mergedLogs = [...syncedState.logs];
+                                for (const hint of myPrivateHints) {
+                                    const exists = mergedLogs.some(l =>
+                                        l.turn === hint.turn &&
+                                        l.messageKey === hint.messageKey &&
+                                        JSON.stringify(l.params) === JSON.stringify(hint.params)
+                                    );
+                                    if (!exists) {
+                                        mergedLogs.unshift(hint);
                                     }
-                                },
-                                logs: [{ turn: prev.turnCount, messageKey: 'log_action_phase', type: 'info' as const }, ...logsWithRemotePlacement]
+                                }
+                                // Keep the list manageable
+                                const finalLogs = mergedLogs.sort((a, b) => b.turn - a.turn).slice(0, 100);
+
+                                return {
+                                    ...syncedState,
+                                    logs: finalLogs,
+                                    // Preserve LOCAL UI state
+                                    selectedUnitId: prev.selectedUnitId,
+                                    activeUnitId: prev.activeUnitId,
+                                    isPaused: prev.isPaused,
+                                    isSandboxTimerPaused: prev.isSandboxTimerPaused,
+
+                                    // Preserve UI animation state
+                                    vfx: prev.vfx,
+                                };
+                            });
+
+                            return;
+                        }
+
+
+                        if (type === 'PLAYER_READY') {
+                            if (!isReadyPayload(payload)) return;
+                            if (payload.playerId !== expectedRemoteOwner) {
+                                return;
+                            }
+                            if (state.phase !== payload.phase) {
+                                if (isHost) {
+                                    sendGameStateDeferred('ready_phase_mismatch');
+                                }
+                                return;
+                            }
+
+                            // Mark remote player as ready
+                            setGameState(prev => {
+                                const logsWithRemotePlacement = payload.phase === 'placement'
+                                    ? upsertPlacementLogs(prev.logs, prev, payload.playerId)
+                                    : prev.logs;
+                                const newReadyState = {
+                                    [PlayerID.P1]: prev.pvpReadyState?.[PlayerID.P1] ?? false,
+                                    [PlayerID.P2]: prev.pvpReadyState?.[PlayerID.P2] ?? false,
+                                    [payload.playerId]: true
+                                };
+
+                                const bothReady = newReadyState[PlayerID.P1] && newReadyState[PlayerID.P2];
+
+                                if (prev.phase !== payload.phase) {
+                                    return prev;
+                                }
+
+                                // Check if phase transition is needed
+                                if (bothReady) {
+                                    if (payload.phase === 'placement') {
+                                        return {
+                                            ...prev,
+                                            phase: 'thinking',
+                                            timeLeft: THINKING_TIMER,
+                                            pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
+                                            logs: [{ turn: 1, messageKey: 'log_planning_phase', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
+                                        };
+                                    } else {
+                                        const updatedMines = applyRadarScans(prev);
+                                        return {
+                                            ...prev,
+                                            phase: 'action',
+                                            timeLeft: TURN_TIMER,
+                                            mines: updatedMines,
+                                            pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false }, // Reset but won't be used in action phase
+                                            players: {
+                                                ...prev.players,
+                                                [PlayerID.P1]: {
+                                                    ...prev.players[PlayerID.P1],
+                                                    startOfActionEnergy: prev.players[PlayerID.P1].energy,
+                                                    units: prev.players[PlayerID.P1].units.map(u => ({ ...u, startOfActionEnergy: prev.players[PlayerID.P1].energy }))
+                                                },
+                                                [PlayerID.P2]: {
+                                                    ...prev.players[PlayerID.P2],
+                                                    startOfActionEnergy: prev.players[PlayerID.P2].energy,
+                                                    units: prev.players[PlayerID.P2].units.map(u => ({ ...u, startOfActionEnergy: prev.players[PlayerID.P2].energy }))
+                                                }
+                                            },
+                                            logs: [{ turn: prev.turnCount, messageKey: 'log_action_phase', type: 'info' as const }, ...logsWithRemotePlacement]
+                                        }
+                                    }
+                                }
+
+                                return {
+                                    ...prev,
+                                    pvpReadyState: newReadyState,
+                                    logs: logsWithRemotePlacement
+                                };
+                            });
+                            return;
+                        }
+
+                        if (type === 'MOVE') {
+                            if (!isMovePayload(payload)) {
+                                return;
+                            }
+                            const unit = getUnit(payload.unitId, state);
+                            if (!unit || unit.owner !== expectedRemoteOwner) {
+                                return;
+                            }
+                            executeMoveAction(payload.unitId, payload.r, payload.c, payload.cost, 'remote');
+                            return;
+                        }
+
+                        if (type === 'ATTACK') {
+                            if (!isAttackPayload(payload)) {
+                                return;
+                            }
+                            const attacker = getUnit(payload.attackerId, state);
+                            const target = getUnit(payload.targetId, state);
+                            if (!attacker || !target || attacker.owner !== expectedRemoteOwner) {
+                                return;
+                            }
+                            executeAttackAction(payload.attackerId, target, 'remote');
+                            return;
+                        }
+
+                        if (type === 'SCAN') {
+                            if (!isScanPayload(payload)) {
+                                return;
+                            }
+                            const unit = getUnit(payload.unitId, state);
+                            if (!unit || unit.owner !== expectedRemoteOwner || unit.type !== UnitType.MINESWEEPER) {
+                                return;
+                            }
+                            executeScanAction(unit, payload.r, payload.c, 'remote');
+                            return;
+                        }
+
+                        if (type === 'SENSOR_SCAN') {
+                            if (!isSensorScanPayload(payload)) {
+                                return;
+                            }
+                            const unit = getUnit(payload.unitId, state);
+                            if (!unit || unit.owner !== expectedRemoteOwner || unit.type !== UnitType.MINESWEEPER) {
+                                return;
+                            }
+                            executeSensorScanAction(payload.unitId, payload.r, payload.c, 'remote');
+                            return;
+                        }
+
+                        if (type === 'PLACE_MINE') {
+                            if (!isPlaceMinePayload(payload)) {
+                                return;
+                            }
+                            const unit = getUnit(payload.unitId, state);
+                            if (!unit || unit.owner !== expectedRemoteOwner || unit.type !== UnitType.MAKER) {
+                                return;
+                            }
+                            executePlaceMineAction(unit, payload.r, payload.c, payload.mineType, 'remote');
+                            return;
+                        }
+
+                        if (type === 'EVOLVE') {
+                            if (!isEvolvePayload(payload)) {
+                                return;
+                            }
+                            executeEvolveAction(payload.unitType, payload.branch, payload.variant, 'remote');
+                            return;
+                        }
+
+                        if (type === 'END_TURN') {
+                            if (!isEndTurnPayload(payload)) {
+                                return;
+                            }
+                            executeEndTurnAction(payload.actedUnitId, 'remote');
+                            return;
+                        }
+
+                        if (type === 'SKIP_TURN') {
+                            executeSkipTurnAction('remote');
+                        }
+                    } finally {
+                        applyingRemoteActionRef.current = false;
+                    }
+                }, [
+                    executeAttackAction,
+                    executeEndTurnAction,
+                    executeEvolveAction,
+                    executeMoveAction,
+                    executePlaceMineAction,
+                    executeScanAction,
+                    executeSensorScanAction,
+                    executeSkipTurnAction,
+                    getUnit,
+                    handleStartGame,
+                    isHost,
+                    lastIncomingPacket,
+                    roomId,
+                    sendGameStateDeferred,
+                    setGameState,
+                    view
+                ]);
+
+                const handleCellClick = (r: number, c: number) => {
+                    // === IMMEDIATE TIME FREEZE - FIRST LINE === 
+                    // Set frozen state BEFORE any logic to ensure UI updates in the same frame as the click.
+                    const state = gameStateRef.current;
+                    if (state.gameOver || state.isPaused) return;
+
+                    // Manual dismiss for MISS markers: clicking that MISS cell clears it immediately.
+                    console.log('[DEBUG MISS] handleCellClick called at', r, c, 'sensorResults:', state.sensorResults.filter(sr => sr.kind === 'mark'));
+                    const clickedCellHasMiss = state.sensorResults.some(
+                        sr => sr.kind === 'mark' &&
+                            sr.owner === state.currentPlayer &&
+                            sr.r === r &&
+                            sr.c === c &&
+                            sr.success !== true
+                    );
+                    console.log('[DEBUG MISS] clickedCellHasMiss:', clickedCellHasMiss, 'currentPlayer:', state.currentPlayer);
+                    if (clickedCellHasMiss) {
+                        console.log('[DEBUG MISS] Clearing miss at', r, c);
+                        clearMissMarksImmediatelyAt(r, c);
+                        return;
+                    }
+
+                    // Check if this action will cause time freeze
+                    const isActionPotentiallyFreezing =
+                        targetMode === 'move' || targetMode === 'attack' || targetMode === 'scan' ||
+                        targetMode === 'place_mine' || targetMode === 'disarm' || targetMode === 'place_tower' ||
+                        targetMode === 'place_factory' || targetMode === 'place_hub' || targetMode === 'teleport' ||
+                        targetMode === 'throw_mine' || targetMode === 'convert_mine';
+
+                    // GUARD CLAUSE: Only freeze if NOT already frozen (prevents state overlapping)
+                    if (isActionPotentiallyFreezing && !state.isTimeFrozen) {
+                        // INSTANT FREEZE: Set both ref (for immediate UI) and state (for timer logic) 
+                        // Use flushSync to guarantee DOM update happens NOW, not on next tick
+                        flushSync(() => {
+                            setGameState(prev => ({
+                                ...prev,
+                                isTimeFrozen: true,
+                                lastActionTime: Date.now()
+                            }));
+                        });
+                    }
+
+                    // Execute logic synchronously - no delays
+                    executeCellClickLogic(r, c);
+                };
+
+                const executeCellClickLogic = (r: number, c: number) => {
+                    const state = gameStateRef.current; // Re-fetch current state inside the deferred execution
+                    if (state.gameOver || state.isPaused) return;
+                    if (state.gameMode === 'pvp' && roomId && state.phase !== 'placement') {
+                        const localPlayer = resolveLocalPlayer(state);
+                        if (state.currentPlayer !== localPlayer) return;
+                    }
+
+                    const cell = state.cells[r][c];
+                    const unitInCell = state.players[PlayerID.P1].units.find(u => u.r === r && u.c === c && !u.isDead) ||
+                        state.players[PlayerID.P2].units.find(u => u.r === r && u.c === c && !u.isDead);
+
+                    if (state.phase === 'placement') {
+                        // Determine acting player for Placement Phase logic
+                        const actingPlayerId = resolveLocalPlayer(state);
+
+                        if (targetMode === 'place_setup_mine') {
+                            // Valid Zone Check
+                            // Correct logic: if P1, allowed in P1 zone; if P2, allowed in P2 zone.
+                            const isP1Zone = c < 12;
+                            const isMyZone = actingPlayerId === PlayerID.P1 ? isP1Zone : !isP1Zone;
+
+                            if (!isMyZone) {
+                                addLog('log_mine_zone', 'error');
+                                return;
+                            }
+
+                            if (cell.isObstacle || unitInCell) {
+                                addLog('log_obstacle', 'error');
+                                return;
+                            }
+
+                            const player = state.players[actingPlayerId];
+                            if (player.placementMinesPlaced >= PLACEMENT_MINE_LIMIT) {
+                                addLog('log_mine_limit', 'error');
+                                setTargetMode(null);
+                                return;
+                            }
+
+                            setGameState(prev => {
+                                const p = prev.players[actingPlayerId];
+                                return {
+                                    ...prev,
+                                    mines: [...prev.mines, { id: `pm-${Date.now()}`, owner: actingPlayerId, type: MineType.NORMAL, r, c, revealedTo: [actingPlayerId] }],
+                                    players: {
+                                        ...prev.players,
+                                        [actingPlayerId]: { ...p, placementMinesPlaced: p.placementMinesPlaced + 1 }
+                                    }
+                                }
+                            });
+                            if (state.gameMode === 'pvp' && roomId && isNetworkConnected && !applyingRemoteActionRef.current) {
+                                sendGameStateDeferred('place_setup_mine');
+                            }
+                            return;
+                        }
+
+                        // Rule 4: "Cannot move to other places, can only swap"
+                        // If clicking empty cell, DO NOTHING in placement phase (unless placing mine above)
+                        if (!unitInCell) {
+                            return;
+                        }
+                        // If clicking own unit, handle selection (which leads to swap logic in handleUnitClick)
+                        if (unitInCell.owner === actingPlayerId) {
+                            handleUnitClick(unitInCell);
+                        }
+                        return;
+                    }
+
+                    // Thinking Phase
+                    if (state.phase === 'thinking') return;
+
+                    if (state.gameMode === 'pve' && state.currentPlayer === PlayerID.P2) return;
+
+                    // Handle Skill Targeting - MUST BE BEFORE unitInCell CHECK
+                    if (state.selectedUnitId && (targetMode === 'scan' || targetMode === 'sensor_scan' || targetMode === 'place_mine' || targetMode === 'disarm' || targetMode === 'teleport' || targetMode === 'place_tower' || targetMode === 'place_hub' || targetMode === 'throw_mine' || targetMode === 'place_factory' || targetMode === 'move_mine_start' || targetMode === 'move_mine_end' || targetMode === 'convert_mine' || targetMode === 'pickup_mine_select')) {
+                        const unit = getUnit(state.selectedUnitId);
+                        if (unit) {
+                            if (targetMode === 'teleport') {
+                                // Sandbox Teleport: Move unit anywhere instantly
+                                setGameState(prev => {
+                                    const pId = unit.owner;
+                                    const pState = prev.players[pId];
+                                    const newUnits = pState.units.map(u => u.id === unit.id ? { ...u, r, c } : u);
+                                    return {
+                                        ...prev,
+                                        players: { ...prev.players, [pId]: { ...pState, units: newUnits } }
+                                    };
+                                });
+                                setTargetMode(null);
+                                return;
+                            }
+                            if (targetMode === 'scan' && unit.type === UnitType.MINESWEEPER) {
+                                executeScanAction(unit, r, c);
+                                return;
+                            }
+                            if (targetMode === 'sensor_scan' && unit.type === UnitType.MINESWEEPER) {
+                                executeSensorScanAction(unit.id, r, c);
+                                return;
+                            }
+                            if (targetMode === 'place_mine' && unit.type === UnitType.MAKER) {
+                                const currentMineType = selectedMineTypeRef.current;
+                                console.log('[DEBUG] App.tsx handleCellClick - selectedMineTypeRef.current:', currentMineType);
+                                executePlaceMineAction(unit, r, c, currentMineType);
+                                return;
+                            }
+                            if (targetMode === 'disarm' && unit.type === UnitType.DEFUSER) {
+                                handleDisarmAction(unit, r, c);
+                                return;
+                            }
+                            if (targetMode === 'place_tower' && unit.type === UnitType.MINESWEEPER) {
+                                handlePlaceTowerAction(unit, r, c);
+                                return;
+                            }
+                            if (targetMode === 'place_hub' && unit.type === UnitType.RANGER) {
+                                handlePlaceHubAction(unit, r, c);
+                                return;
+                            }
+                            if (targetMode === 'throw_mine' && unit.type === UnitType.RANGER) {
+                                handleThrowMineAction(unit, r, c);
+                                return;
+                            }
+                            if (targetMode === 'place_factory' && unit.type === UnitType.MAKER) {
+                                handlePlaceFactoryAction(unit, r, c);
+                                return;
+                            }
+                            if (targetMode === 'move_mine_start' && unit.type === UnitType.DEFUSER) {
+                                const mine = state.mines.find(m => m.r === r && m.c === c && m.owner !== unit.owner);
+                                if (mine) {
+                                    setSelectedMineId(mine.id);
+                                    setTargetMode('move_mine_end');
+                                    addLog('log_select_action', 'info', undefined, unit.owner); // Generic 'selected' with yellow color
+                                }
+                                return;
+                            }
+                            if (targetMode === 'move_mine_end' && unit.type === UnitType.DEFUSER && selectedMineId) {
+                                const mine = state.mines.find(m => m.id === selectedMineId);
+                                if (mine) {
+                                    handleMoveEnemyMineAction(unit, mine.r, mine.c, r, c);
+                                }
+                                setSelectedMineId(null);
+                                setTargetMode(null);
+                                return;
+                            }
+                            if (targetMode === 'convert_mine' && unit.type === UnitType.DEFUSER) {
+                                handleConvertEnemyMineAction(unit, r, c);
+                                return;
+                            }
+                            if (targetMode === 'pickup_mine_select' && unit.type === UnitType.RANGER) {
+                                handlePickupMineAt(unit, r, c);
+                                return;
                             }
                         }
                     }
 
-                    return {
-                        ...prev,
-                        pvpReadyState: newReadyState,
-                        logs: logsWithRemotePlacement
-                    };
-                });
-                return;
-            }
-
-            if (type === 'MOVE') {
-                if (!isMovePayload(payload)) {
-                    return;
-                }
-                const unit = getUnit(payload.unitId, state);
-                if (!unit || unit.owner !== expectedRemoteOwner) {
-                    return;
-                }
-                executeMoveAction(payload.unitId, payload.r, payload.c, payload.cost, 'remote');
-                return;
-            }
-
-            if (type === 'ATTACK') {
-                if (!isAttackPayload(payload)) {
-                    return;
-                }
-                const attacker = getUnit(payload.attackerId, state);
-                const target = getUnit(payload.targetId, state);
-                if (!attacker || !target || attacker.owner !== expectedRemoteOwner) {
-                    return;
-                }
-                executeAttackAction(payload.attackerId, target, 'remote');
-                return;
-            }
-
-            if (type === 'SCAN') {
-                if (!isScanPayload(payload)) {
-                    return;
-                }
-                const unit = getUnit(payload.unitId, state);
-                if (!unit || unit.owner !== expectedRemoteOwner || unit.type !== UnitType.MINESWEEPER) {
-                    return;
-                }
-                executeScanAction(unit, payload.r, payload.c, 'remote');
-                return;
-            }
-
-            if (type === 'SENSOR_SCAN') {
-                if (!isSensorScanPayload(payload)) {
-                    return;
-                }
-                const unit = getUnit(payload.unitId, state);
-                if (!unit || unit.owner !== expectedRemoteOwner || unit.type !== UnitType.MINESWEEPER) {
-                    return;
-                }
-                executeSensorScanAction(payload.unitId, payload.r, payload.c, 'remote');
-                return;
-            }
-
-            if (type === 'PLACE_MINE') {
-                if (!isPlaceMinePayload(payload)) {
-                    return;
-                }
-                const unit = getUnit(payload.unitId, state);
-                if (!unit || unit.owner !== expectedRemoteOwner || unit.type !== UnitType.MAKER) {
-                    return;
-                }
-                executePlaceMineAction(unit, payload.r, payload.c, payload.mineType, 'remote');
-                return;
-            }
-
-            if (type === 'EVOLVE') {
-                if (!isEvolvePayload(payload)) {
-                    return;
-                }
-                executeEvolveAction(payload.unitType, payload.branch, payload.variant, 'remote');
-                return;
-            }
-
-            if (type === 'END_TURN') {
-                if (!isEndTurnPayload(payload)) {
-                    return;
-                }
-                executeEndTurnAction(payload.actedUnitId, 'remote');
-                return;
-            }
-
-            if (type === 'SKIP_TURN') {
-                executeSkipTurnAction('remote');
-            }
-        } finally {
-            applyingRemoteActionRef.current = false;
-        }
-    }, [
-        executeAttackAction,
-        executeEndTurnAction,
-        executeEvolveAction,
-        executeMoveAction,
-        executePlaceMineAction,
-        executeScanAction,
-        executeSensorScanAction,
-        executeSkipTurnAction,
-        getUnit,
-        handleStartGame,
-        isHost,
-        lastIncomingPacket,
-        roomId,
-        sendGameStateDeferred,
-        setGameState,
-        view
-    ]);
-
-    const handleCellClick = (r: number, c: number) => {
-        // === IMMEDIATE TIME FREEZE - FIRST LINE === 
-        // Set frozen state BEFORE any logic to ensure UI updates in the same frame as the click.
-        const state = gameStateRef.current;
-        if (state.gameOver || state.isPaused) return;
-
-        // Manual dismiss for MISS markers: clicking that MISS cell clears it immediately.
-        console.log('[DEBUG MISS] handleCellClick called at', r, c, 'sensorResults:', state.sensorResults.filter(sr => sr.kind === 'mark'));
-        const clickedCellHasMiss = state.sensorResults.some(
-            sr => sr.kind === 'mark' &&
-                sr.owner === state.currentPlayer &&
-                sr.r === r &&
-                sr.c === c &&
-                sr.success !== true
-        );
-        console.log('[DEBUG MISS] clickedCellHasMiss:', clickedCellHasMiss, 'currentPlayer:', state.currentPlayer);
-        if (clickedCellHasMiss) {
-            console.log('[DEBUG MISS] Clearing miss at', r, c);
-            clearMissMarksImmediatelyAt(r, c);
-            return;
-        }
-
-        // Check if this action will cause time freeze
-        const isActionPotentiallyFreezing =
-            targetMode === 'move' || targetMode === 'attack' || targetMode === 'scan' ||
-            targetMode === 'place_mine' || targetMode === 'disarm' || targetMode === 'place_tower' ||
-            targetMode === 'place_factory' || targetMode === 'place_hub' || targetMode === 'teleport' ||
-            targetMode === 'throw_mine' || targetMode === 'convert_mine';
-
-        // GUARD CLAUSE: Only freeze if NOT already frozen (prevents state overlapping)
-        if (isActionPotentiallyFreezing && !state.isTimeFrozen) {
-            // INSTANT FREEZE: Set both ref (for immediate UI) and state (for timer logic) 
-            // Use flushSync to guarantee DOM update happens NOW, not on next tick
-            flushSync(() => {
-                setGameState(prev => ({
-                    ...prev,
-                    isTimeFrozen: true,
-                    lastActionTime: Date.now()
-                }));
-            });
-        }
-
-        // Execute logic synchronously - no delays
-        executeCellClickLogic(r, c);
-    };
-
-    const executeCellClickLogic = (r: number, c: number) => {
-        const state = gameStateRef.current; // Re-fetch current state inside the deferred execution
-        if (state.gameOver || state.isPaused) return;
-        if (state.gameMode === 'pvp' && roomId && state.phase !== 'placement') {
-            const localPlayer = resolveLocalPlayer(state);
-            if (state.currentPlayer !== localPlayer) return;
-        }
-
-        const cell = state.cells[r][c];
-        const unitInCell = state.players[PlayerID.P1].units.find(u => u.r === r && u.c === c && !u.isDead) ||
-            state.players[PlayerID.P2].units.find(u => u.r === r && u.c === c && !u.isDead);
-
-        if (state.phase === 'placement') {
-            // Determine acting player for Placement Phase logic
-            const actingPlayerId = resolveLocalPlayer(state);
-
-            if (targetMode === 'place_setup_mine') {
-                // Valid Zone Check
-                // Correct logic: if P1, allowed in P1 zone; if P2, allowed in P2 zone.
-                const isP1Zone = c < 12;
-                const isMyZone = actingPlayerId === PlayerID.P1 ? isP1Zone : !isP1Zone;
-
-                if (!isMyZone) {
-                    addLog('log_mine_zone', 'error');
-                    return;
-                }
-
-                if (cell.isObstacle || unitInCell) {
-                    addLog('log_obstacle', 'error');
-                    return;
-                }
-
-                const player = state.players[actingPlayerId];
-                if (player.placementMinesPlaced >= PLACEMENT_MINE_LIMIT) {
-                    addLog('log_mine_limit', 'error');
-                    setTargetMode(null);
-                    return;
-                }
-
-                setGameState(prev => {
-                    const p = prev.players[actingPlayerId];
-                    return {
-                        ...prev,
-                        mines: [...prev.mines, { id: `pm-${Date.now()}`, owner: actingPlayerId, type: MineType.NORMAL, r, c, revealedTo: [actingPlayerId] }],
-                        players: {
-                            ...prev.players,
-                            [actingPlayerId]: { ...p, placementMinesPlaced: p.placementMinesPlaced + 1 }
+                    if (unitInCell) {
+                        if (unitInCell.owner === state.currentPlayer) {
+                            handleUnitClick(unitInCell);
+                            return;
+                        }
+                        if (targetMode === 'attack' && state.selectedUnitId) {
+                            handleUnitClick(unitInCell);
+                            return;
                         }
                     }
-                });
-                if (state.gameMode === 'pvp' && roomId && isNetworkConnected && !applyingRemoteActionRef.current) {
-                    sendGameStateDeferred('place_setup_mine');
-                }
-                return;
-            }
 
-            // Rule 4: "Cannot move to other places, can only swap"
-            // If clicking empty cell, DO NOTHING in placement phase (unless placing mine above)
-            if (!unitInCell) {
-                return;
-            }
-            // If clicking own unit, handle selection (which leads to swap logic in handleUnitClick)
-            if (unitInCell.owner === actingPlayerId) {
-                handleUnitClick(unitInCell);
-            }
-            return;
-        }
+                    if (state.selectedUnitId) {
+                        const unit = getUnit(state.selectedUnitId);
+                        if (!unit || unit.owner !== state.currentPlayer) return;
 
-        // Thinking Phase
-        if (state.phase === 'thinking') return;
+                        if (targetMode === 'move') {
+                            const dist = Math.abs(unit.r - r) + Math.abs(unit.c - c);
+                            if (dist === 1 && !unitInCell && !state.cells[r][c].isObstacle) {
+                                // --- General Evolution Logic: Path B (Reduce Flag Move Cost) ---
+                                const player = state.players[unit.owner];
+                                const genLevelB = player.evolutionLevels[UnitType.GENERAL].b;
 
-        if (state.gameMode === 'pve' && state.currentPlayer === PlayerID.P2) return;
+                                let baseCost = UNIT_STATS[unit.type].moveCost;
+                                if (unit.hasFlag) {
+                                    if (unit.type === UnitType.GENERAL) {
+                                        // Gen Path B Level 3: Cost reduced to 4 (normally 5)
+                                        baseCost = (genLevelB >= 3) ? 4 : UNIT_STATS[UnitType.GENERAL].flagMoveCost;
+                                    } else if (genLevelB >= 3) {
+                                        // Gen Path B Level 3: Any unit can carry flag, cost is 4
+                                        baseCost = 4;
+                                    } else {
+                                        // Should technically not happen if only General can carry, but fail safe
+                                        baseCost = 5;
+                                    }
+                                } else if (unit.type === UnitType.RANGER && unit.carriedMine) {
+                                    // Ranger carrying mine costs 3 to move
+                                    baseCost = 3;
+                                }
 
-        // Handle Skill Targeting - MUST BE BEFORE unitInCell CHECK
-        if (state.selectedUnitId && (targetMode === 'scan' || targetMode === 'sensor_scan' || targetMode === 'place_mine' || targetMode === 'disarm' || targetMode === 'teleport' || targetMode === 'place_tower' || targetMode === 'place_hub' || targetMode === 'throw_mine' || targetMode === 'place_factory' || targetMode === 'move_mine_start' || targetMode === 'move_mine_end' || targetMode === 'convert_mine' || targetMode === 'pickup_mine_select')) {
-            const unit = getUnit(state.selectedUnitId);
-            if (unit) {
-                if (targetMode === 'teleport') {
-                    // Sandbox Teleport: Move unit anywhere instantly
-                    setGameState(prev => {
-                        const pId = unit.owner;
-                        const pState = prev.players[pId];
-                        const newUnits = pState.units.map(u => u.id === unit.id ? { ...u, r, c } : u);
-                        return {
-                            ...prev,
-                            players: { ...prev.players, [pId]: { ...pState, units: newUnits } }
-                        };
-                    });
-                    setTargetMode(null);
-                    return;
-                }
-                if (targetMode === 'scan' && unit.type === UnitType.MINESWEEPER) {
-                    executeScanAction(unit, r, c);
-                    return;
-                }
-                if (targetMode === 'sensor_scan' && unit.type === UnitType.MINESWEEPER) {
-                    executeSensorScanAction(unit.id, r, c);
-                    return;
-                }
-                if (targetMode === 'place_mine' && unit.type === UnitType.MAKER) {
-                    const currentMineType = selectedMineTypeRef.current;
-                    console.log('[DEBUG] App.tsx handleCellClick - selectedMineTypeRef.current:', currentMineType);
-                    executePlaceMineAction(unit, r, c, currentMineType);
-                    return;
-                }
-                if (targetMode === 'disarm' && unit.type === UnitType.DEFUSER) {
-                    handleDisarmAction(unit, r, c);
-                    return;
-                }
-                if (targetMode === 'place_tower' && unit.type === UnitType.MINESWEEPER) {
-                    handlePlaceTowerAction(unit, r, c);
-                    return;
-                }
-                if (targetMode === 'place_hub' && unit.type === UnitType.RANGER) {
-                    handlePlaceHubAction(unit, r, c);
-                    return;
-                }
-                if (targetMode === 'throw_mine' && unit.type === UnitType.RANGER) {
-                    handleThrowMineAction(unit, r, c);
-                    return;
-                }
-                if (targetMode === 'place_factory' && unit.type === UnitType.MAKER) {
-                    handlePlaceFactoryAction(unit, r, c);
-                    return;
-                }
-                if (targetMode === 'move_mine_start' && unit.type === UnitType.DEFUSER) {
-                    const mine = state.mines.find(m => m.r === r && m.c === c && m.owner !== unit.owner);
-                    if (mine) {
-                        setSelectedMineId(mine.id);
-                        setTargetMode('move_mine_end');
-                        addLog('log_select_action', 'info', undefined, unit.owner); // Generic 'selected' with yellow color
-                    }
-                    return;
-                }
-                if (targetMode === 'move_mine_end' && unit.type === UnitType.DEFUSER && selectedMineId) {
-                    const mine = state.mines.find(m => m.id === selectedMineId);
-                    if (mine) {
-                        handleMoveEnemyMineAction(unit, mine.r, mine.c, r, c);
-                    }
-                    setSelectedMineId(null);
-                    setTargetMode(null);
-                    return;
-                }
-                if (targetMode === 'convert_mine' && unit.type === UnitType.DEFUSER) {
-                    handleConvertEnemyMineAction(unit, r, c);
-                    return;
-                }
-                if (targetMode === 'pickup_mine_select' && unit.type === UnitType.RANGER) {
-                    handlePickupMineAt(unit, r, c);
-                    return;
-                }
-            }
-        }
-
-        if (unitInCell) {
-            if (unitInCell.owner === state.currentPlayer) {
-                handleUnitClick(unitInCell);
-                return;
-            }
-            if (targetMode === 'attack' && state.selectedUnitId) {
-                handleUnitClick(unitInCell);
-                return;
-            }
-        }
-
-        if (state.selectedUnitId) {
-            const unit = getUnit(state.selectedUnitId);
-            if (!unit || unit.owner !== state.currentPlayer) return;
-
-            if (targetMode === 'move') {
-                const dist = Math.abs(unit.r - r) + Math.abs(unit.c - c);
-                if (dist === 1 && !unitInCell && !state.cells[r][c].isObstacle) {
-                    // --- General Evolution Logic: Path B (Reduce Flag Move Cost) ---
-                    const player = state.players[unit.owner];
-                    const genLevelB = player.evolutionLevels[UnitType.GENERAL].b;
-
-                    let baseCost = UNIT_STATS[unit.type].moveCost;
-                    if (unit.hasFlag) {
-                        if (unit.type === UnitType.GENERAL) {
-                            // Gen Path B Level 3: Cost reduced to 4 (normally 5)
-                            baseCost = (genLevelB >= 3) ? 4 : UNIT_STATS[UnitType.GENERAL].flagMoveCost;
-                        } else if (genLevelB >= 3) {
-                            // Gen Path B Level 3: Any unit can carry flag, cost is 4
-                            baseCost = 4;
-                        } else {
-                            // Should technically not happen if only General can carry, but fail safe
-                            baseCost = 5;
+                                // Apply debuffs and territory costs via getDisplayCost
+                                const finalCost = getDisplayCost(unit, baseCost, state);
+                                executeMoveAction(unit.id, r, c, finalCost);
+                            }
                         }
-                    } else if (unit.type === UnitType.RANGER && unit.carriedMine) {
-                        // Ranger carrying mine costs 3 to move
-                        baseCost = 3;
                     }
+                };
 
-                    // Apply debuffs and territory costs via getDisplayCost
-                    const finalCost = getDisplayCost(unit, baseCost, state);
-                    executeMoveAction(unit.id, r, c, finalCost);
-                }
-            }
-        }
-    };
-
-    // Initialize Game Loop and Listeners
-    const gameLoopActions = {
-        ...playerActions,
-        attemptMove: executeMoveAction,
-        handleAttack: executeAttackAction,
-        handleScanAction: executeScanAction,
-        handlePlaceMineAction: executePlaceMineAction,
-        handleEvolution: executeEvolveAction,
-        handleActionComplete: executeEndTurnAction,
-        handleSkipTurn: executeSkipTurnAction,
-        addLog,
-        startActionPhase,
-        finishPlacementPhase,
-        handleUnitClick,
-        applyRadarScans,
-        handlePlaceTowerAction,
-        handlePlaceFactoryAction,
-        handlePlaceHubAction,
-        handleTeleportToHubAction,
-        handleDisarmAction,
-        handleDetonateTowerAction,
-        handleRangerAction,
-        setShowEvolutionTree,
-        getLocalizedUnitName: (type: UnitType) => t(getUnitNameKey(type)),
-    };
+                // Initialize Game Loop and Listeners
+                const gameLoopActions = {
+                    ...playerActions,
+                    attemptMove: executeMoveAction,
+                    handleAttack: executeAttackAction,
+                    handleScanAction: executeScanAction,
+                    handlePlaceMineAction: executePlaceMineAction,
+                    handleEvolution: executeEvolveAction,
+                    handleActionComplete: executeEndTurnAction,
+                    handleSkipTurn: executeSkipTurnAction,
+                    addLog,
+                    startActionPhase,
+                    finishPlacementPhase,
+                    handleUnitClick,
+                    applyRadarScans,
+                    handlePlaceTowerAction,
+                    handlePlaceFactoryAction,
+                    handlePlaceHubAction,
+                    handleTeleportToHubAction,
+                    handleDisarmAction,
+                    handleDetonateTowerAction,
+                    handleRangerAction,
+                    setShowEvolutionTree,
+                    getLocalizedUnitName: (type: UnitType) => t(getUnitNameKey(type)),
+                };
 
 
-    // Visual perspective should be stable from room role, independent of socket ready timing.
-    const localPerspectivePlayer = (gameState.gameMode === 'pvp')
-        ? (pvpPerspectivePlayer ?? (isHost ? PlayerID.P1 : PlayerID.P2))
-        : null;
-    const localLogOwnerPlayerId = gameState.gameMode === 'pvp'
-        ? (isHost ? PlayerID.P1 : PlayerID.P2)
-        : PlayerID.P1;
-    const shouldHideEnemyMineLogs = gameState.gameMode === 'pvp' || gameState.gameMode === 'pve';
-    const shouldFlipBoard = gameState.gameMode === 'pvp' && localPerspectivePlayer === PlayerID.P2;
-    const viewerPlayerId = gameState.gameMode === 'pvp'
-        ? (localPerspectivePlayer ?? gameState.currentPlayer)
-        : PlayerID.P1;
+                // Visual perspective should be stable from room role, independent of socket ready timing.
+                const localPerspectivePlayer = (gameState.gameMode === 'pvp')
+                    ? (pvpPerspectivePlayer ?? (isHost ? PlayerID.P1 : PlayerID.P2))
+                    : null;
+                const logViewerPlayerId = gameState.gameMode === 'pvp'
+                    ? (localPerspectivePlayer ?? PlayerID.P1)
+                    : PlayerID.P1;
+                const shouldHideEnemyMineLogs = gameState.gameMode === 'pvp' || gameState.gameMode === 'pve';
+                const shouldFlipBoard = gameState.gameMode === 'pvp' && localPerspectivePlayer === PlayerID.P2;
+                const viewerPlayerId = gameState.gameMode === 'pvp'
+                    ? (localPerspectivePlayer ?? gameState.currentPlayer)
+                    : PlayerID.P1;
 
-    useGameLoop({
-        gameStateRef,
-        setGameState,
-        view,
-        targetMode,
-        setTargetMode,
-        isBoardFlippedForLocal: shouldFlipBoard,
-        actions: gameLoopActions
-    });
+                useGameLoop({
+                    gameStateRef,
+                    setGameState,
+                    view,
+                    targetMode,
+                    setTargetMode,
+                    isBoardFlippedForLocal: shouldFlipBoard,
+                    actions: gameLoopActions
+                });
 
-    // Use the AI Hook
-    useGameAI({
-        gameState,
-        difficulty: aiDifficulty,
-        tuningProfile: aiTuningProfile,
-        selectUnit: selectUnitForAI,
-        debug: aiDebug,
-        onDecision: (info) => setAiDecision(info),
-        actions: {
-            attemptMove: executeMoveAction,
-            handleAttack: executeAttackAction,
-            handleScanAction: executeScanAction,
-            handleSensorScan: executeSensorScanAction,
-            handleMinePlacement: executePlaceMineAction,
-            handlePlaceTowerAction,
-            handlePlaceFactoryAction,
-            handlePlaceHubAction,
-            handleTeleportToHubAction,
-            handleDetonateTowerAction,
-            handleThrowMineAction,
-            handlePickupMineAt,
-            handleMoveEnemyMineAction,
-            handleConvertEnemyMineAction,
-            handleRangerAction,
-            handleDisarm: handleDisarmAction,
-            handleEvolution: executeEvolveAction,
-            handlePickupFlag: playerActions.handlePickupFlag,
-            handleDropFlag: playerActions.handleDropFlag,
-            handleActionComplete: executeEndTurnAction
-        }
-    });
-    const leftSideAura = shouldFlipBoard ? 'rgba(255, 50, 100, 0.58)' : 'rgba(0, 150, 255, 0.58)';
-    const rightSideAura = shouldFlipBoard ? 'rgba(0, 150, 255, 0.58)' : 'rgba(255, 50, 100, 0.58)';
-    const leftPlanetColorClass = shouldFlipBoard ? 'neon-planet-red' : 'neon-planet-blue';
-    const rightPlanetColorClass = shouldFlipBoard ? 'neon-planet-blue' : 'neon-planet-red';
-    const rightAuraCenter = showLog ? '52% 42%' : '70% 42%';
-    const neutralAuraCenter = showLog ? '41% 20%' : '50% 20%';
-    const isLocalPlayerTurn = gameState.gameMode === 'pvp'
-        ? (
-            gameState.phase === 'placement' ||
-            gameState.phase === 'thinking' ||
-            localPerspectivePlayer === gameState.currentPlayer
-        )
-        : gameState.gameMode === 'sandbox'
-            ? true
-            : (gameState.currentPlayer === PlayerID.P1);
-    const filteredLogs = gameState.logs.filter((log) => {
-        if (gameState.gameMode === 'sandbox') return true;
-        if (PRIVATE_HINT_LOG_KEYS.has(log.messageKey)) {
-            return !!log.owner && log.owner === localLogOwnerPlayerId;
-        }
-        if (!shouldHideEnemyMineLogs) return true;
-        if (!log.owner) return true;
-        if (!ENEMY_MINE_LOG_KEYS.has(log.messageKey)) return true;
-        return log.owner === localLogOwnerPlayerId;
-    });
+                // Use the AI Hook
+                useGameAI({
+                    gameState,
+                    difficulty: aiDifficulty,
+                    tuningProfile: aiTuningProfile,
+                    selectUnit: selectUnitForAI,
+                    debug: aiDebug,
+                    onDecision: (info) => setAiDecision(info),
+                    actions: {
+                        attemptMove: executeMoveAction,
+                        handleAttack: executeAttackAction,
+                        handleScanAction: executeScanAction,
+                        handleSensorScan: executeSensorScanAction,
+                        handleMinePlacement: executePlaceMineAction,
+                        handlePlaceTowerAction,
+                        handlePlaceFactoryAction,
+                        handlePlaceHubAction,
+                        handleTeleportToHubAction,
+                        handleDetonateTowerAction,
+                        handleThrowMineAction,
+                        handlePickupMineAt,
+                        handleMoveEnemyMineAction,
+                        handleConvertEnemyMineAction,
+                        handleRangerAction,
+                        handleDisarm: handleDisarmAction,
+                        handleEvolution: executeEvolveAction,
+                        handlePickupFlag: playerActions.handlePickupFlag,
+                        handleDropFlag: playerActions.handleDropFlag,
+                        handleActionComplete: executeEndTurnAction
+                    }
+                });
+                const leftSideAura = shouldFlipBoard ? 'rgba(255, 50, 100, 0.58)' : 'rgba(0, 150, 255, 0.58)';
+                const rightSideAura = shouldFlipBoard ? 'rgba(0, 150, 255, 0.58)' : 'rgba(255, 50, 100, 0.58)';
+                const leftPlanetColorClass = shouldFlipBoard ? 'neon-planet-red' : 'neon-planet-blue';
+                const rightPlanetColorClass = shouldFlipBoard ? 'neon-planet-blue' : 'neon-planet-red';
+                const rightAuraCenter = showLog ? '52% 42%' : '70% 42%';
+                const neutralAuraCenter = showLog ? '41% 20%' : '50% 20%';
+                const isLocalPlayerTurn = gameState.gameMode === 'pvp'
+                    ? (
+                        gameState.phase === 'placement' ||
+                        gameState.phase === 'thinking' ||
+                        localPerspectivePlayer === gameState.currentPlayer
+                    )
+                    : gameState.gameMode === 'sandbox'
+                        ? true
+                        : (gameState.currentPlayer === PlayerID.P1);
+                const filteredLogs = gameState.logs.filter((log) => {
+                    if (gameState.gameMode === 'sandbox') return true;
+                    if (PRIVATE_HINT_LOG_KEYS.has(log.messageKey)) {
+                        return !!log.owner && log.owner === logViewerPlayerId;
+                    }
+                    if (!shouldHideEnemyMineLogs) return true;
+                    if (!log.owner) return true;
+                    if (!ENEMY_MINE_LOG_KEYS.has(log.messageKey)) return true;
+                    return log.owner === logViewerPlayerId;
+                });
 
-    return (
-        <div className="w-full h-screen bg-slate-950 text-white flex flex-col overflow-hidden font-sans select-none">
-            {/* Background Music */}
-            <audio
-                ref={audioRef}
-                src={view === 'lobby' ? '/日常を描いたbgmdailyフリー素材.mp3' : '/the-final-boss-battle-158700.mp3'}
-                loop
-            />
+                return (
+                    <div className="w-full h-screen bg-slate-950 text-white flex flex-col overflow-hidden font-sans select-none">
+                        {/* Background Music */}
+                        <audio
+                            ref={audioRef}
+                            src={view === 'lobby' ? '/日常を描いたbgmdailyフリー素材.mp3' : '/the-final-boss-battle-158700.mp3'}
+                            loop
+                        />
 
-            {/* Modals & Lobby System */}
-            <GameModals
-                view={view}
-                gameState={gameState}
-                language={language}
-                setLanguage={setLanguage}
-                musicVolume={musicVolume}
-                setMusicVolume={setMusicVolume}
-                aiDifficulty={aiDifficulty}
-                setAiDifficulty={setAiDifficulty}
-                onStartGame={handleStartGame}
-                onExitGame={handleExitGame}
-                onRestart={handleRestart}
-                onPauseToggle={handlePause}
-                isHost={isHost}
-                setIsHost={setIsHost}
-                roomId={roomId}
-                setRoomId={setRoomId}
-                allowDevToolsInPvp={allowDevToolsInPvp}
-                setAllowDevToolsInPvp={setAllowDevToolsInPvp}
-                t={t}
-            />
+                        {/* Modals & Lobby System */}
+                        <GameModals
+                            view={view}
+                            gameState={gameState}
+                            language={language}
+                            setLanguage={setLanguage}
+                            musicVolume={musicVolume}
+                            setMusicVolume={setMusicVolume}
+                            aiDifficulty={aiDifficulty}
+                            setAiDifficulty={setAiDifficulty}
+                            onStartGame={handleStartGame}
+                            onExitGame={handleExitGame}
+                            onRestart={handleRestart}
+                            onPauseToggle={handlePause}
+                            isHost={isHost}
+                            setIsHost={setIsHost}
+                            roomId={roomId}
+                            setRoomId={setRoomId}
+                            t={t}
+                        />
 
-            {view === 'game' && (
-                <>
-                    {/* Game Start Animation */}
-                    {showGameStartAnimation && (
-                        <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50 animate-fade-out" style={{
-                            animation: 'fadeOut 3s ease-in-out forwards'
-                        }}>
-                            <style>{`
+                        {view === 'game' && (
+                            <>
+                                {/* Game Start Animation */}
+                                {showGameStartAnimation && (
+                                    <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50 animate-fade-out" style={{
+                                        animation: 'fadeOut 3s ease-in-out forwards'
+                                    }}>
+                                        <style>{`
                 @keyframes fadeOut {
                   0% { opacity: 1; }
                   70% { opacity: 1; }
                   100% { opacity: 0; }
                 }
               `}</style>
-                            <div className="text-center">
-                                <div className="text-6xl font-black text-white mb-4 animate-pulse">
-                                    開始
-                                </div>
-                                <div className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-                                    BATTLE START
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                                        <div className="text-center">
+                                            <div className="text-6xl font-black text-white mb-4 animate-pulse">
+                                                開始
+                                            </div>
+                                            <div className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
+                                                BATTLE START
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
-                    {/* Game Header */}
-                    {/* Game Header */}
-                    <GameHeader
-                        gameState={gameState}
-                        language={language}
-                        setLanguage={setLanguage}
-                        musicVolume={musicVolume}
-                        setMusicVolume={setMusicVolume}
-                        onPauseToggle={handlePause}
-                        onExitGame={handleExitGame}
-                        t={t}
-                    />
+                                {/* Game Header */}
+                                {/* Game Header */}
+                                <GameHeader
+                                    gameState={gameState}
+                                    language={language}
+                                    setLanguage={setLanguage}
+                                    musicVolume={musicVolume}
+                                    setMusicVolume={setMusicVolume}
+                                    onPauseToggle={handlePause}
+                                    onExitGame={handleExitGame}
+                                    t={t}
+                                />
 
-                    {/* Main Game Area */}
-                    <div className={`flex-1 flex flex-col overflow-hidden relative ${showLog ? 'game-area--log-open' : 'game-area--log-closed'}`}
-                        style={{
-                            background: 'linear-gradient(135deg, #0a0e27 0%, #1a0033 25%, #0a0e27 50%, #1a0033 75%, #0a0e27 100%)',
-                            backgroundSize: '400% 400%',
-                            animation: 'gradientShift 15s ease infinite'
-                        }}>
-                        {/* Neon Grid Background */}
-                        <div className="absolute inset-0 opacity-10"
-                            style={{
-                                backgroundImage: `
+                                {/* Main Game Area */}
+                                <div className={`flex-1 flex flex-col overflow-hidden relative ${showLog ? 'game-area--log-open' : 'game-area--log-closed'}`}
+                                    style={{
+                                        background: 'linear-gradient(135deg, #0a0e27 0%, #1a0033 25%, #0a0e27 50%, #1a0033 75%, #0a0e27 100%)',
+                                        backgroundSize: '400% 400%',
+                                        animation: 'gradientShift 15s ease infinite'
+                                    }}>
+                                    {/* Neon Grid Background */}
+                                    <div className="absolute inset-0 opacity-10"
+                                        style={{
+                                            backgroundImage: `
                        linear-gradient(0deg, transparent 24%, rgba(0, 255, 255, 0.08) 25%, rgba(0, 255, 255, 0.08) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.08) 75%, rgba(0, 255, 255, 0.08) 76%, transparent 77%, transparent),
                        linear-gradient(90deg, transparent 24%, rgba(0, 255, 255, 0.08) 25%, rgba(0, 255, 255, 0.08) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.08) 75%, rgba(0, 255, 255, 0.08) 76%, transparent 77%, transparent)
                      `,
-                                backgroundSize: '60px 60px',
-                                pointerEvents: 'none',
-                                zIndex: 1
-                            }}>
-                        </div>
+                                            backgroundSize: '60px 60px',
+                                            pointerEvents: 'none',
+                                            zIndex: 1
+                                        }}>
+                                    </div>
 
-                        {/* Meteors - Behind Board */}
-                        <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 9 }}>
-                            <style>{`
+                                    {/* Meteors - Behind Board */}
+                                    <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 9 }}>
+                                        <style>{`
                                 @keyframes meteorFall {
                                     0% {
                                         transform: translateY(-200px) translateX(0);
@@ -3360,282 +3520,282 @@ export default function App() {
                                     }
                                 }
                             `}</style>
-                            {Array.from({ length: 25 }).map((_, i) => (
-                                <div
-                                    key={`meteor-${i}`}
-                                    className="absolute"
-                                    style={{
-                                        left: `${(i * 13 + 7) % 100}%`,
-                                        top: '-200px',
-                                        animation: `meteorFall ${3 + (i % 5)}s linear infinite`,
-                                        animationDelay: `${i * 0.5}s`,
-                                        opacity: 0
-                                    }}
-                                >
-                                    <div style={{
-                                        width: '2px',
-                                        height: `${80 + (i % 6) * 20}px`,
-                                        background: 'linear-gradient(to bottom, rgba(0, 255, 255, 0), rgba(200, 255, 255, 0.8))',
-                                        boxShadow: '0 0 15px rgba(0, 255, 255, 0.6)',
-                                        transform: 'rotate(-25deg)',
-                                        transformOrigin: 'bottom center'
-                                    }} />
+                                        {Array.from({ length: 25 }).map((_, i) => (
+                                            <div
+                                                key={`meteor-${i}`}
+                                                className="absolute"
+                                                style={{
+                                                    left: `${(i * 13 + 7) % 100}%`,
+                                                    top: '-200px',
+                                                    animation: `meteorFall ${3 + (i % 5)}s linear infinite`,
+                                                    animationDelay: `${i * 0.5}s`,
+                                                    opacity: 0
+                                                }}
+                                            >
+                                                <div style={{
+                                                    width: '2px',
+                                                    height: `${80 + (i % 6) * 20}px`,
+                                                    background: 'linear-gradient(to bottom, rgba(0, 255, 255, 0), rgba(200, 255, 255, 0.8))',
+                                                    boxShadow: '0 0 15px rgba(0, 255, 255, 0.6)',
+                                                    transform: 'rotate(-25deg)',
+                                                    transformOrigin: 'bottom center'
+                                                }} />
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Background Decorative Elements */}
+                                    <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 5 }}>
+                                        {/* Aurora Effect */}
+                                        <div className="absolute inset-0 opacity-40 mix-blend-screen" style={{ zIndex: 0 }}>
+                                            <div className="absolute inset-[-50%]" style={{
+                                                background: 'linear-gradient(45deg, transparent 40%, rgba(0, 255, 128, 0.3) 50%, transparent 60%)',
+                                                filter: 'blur(60px)',
+                                                animation: 'aurora-flow 8s ease-in-out infinite alternate',
+                                                transformOrigin: 'center'
+                                            }}></div>
+                                            <div className="absolute inset-[-50%]" style={{
+                                                background: 'linear-gradient(-45deg, transparent 40%, rgba(50, 255, 100, 0.2) 50%, transparent 60%)',
+                                                filter: 'blur(40px)',
+                                                animation: 'aurora-flow 12s ease-in-out infinite alternate-reverse',
+                                                transformOrigin: 'center',
+                                                animationDelay: '-4s'
+                                            }}></div>
+                                        </div>
+
+                                        {/* Neon Planets */}
+                                        <div className="neon-planets-layer">
+                                            <div className={`neon-planet ${leftPlanetColorClass} planet-left`} />
+                                            <div className={`neon-planet ${rightPlanetColorClass} planet-right`} />
+                                        </div>
+
+                                        {/* Animated Energy Waves - Blue - Slower */}
+                                        <div className="absolute inset-0" style={{
+                                            background: `radial-gradient(circle at 30% 42%, ${leftSideAura} 0%, transparent 50%)`,
+                                            animation: 'pulse 4.6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                            zIndex: 1
+                                        }}></div>
+
+                                        {/* Animated Energy Waves - Red - Slower */}
+                                        <div className="absolute inset-0" style={{
+                                            background: `radial-gradient(circle at ${rightAuraCenter}, ${rightSideAura} 0%, transparent 50%)`,
+                                            animation: 'pulse 4.6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                            animationDelay: '0.25s',
+                                            zIndex: 1
+                                        }}></div>
+
+                                        {/* Animated Energy Waves - Purple - Slower */}
+                                        <div className="absolute inset-0" style={{
+                                            background: `radial-gradient(circle at ${neutralAuraCenter}, rgba(150, 50, 255, 0.5) 0%, transparent 50%)`,
+                                            animation: 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                            animationDelay: '1s',
+                                            zIndex: 1
+                                        }}></div>
+                                    </div>
+
+                                    {/* Content Container */}
+                                    <div className="flex-1 flex flex-row overflow-hidden relative" style={{ zIndex: 10 }}>
+
+                                        {/* Board + Timer Container */}
+                                        <div className="flex-1 flex flex-col overflow-visible relative">
+                                            {/* Game Board */}
+                                            <GameField
+                                                gameState={gameState}
+                                                targetMode={targetMode}
+                                                handleCellClick={handleCellClick}
+                                                handleUnitClick={handleUnitClick}
+                                                onDismissMiss={clearMissMarksImmediatelyAt}
+                                                onDismissCount={clearCountMarkersImmediatelyAt}
+                                                isFlipped={shouldFlipBoard}
+                                                viewerPlayerId={viewerPlayerId}
+                                            />
+
+                                            {/* Timer Bar Below Board */}
+                                            <div className="w-full px-8 py-3 flex items-center justify-center gap-6 relative z-20">
+                                                <span className="text-white font-bold text-lg min-w-[80px]">
+                                                    {gameState.phase === 'placement' ? t('placement_phase') : gameState.phase === 'thinking' ? t('planning_phase') : t('action_phase')}
+                                                </span>
+                                                <div className="flex-1 max-w-2xl">
+                                                    <div className="w-full h-5 bg-slate-900 rounded-full overflow-hidden border-2 border-white/50 shadow-lg">
+                                                        {(() => {
+                                                            const maxTime = gameState.phase === 'placement' ? 45 : gameState.phase === 'thinking' ? 30 : 15;
+                                                            const percentage = (gameState.timeLeft / maxTime) * 100;
+                                                            // 顏色邏輯
+                                                            const color = percentage >= 67 ? 'bg-emerald-500 shadow-lg shadow-emerald-500/60' :
+                                                                percentage >= 34 ? 'bg-yellow-500 shadow-lg shadow-yellow-500/60' :
+                                                                    'bg-red-500 shadow-lg shadow-red-500/60';
+                                                            // Sync transition with time freeze: 
+                                                            // If frozen, use very fast transition to halt visual movement instantly.
+                                                            // Normal: 1s linear transition for smooth countdown.
+                                                            const transitionClass = percentage >= 99
+                                                                ? ''
+                                                                : gameState.isTimeFrozen
+                                                                    ? 'transition-none'
+                                                                    : 'transition-all duration-150 ease-linear';
+                                                            return (
+                                                                <div
+                                                                    className={`h-full ${color} ${transitionClass}`}
+                                                                    style={{ width: `${Math.min(percentage, 100)}%` }}
+                                                                />
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 justify-end min-w-[80px]">
+                                                    <div
+                                                        className={`transition-opacity duration-75 ease-in-out ${gameState.isTimeFrozen ? 'opacity-100' : 'opacity-0'}`}
+                                                    >
+                                                        <Snowflake size={18} className="text-cyan-300 animate-spin-slow" />
+                                                    </div>
+                                                    <span className={`font-bold text-lg text-right transition-colors duration-75 ${gameState.isTimeFrozen ? 'text-cyan-300' : 'text-white'}`}>
+                                                        {Math.ceil(gameState.timeLeft)}s
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Log Panel Container */}
+                                        <div className={`shrink-0 z-20 relative transition-all duration-500 ease-in-out flex flex-row ${showLog ? 'w-80' : 'w-0'}`}>
+
+                                            {/* Toggle Button - Floating on the left edge of the panel */}
+                                            <button
+                                                onClick={() => setShowLog(!showLog)}
+                                                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full w-8 h-24 bg-slate-900 border-2 border-white border-r-0 rounded-l-2xl flex flex-col items-center justify-center text-white hover:bg-slate-800 transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] z-30 group"
+                                                title={showLog ? t('hide_log') : t('show_log')}
+                                            >
+                                                {showLog ? <ChevronRight size={20} className="group-hover:scale-125 transition-transform" /> : <ChevronLeft size={20} className="group-hover:scale-125 transition-transform" />}
+                                                <div className="text-[10px] font-black uppercase vertical-text mt-1 opacity-50 group-hover:opacity-100 transition-opacity">LOG</div>
+                                            </button>
+
+                                            {/* Log Panel Content */}
+                                            <div className={`w-80 h-full bg-slate-900 border-l-4 border-white flex flex-col text-sm transition-all duration-500 ${!showLog ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                                                <div className="shrink-0 p-3 font-black border-b-2 border-white bg-slate-800 flex items-center gap-2 text-white">
+                                                    <Info size={18} />
+                                                    <span className="text-lg whitespace-nowrap overflow-hidden">{t('update_log')}</span>
+                                                </div>
+
+                                                <div className="flex-1 overflow-y-auto p-2 space-y-2 text-sm scrollbar-thin scrollbar-thumb-white/30">
+                                                    {filteredLogs.map((log, i) => {
+                                                        // Determine color based on type and owner
+                                                        // Blue = P1 (always viewer), Red = P2 (always enemy)
+                                                        let bgColor = 'bg-slate-800/50 border-white text-white';
+
+                                                        if (log.type === 'error') {
+                                                            bgColor = 'bg-slate-700/40 border-slate-500 text-slate-300';
+                                                        } else if (log.type === 'evolution') {
+                                                            bgColor = 'bg-purple-950/40 border-purple-500 text-purple-200';
+                                                        } else if (log.type === 'combat' || log.type === 'mine' || log.type === 'move') {
+                                                            // Combat/Mine/Move: Blue if P1, Red if P2
+                                                            if (log.owner === PlayerID.P1) {
+                                                                bgColor = 'bg-blue-950/40 border-blue-500 text-blue-200';
+                                                            } else if (log.owner === PlayerID.P2) {
+                                                                bgColor = 'bg-red-950/40 border-red-500 text-red-200';
+                                                            }
+                                                        } else {
+                                                            // Info/System: Yellow
+                                                            bgColor = 'bg-yellow-950/40 border-yellow-500 text-yellow-200';
+                                                        }
+
+                                                        return (
+                                                            <div key={i} className={`p-2 rounded border-l-4 leading-tight font-bold text-xs ${bgColor}`}>
+                                                                <span className="opacity-60 text-[10px] mr-2 font-bold text-gray-400">[{log.turn}]</span>
+                                                                {t(log.messageKey, log.params)}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
 
-                        {/* Background Decorative Elements */}
-                        <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 5 }}>
-                            {/* Aurora Effect */}
-                            <div className="absolute inset-0 opacity-40 mix-blend-screen" style={{ zIndex: 0 }}>
-                                <div className="absolute inset-[-50%]" style={{
-                                    background: 'linear-gradient(45deg, transparent 40%, rgba(0, 255, 128, 0.3) 50%, transparent 60%)',
-                                    filter: 'blur(60px)',
-                                    animation: 'aurora-flow 8s ease-in-out infinite alternate',
-                                    transformOrigin: 'center'
-                                }}></div>
-                                <div className="absolute inset-[-50%]" style={{
-                                    background: 'linear-gradient(-45deg, transparent 40%, rgba(50, 255, 100, 0.2) 50%, transparent 60%)',
-                                    filter: 'blur(40px)',
-                                    animation: 'aurora-flow 12s ease-in-out infinite alternate-reverse',
-                                    transformOrigin: 'center',
-                                    animationDelay: '-4s'
-                                }}></div>
-                            </div>
-
-                            {/* Neon Planets */}
-                            <div className="neon-planets-layer">
-                                <div className={`neon-planet ${leftPlanetColorClass} planet-left`} />
-                                <div className={`neon-planet ${rightPlanetColorClass} planet-right`} />
-                            </div>
-
-                            {/* Animated Energy Waves - Blue - Slower */}
-                            <div className="absolute inset-0" style={{
-                                background: `radial-gradient(circle at 30% 42%, ${leftSideAura} 0%, transparent 50%)`,
-                                animation: 'pulse 4.6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                                zIndex: 1
-                            }}></div>
-
-                            {/* Animated Energy Waves - Red - Slower */}
-                            <div className="absolute inset-0" style={{
-                                background: `radial-gradient(circle at ${rightAuraCenter}, ${rightSideAura} 0%, transparent 50%)`,
-                                animation: 'pulse 4.6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                                animationDelay: '0.25s',
-                                zIndex: 1
-                            }}></div>
-
-                            {/* Animated Energy Waves - Purple - Slower */}
-                            <div className="absolute inset-0" style={{
-                                background: `radial-gradient(circle at ${neutralAuraCenter}, rgba(150, 50, 255, 0.5) 0%, transparent 50%)`,
-                                animation: 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                                animationDelay: '1s',
-                                zIndex: 1
-                            }}></div>
-                        </div>
-
-                        {/* Content Container */}
-                        <div className="flex-1 flex flex-row overflow-hidden relative" style={{ zIndex: 10 }}>
-
-                            {/* Board + Timer Container */}
-                            <div className="flex-1 flex flex-col overflow-visible relative">
-                                {/* Game Board */}
-                                <GameField
+                                {/* Control Panel */}
+                                <ControlPanel
                                     gameState={gameState}
                                     targetMode={targetMode}
-                                    handleCellClick={handleCellClick}
-                                    handleUnitClick={handleUnitClick}
-                                    onDismissMiss={clearMissMarksImmediatelyAt}
-                                    onDismissCount={clearCountMarkersImmediatelyAt}
-                                    isFlipped={shouldFlipBoard}
-                                    viewerPlayerId={viewerPlayerId}
-                                />
-
-                                {/* Timer Bar Below Board */}
-                                <div className="w-full px-8 py-3 flex items-center justify-center gap-6 relative z-20">
-                                    <span className="text-white font-bold text-lg min-w-[80px]">
-                                        {gameState.phase === 'placement' ? t('placement_phase') : gameState.phase === 'thinking' ? t('planning_phase') : t('action_phase')}
-                                    </span>
-                                    <div className="flex-1 max-w-2xl">
-                                        <div className="w-full h-5 bg-slate-900 rounded-full overflow-hidden border-2 border-white/50 shadow-lg">
-                                            {(() => {
-                                                const maxTime = gameState.phase === 'placement' ? 45 : gameState.phase === 'thinking' ? 30 : 15;
-                                                const percentage = (gameState.timeLeft / maxTime) * 100;
-                                                // 顏色邏輯
-                                                const color = percentage >= 67 ? 'bg-emerald-500 shadow-lg shadow-emerald-500/60' :
-                                                    percentage >= 34 ? 'bg-yellow-500 shadow-lg shadow-yellow-500/60' :
-                                                        'bg-red-500 shadow-lg shadow-red-500/60';
-                                                // Sync transition with time freeze: 
-                                                // If frozen, use very fast transition to halt visual movement instantly.
-                                                // Normal: 1s linear transition for smooth countdown.
-                                                const transitionClass = percentage >= 99
-                                                    ? ''
-                                                    : gameState.isTimeFrozen
-                                                        ? 'transition-none'
-                                                        : 'transition-all duration-150 ease-linear';
-                                                return (
-                                                    <div
-                                                        className={`h-full ${color} ${transitionClass}`}
-                                                        style={{ width: `${Math.min(percentage, 100)}%` }}
-                                                    />
-                                                );
-                                            })()}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 justify-end min-w-[80px]">
-                                        <div
-                                            className={`transition-opacity duration-75 ease-in-out ${gameState.isTimeFrozen ? 'opacity-100' : 'opacity-0'}`}
-                                        >
-                                            <Snowflake size={18} className="text-cyan-300 animate-spin-slow" />
-                                        </div>
-                                        <span className={`font-bold text-lg text-right transition-colors duration-75 ${gameState.isTimeFrozen ? 'text-cyan-300' : 'text-white'}`}>
-                                            {Math.ceil(gameState.timeLeft)}s
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Log Panel Container */}
-                            <div className={`shrink-0 z-20 relative transition-all duration-500 ease-in-out flex flex-row ${showLog ? 'w-80' : 'w-0'}`}>
-
-                                {/* Toggle Button - Floating on the left edge of the panel */}
-                                <button
-                                    onClick={() => setShowLog(!showLog)}
-                                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full w-8 h-24 bg-slate-900 border-2 border-white border-r-0 rounded-l-2xl flex flex-col items-center justify-center text-white hover:bg-slate-800 transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] z-30 group"
-                                    title={showLog ? t('hide_log') : t('show_log')}
-                                >
-                                    {showLog ? <ChevronRight size={20} className="group-hover:scale-125 transition-transform" /> : <ChevronLeft size={20} className="group-hover:scale-125 transition-transform" />}
-                                    <div className="text-[10px] font-black uppercase vertical-text mt-1 opacity-50 group-hover:opacity-100 transition-opacity">LOG</div>
-                                </button>
-
-                                {/* Log Panel Content */}
-                                <div className={`w-80 h-full bg-slate-900 border-l-4 border-white flex flex-col text-sm transition-all duration-500 ${!showLog ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                                    <div className="shrink-0 p-3 font-black border-b-2 border-white bg-slate-800 flex items-center gap-2 text-white">
-                                        <Info size={18} />
-                                        <span className="text-lg whitespace-nowrap overflow-hidden">{t('update_log')}</span>
-                                    </div>
-
-                                    <div className="flex-1 overflow-y-auto p-2 space-y-2 text-sm scrollbar-thin scrollbar-thumb-white/30">
-                                        {filteredLogs.map((log, i) => {
-                                            // Determine color based on type and owner
-                                            // Blue = P1 (always viewer), Red = P2 (always enemy)
-                                            let bgColor = 'bg-slate-800/50 border-white text-white';
-
-                                            if (log.type === 'error') {
-                                                bgColor = 'bg-slate-700/40 border-slate-500 text-slate-300';
-                                            } else if (log.type === 'evolution') {
-                                                bgColor = 'bg-purple-950/40 border-purple-500 text-purple-200';
-                                            } else if (log.type === 'combat' || log.type === 'mine' || log.type === 'move') {
-                                                // Combat/Mine/Move: Blue if P1, Red if P2
-                                                if (log.owner === PlayerID.P1) {
-                                                    bgColor = 'bg-blue-950/40 border-blue-500 text-blue-200';
-                                                } else if (log.owner === PlayerID.P2) {
-                                                    bgColor = 'bg-red-950/40 border-red-500 text-red-200';
-                                                }
-                                            } else {
-                                                // Info/System: Yellow
-                                                bgColor = 'bg-yellow-950/40 border-yellow-500 text-yellow-200';
+                                    setTargetMode={setTargetMode}
+                                    selectedMineType={selectedMineType}
+                                    setSelectedMineType={setSelectedMineType}
+                                    showEvolutionTree={showEvolutionTree}
+                                    setShowEvolutionTree={setShowEvolutionTree}
+                                    language={language}
+                                    isLocalPlayerTurn={isLocalPlayerTurn}
+                                    localPlayerId={localPerspectivePlayer ?? PlayerID.P1}
+                                    t={t}
+                                    aiDecision={aiDecision}
+                                    actions={{
+                                        handleActionComplete: executeEndTurnAction,
+                                        handleSkipTurn: executeSkipTurnAction,
+                                        handleScanAction: executeScanAction,
+                                        handlePlaceMineAction: executePlaceMineAction,
+                                        handleEvolve: executeEvolveAction,
+                                        handlePickupFlag: playerActions.handlePickupFlag,
+                                        handleDropFlag: playerActions.handleDropFlag,
+                                        handleAttack: executeAttackAction,
+                                        handleStealth: handleStealthAction,
+                                    }}
+                                    helpers={{
+                                        getUnit: (id) => id ? (getUnit(id) ?? null) : null,
+                                        getActionButtonIndex: (action, unit) => unit ? getActionButtonIndex(action, unit) : -1,
+                                        getEvolutionButtonStartIndex,
+                                        getDisplayCost,
+                                        getNextUnitToAct: () => {
+                                            const player = gameState.players[gameState.currentPlayer];
+                                            // Use display order so swapping works
+                                            for (const unitId of player.unitDisplayOrder) {
+                                                const unit = player.units.find(u => u.id === unitId);
+                                                if (unit && !unit.isDead && !unit.hasActedThisRound) return unit;
                                             }
+                                            return null;
+                                        }
+                                    }}
+                                    phases={{
+                                        finishPlacementPhase,
+                                        startActionPhase
+                                    }}
+                                    handleUnitClick={handleUnitClick}
+                                    handleDisarmAction={handleDisarmAction}
+                                    handlePlaceTowerAction={handlePlaceTowerAction}
+                                    handleDetonateTowerAction={handleDetonateTowerAction}
+                                    handlePlaceFactoryAction={handlePlaceFactoryAction}
+                                    handlePlaceHubAction={handlePlaceHubAction}
+                                    handleTeleportToHubAction={handleTeleportToHubAction}
+                                    handleStealthAction={handleStealthAction}
+                                    handleRangerAction={handleRangerAction}
+                                    swapUnits={swapUnitDisplayOrder}
+                                />
+                                {view === 'game' && (
+                                    <DevToolsPanel
+                                        open={showDevTools}
+                                        onToggle={() => setShowDevTools(prev => !prev)}
+                                        aiDecision={aiDecision}
+                                        aiTuningProfile={aiTuningProfile}
+                                        setAiTuningProfile={setAiTuningProfile}
+                                        gameState={gameState}
+                                    />
+                                )}
 
-                                            return (
-                                                <div key={i} className={`p-2 rounded border-l-4 leading-tight font-bold text-xs ${bgColor}`}>
-                                                    <span className="opacity-60 text-[10px] mr-2 font-bold text-gray-400">[{log.turn}]</span>
-                                                    {t(log.messageKey, log.params)}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                                {/* Sandbox Panel */}
+                                {/* Sandbox Panel moved to global overlay */}
+
+                                {/* Sandbox Panel - Only visible in Sandbox Mode */}
+                                {view === 'game' && (
+                                    <SandboxPanel
+                                        gameState={gameState}
+                                        setGameState={setGameState}
+                                        startNewRound={playerActions.startNewRound}
+                                        language={language}
+                                        isSandboxCollapsed={isSandboxCollapsed}
+                                        setIsSandboxCollapsed={setIsSandboxCollapsed}
+                                        sandboxPos={sandboxPos}
+                                        onSandboxDragStart={onSandboxDragStart}
+                                        targetMode={targetMode}
+                                        setTargetMode={setTargetMode}
+                                    />
+                                )}
+
+                            </>
+                        )}
                     </div>
-
-                    {/* Control Panel */}
-                    <ControlPanel
-                        gameState={gameState}
-                        targetMode={targetMode}
-                        setTargetMode={setTargetMode}
-                        selectedMineType={selectedMineType}
-                        setSelectedMineType={setSelectedMineType}
-                        showEvolutionTree={showEvolutionTree}
-                        setShowEvolutionTree={setShowEvolutionTree}
-                        language={language}
-                        isLocalPlayerTurn={isLocalPlayerTurn}
-                        localPlayerId={localPerspectivePlayer ?? PlayerID.P1}
-                        t={t}
-                        aiDecision={aiDecision}
-                        actions={{
-                            handleActionComplete: executeEndTurnAction,
-                            handleSkipTurn: executeSkipTurnAction,
-                            handleScanAction: executeScanAction,
-                            handlePlaceMineAction: executePlaceMineAction,
-                            handleEvolve: executeEvolveAction,
-                            handlePickupFlag: playerActions.handlePickupFlag,
-                            handleDropFlag: playerActions.handleDropFlag,
-                            handleAttack: executeAttackAction,
-                            handleStealth: handleStealthAction,
-                        }}
-                        helpers={{
-                            getUnit: (id) => id ? (getUnit(id) ?? null) : null,
-                            getActionButtonIndex: (action, unit) => unit ? getActionButtonIndex(action, unit) : -1,
-                            getEvolutionButtonStartIndex,
-                            getDisplayCost,
-                            getNextUnitToAct: () => {
-                                const player = gameState.players[gameState.currentPlayer];
-                                // Use display order so swapping works
-                                for (const unitId of player.unitDisplayOrder) {
-                                    const unit = player.units.find(u => u.id === unitId);
-                                    if (unit && !unit.isDead && !unit.hasActedThisRound) return unit;
-                                }
-                                return null;
-                            }
-                        }}
-                        phases={{
-                            finishPlacementPhase,
-                            startActionPhase
-                        }}
-                        handleUnitClick={handleUnitClick}
-                        handleDisarmAction={handleDisarmAction}
-                        handlePlaceTowerAction={handlePlaceTowerAction}
-                        handleDetonateTowerAction={handleDetonateTowerAction}
-                        handlePlaceFactoryAction={handlePlaceFactoryAction}
-                        handlePlaceHubAction={handlePlaceHubAction}
-                        handleTeleportToHubAction={handleTeleportToHubAction}
-                        handleStealthAction={handleStealthAction}
-                        handleRangerAction={handleRangerAction}
-                        swapUnits={swapUnitDisplayOrder}
-                    />
-                    {view === 'game' && isDevToolsAllowedInCurrentMatch && (
-                        <DevToolsPanel
-                            open={showDevTools}
-                            onToggle={() => setShowDevTools(prev => !prev)}
-                            aiDecision={aiDecision}
-                            aiTuningProfile={aiTuningProfile}
-                            setAiTuningProfile={setAiTuningProfile}
-                            gameState={gameState}
-                        />
-                    )}
-
-                    {/* Sandbox Panel */}
-                    {/* Sandbox Panel moved to global overlay */}
-
-                    {/* Sandbox Panel - Only visible in Sandbox Mode */}
-                    {view === 'game' && isSandboxToolsAllowedInCurrentMatch && (
-                        <SandboxPanel
-                            gameState={gameState}
-                            setGameState={setGameState}
-                            startNewRound={playerActions.startNewRound}
-                            language={language}
-                            isSandboxCollapsed={isSandboxCollapsed}
-                            setIsSandboxCollapsed={setIsSandboxCollapsed}
-                            sandboxPos={sandboxPos}
-                            onSandboxDragStart={onSandboxDragStart}
-                            targetMode={targetMode}
-                            setTargetMode={setTargetMode}
-                        />
-                    )}
-
-                </>
-            )}
-        </div>
-    );
-}
+                );
+            }

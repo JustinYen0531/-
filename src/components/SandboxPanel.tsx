@@ -76,7 +76,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                     ...prev.players,
                     [unit.owner]: { ...p, evolutionLevels: newLevels }
                 },
-                logs: [{ turn: prev.turnCount, messageKey: 'log_evolved', params: { unit: t(getUnitNameKey(unit.type)), branch: branch.toUpperCase() + (variant ? `-${variant}` : ''), level: newLevels[unit.type][branch] }, type: 'evolution' as const }, ...prev.logs]
+                logs: [{ turn: prev.turnCount, messageKey: 'log_evolved', params: { unit: getUnitNameKey(unit.type), branch: branch.toUpperCase() + (variant ? `-${variant}` : ''), level: newLevels[unit.type][branch] }, type: 'evolution' as const }, ...prev.logs]
             };
         });
     };

@@ -41,7 +41,6 @@ import {
     PlaceMinePayload,
     ScanPayload,
     SensorScanPayload,
-    StartGamePayload,
     StateSyncPayload,
     ReadyPayload
 } from './network/protocol';
@@ -188,8 +187,6 @@ const PRIVATE_HINT_LOG_KEYS = new Set([
     'log_scan_smoke_blocked'
 ]);
 
-const serializeLogParams = (params?: Record<string, any>) => JSON.stringify(params ?? {});
-
 const upsertPlacementLogs = (logs: GameLog[], state: GameState, playerId: PlayerID): GameLog[] => {
     const nextLogs = [...logs];
     const alreadyHas = (messageKey: string) =>
@@ -306,7 +303,6 @@ export default function App() {
     const [sandboxPos, setSandboxPos] = useState({ x: 0, y: 0 });
     const [isSandboxCollapsed, setIsSandboxCollapsed] = useState(false);
     const [showDevTools, setShowDevTools] = useState(false);
-    const [allowDevToolsInPvp, setAllowDevToolsInPvp] = useState(false);
     const sandboxDragRef = useRef({ isDragging: false, startX: 0, startY: 0 });
     const clampSandboxPos = useCallback((pos: { x: number; y: number }) => {
         if (typeof window === 'undefined') {
@@ -364,15 +360,6 @@ export default function App() {
         return () => window.removeEventListener('resize', onResize);
     }, [view, clampSandboxPos]);
 
-    const isDevToolsAllowedInCurrentMatch = gameState.gameMode !== 'pvp' || allowDevToolsInPvp;
-    const isSandboxToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox' || (gameState.gameMode === 'pvp' && allowDevToolsInPvp);
-
-    useEffect(() => {
-        if (!isDevToolsAllowedInCurrentMatch && showDevTools) {
-            setShowDevTools(false);
-        }
-    }, [isDevToolsAllowedInCurrentMatch, showDevTools]);
-
     // Safety: entering Planning (thinking) should not carry previous selections/active units
     useEffect(() => {
         if (gameState.phase === 'thinking' && (gameState.selectedUnitId || gameState.activeUnitId || targetMode)) {
@@ -386,31 +373,17 @@ export default function App() {
 
 
     const t = useCallback((key: string, params?: Record<string, any>) => {
-        const translations = (TRANSLATIONS[language] || {}) as any;
-        const fallbackEn = TRANSLATIONS.en as any;
-        const fallbackZhTw = TRANSLATIONS.zh_tw as any;
-        const fallbackZhCn = TRANSLATIONS.zh_cn as any;
-        let text = translations[key]
-            ?? fallbackEn[key]
-            ?? fallbackZhTw[key]
-            ?? fallbackZhCn[key]
-            ?? key;
+        const translations = TRANSLATIONS[language] as any;
+        let text = translations[key] || key;
         if (params) {
             Object.entries(params).forEach(([k, v]) => {
                 let strVal = String(v);
                 // Auto-translate: if the whole value is a known translation key
-                if (translations[strVal] || fallbackEn[strVal] || fallbackZhTw[strVal] || fallbackZhCn[strVal]) {
-                    strVal = translations[strVal]
-                        ?? fallbackEn[strVal]
-                        ?? fallbackZhTw[strVal]
-                        ?? fallbackZhCn[strVal]
-                        ?? strVal;
+                if (translations[strVal]) {
+                    strVal = translations[strVal];
                 } else {
                     // Translate embedded keys like "unit_general(2,1), unit_maker(1,3)"
-                    strVal = strVal.replace(
-                        /unit_\w+/g,
-                        (match) => translations[match] ?? fallbackEn[match] ?? fallbackZhTw[match] ?? fallbackZhCn[match] ?? match
-                    );
+                    strVal = strVal.replace(/unit_\w+/g, (match) => translations[match] || match);
                 }
                 text = text.replace(`{{${k}}}`, strVal);
             });
@@ -441,37 +414,18 @@ export default function App() {
 
 
     const addLog = (messageKey: string, type: GameLog['type'] = 'info', params?: Record<string, any>, owner?: PlayerID) => {
-        // Private hint logs should only be generated for local actions, never while replaying remote packets.
-        if (applyingRemoteActionRef.current && PRIVATE_HINT_LOG_KEYS.has(messageKey)) {
-            return;
-        }
         const localActor = (() => {
             const state = gameStateRef.current;
-            if (state.gameMode === 'pvp') {
+            if (state.gameMode === 'pvp' && roomId) {
                 return isHost ? PlayerID.P1 : PlayerID.P2;
             }
             return state.currentPlayer;
         })();
         const resolvedOwner = owner ?? (PRIVATE_HINT_LOG_KEYS.has(messageKey) ? localActor : undefined);
-        setGameState(prev => {
-            if (PRIVATE_HINT_LOG_KEYS.has(messageKey)) {
-                const targetParams = serializeLogParams(params);
-                const existsInCurrentTurn = prev.logs.some(log =>
-                    log.turn === prev.turnCount &&
-                    log.messageKey === messageKey &&
-                    log.owner === resolvedOwner &&
-                    serializeLogParams(log.params) === targetParams
-                );
-                if (existsInCurrentTurn) {
-                    return prev;
-                }
-            }
-
-            return {
-                ...prev,
-                logs: [{ turn: prev.turnCount, messageKey, params, type, owner: resolvedOwner }, ...prev.logs].slice(0, 100)
-            };
-        });
+        setGameState(prev => ({
+            ...prev,
+            logs: [{ turn: prev.turnCount, messageKey, params, type, owner: resolvedOwner }, ...prev.logs].slice(0, 100)
+        }));
     };
 
     const addVFX = (type: VFXEffect['type'], r: number, c: number, size: VFXEffect['size'] = 'medium') => {
@@ -525,8 +479,7 @@ export default function App() {
                 turn: 1,
                 payload: {
                     mode: 'pvp',
-                    initialState: toSerializableGameState(initialState),
-                    allowDevTools: allowDevToolsInPvp
+                    initialState: toSerializableGameState(initialState)
                 }
             });
         }
@@ -535,11 +488,10 @@ export default function App() {
         setTimeout(() => {
             setShowGameStartAnimation(false);
         }, 3000);
-    }, [allowDevToolsInPvp, isHost, roomId, sendActionPacket]);
+    }, [isHost, roomId, sendActionPacket]);
 
     const handleExitGame = () => {
         setPvpPerspectivePlayer(null);
-        setShowDevTools(false);
         setView('lobby');
     };
 
@@ -550,7 +502,6 @@ export default function App() {
         setAiDecision(null);
         setSandboxPos({ x: 0, y: 0 });
         setIsSandboxCollapsed(false);
-        setShowDevTools(false);
     };
 
     const selectUnitForAI = useCallback((unitId: string) => {
@@ -592,7 +543,7 @@ export default function App() {
     };
 
     const resolveLocalPlayer = (state: GameState): PlayerID => {
-        if (state.gameMode === 'pvp') {
+        if (state.gameMode === 'pvp' && roomId) {
             return isHost ? PlayerID.P1 : PlayerID.P2;
         }
         return state.currentPlayer;
@@ -2661,8 +2612,7 @@ export default function App() {
 
         if (lastIncomingPacket.type === 'START_GAME') {
             if (!isHost && view === 'lobby') {
-                const payload = lastIncomingPacket.payload as StartGamePayload;
-                setAllowDevToolsInPvp(payload.allowDevTools === true);
+                const payload = lastIncomingPacket.payload as any;
                 const syncedInitialState = payload.initialState ? fromSerializableGameState(payload.initialState) : null;
                 handleStartGame('pvp', syncedInitialState || undefined);
             }
@@ -2697,15 +2647,8 @@ export default function App() {
                 // CRITICAL: Merge synced state with local UI state to prevent "weird jumps"
                 // This keeps the player's current selection and perspective while updating global board state.
                 setGameState(prev => {
-                    const localPlayer = resolveLocalPlayer(prev);
-                    const preservedLocalPrivateLogs = prev.logs.filter(
-                        log => PRIVATE_HINT_LOG_KEYS.has(log.messageKey) && log.owner === localPlayer
-                    );
-
-                    const mergedLogs = [...preservedLocalPrivateLogs, ...syncedState.logs].slice(0, 100);
                     return {
                         ...syncedState,
-                        logs: mergedLogs,
                         // Preserve LOCAL UI state
                         selectedUnitId: prev.selectedUnitId,
                         activeUnitId: prev.activeUnitId,
@@ -3174,8 +3117,8 @@ export default function App() {
     const localPerspectivePlayer = (gameState.gameMode === 'pvp')
         ? (pvpPerspectivePlayer ?? (isHost ? PlayerID.P1 : PlayerID.P2))
         : null;
-    const localLogOwnerPlayerId = gameState.gameMode === 'pvp'
-        ? (isHost ? PlayerID.P1 : PlayerID.P2)
+    const logViewerPlayerId = gameState.gameMode === 'pvp'
+        ? (localPerspectivePlayer ?? PlayerID.P1)
         : PlayerID.P1;
     const shouldHideEnemyMineLogs = gameState.gameMode === 'pvp' || gameState.gameMode === 'pve';
     const shouldFlipBoard = gameState.gameMode === 'pvp' && localPerspectivePlayer === PlayerID.P2;
@@ -3242,12 +3185,12 @@ export default function App() {
     const filteredLogs = gameState.logs.filter((log) => {
         if (gameState.gameMode === 'sandbox') return true;
         if (PRIVATE_HINT_LOG_KEYS.has(log.messageKey)) {
-            return !!log.owner && log.owner === localLogOwnerPlayerId;
+            return !!log.owner && log.owner === logViewerPlayerId;
         }
         if (!shouldHideEnemyMineLogs) return true;
         if (!log.owner) return true;
         if (!ENEMY_MINE_LOG_KEYS.has(log.messageKey)) return true;
-        return log.owner === localLogOwnerPlayerId;
+        return log.owner === logViewerPlayerId;
     });
 
     return (
@@ -3277,8 +3220,6 @@ export default function App() {
                 setIsHost={setIsHost}
                 roomId={roomId}
                 setRoomId={setRoomId}
-                allowDevToolsInPvp={allowDevToolsInPvp}
-                setAllowDevToolsInPvp={setAllowDevToolsInPvp}
                 t={t}
             />
 
@@ -3604,7 +3545,7 @@ export default function App() {
                         handleRangerAction={handleRangerAction}
                         swapUnits={swapUnitDisplayOrder}
                     />
-                    {view === 'game' && isDevToolsAllowedInCurrentMatch && (
+                    {view === 'game' && (
                         <DevToolsPanel
                             open={showDevTools}
                             onToggle={() => setShowDevTools(prev => !prev)}
@@ -3619,7 +3560,7 @@ export default function App() {
                     {/* Sandbox Panel moved to global overlay */}
 
                     {/* Sandbox Panel - Only visible in Sandbox Mode */}
-                    {view === 'game' && isSandboxToolsAllowedInCurrentMatch && (
+                    {view === 'game' && (
                         <SandboxPanel
                             gameState={gameState}
                             setGameState={setGameState}

@@ -21,7 +21,6 @@ export type ActionPacketType =
 export interface StartGamePayload {
     mode: 'pvp' | 'pve' | 'sandbox';
     initialState?: unknown;
-    allowDevTools?: boolean;
 }
 
 

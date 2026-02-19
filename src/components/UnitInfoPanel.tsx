@@ -163,7 +163,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                                 const levelB = enemyState.evolutionLevels[u.type].b;
                                 const tier = Math.max(levelA, levelB);
                                 const isActed = u.hasActedThisRound;
-                                const isActive = !isPlacement && (gameState.phase === 'action' || gameState.phase === 'thinking') && u.id === enemyActiveUnit?.id;
+                                const isActive = !isPlacement && gameState.phase === 'action' && u.id === enemyActiveUnit?.id;
                                 const isWaiting = !isPlacement && gameState.phase === 'action' && !isActed && !isActive && !u.isDead;
                                 const enemyCanReorderInAction =
                                     gameState.phase === 'action' &&
@@ -178,7 +178,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                                         key={`preview-${u.id}`}
                                         className={`
                                             relative flex flex-col items-center w-[72px] h-[88px] rounded-md border-2 transition-all
-                                            ${isActive ? `ring-2 ring-offset-2 ring-offset-slate-900 ${u.owner === PlayerID.P1 ? 'ring-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.5)]' : 'ring-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.5)]'}` : ''}
+                                            ${isActive ? `ring-2 ring-offset-2 ring-offset-slate-900 ${u.owner === PlayerID.P1 ? 'ring-cyan-400 border-cyan-400 bg-cyan-900/50 shadow-[0_0_20px_rgba(34,211,238,0.5)]' : 'ring-rose-500 border-rose-500 bg-red-900/50 shadow-[0_0_20px_rgba(244,63,94,0.5)]'}` : ''}
                                             ${isWaiting && enemyCanReorderInAction ? `brightness-90 border-dashed ${playerColorBorder} ${playerColorBg}` : ''}
                                             ${isWaiting && !enemyCanReorderInAction ? `brightness-95 border-slate-600 ${u.owner === PlayerID.P1 ? 'bg-cyan-900/35' : 'bg-red-900/35'}` : ''}
                                             ${u.isDead ? 'opacity-30 grayscale bg-red-950/50 border-red-600' : ''}
@@ -320,7 +320,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                         // Waiting: in waitingUnits list
 
                         const isActed = u.hasActedThisRound;
-                        const isActive = !isPlacement && (gameState.phase === 'action' || gameState.phase === 'thinking') && u.id === activeUnit?.id;
+                        const isActive = !isPlacement && gameState.phase === 'action' && u.id === activeUnit?.id;
                         const isWaiting = !isPlacement && gameState.phase === 'action' && !isActed && !isActive && !u.isDead;
                         const canReorderInAction =
                             gameState.phase === 'action' &&
@@ -358,7 +358,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                                         ${canDragReorder ? 'cursor-grab active:cursor-grabbing' : ''}
                                         ${isDragging ? 'opacity-50 scale-95 border-dashed' : ''}
                                         ${isDragOver ? 'bg-emerald-500/40 border-emerald-300 shadow-[0_0_25px_rgba(16,185,129,0.6)] scale-105 ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-900' : ''}
-                                        ${isActive && !isDragging && !isDragOver ? `ring-2 ring-offset-2 ring-offset-slate-900 ${u.owner === PlayerID.P1 ? 'ring-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.5)]' : 'ring-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.5)]'}` : ''}
+                                        ${isActive && !isDragging && !isDragOver ? `ring-2 ring-offset-2 ring-offset-slate-900 ${u.owner === PlayerID.P1 ? 'ring-cyan-400 border-cyan-400 bg-cyan-900/50 shadow-[0_0_20px_rgba(34,211,238,0.5)]' : 'ring-rose-500 border-rose-500 bg-red-900/50 shadow-[0_0_20px_rgba(244,63,94,0.5)]'}` : ''}
                                         ${isWaiting && canReorderInAction && !isDragging && !isDragOver ? `brightness-90 border-dashed ${playerColorBorder} ${playerColorBg}` : ''}
                                         ${isWaiting && !canReorderInAction && !isDragging && !isDragOver ? `brightness-95 border-slate-600 ${u.owner === PlayerID.P1 ? 'bg-cyan-900/35' : 'bg-red-900/35'}` : ''}
                                         ${u.isDead ? 'opacity-30 grayscale cursor-not-allowed bg-red-950/50 border-red-600' : ''}

@@ -24,8 +24,6 @@ interface GameModalsProps {
     setIsHost: (val: boolean) => void;
     roomId: string | null;
     setRoomId: (id: string | null) => void;
-    allowDevToolsInPvp: boolean;
-    setAllowDevToolsInPvp: (val: boolean) => void;
     t: (key: string, params?: Record<string, any>) => string;
 }
 
@@ -83,8 +81,6 @@ const GameModals: React.FC<GameModalsProps> = ({
     setIsHost,
     roomId,
     setRoomId,
-    allowDevToolsInPvp,
-    setAllowDevToolsInPvp,
     t
 }) => {
     const [showJoinModal, setShowJoinModal] = useState(false);
@@ -98,7 +94,6 @@ const GameModals: React.FC<GameModalsProps> = ({
     const [createRoomPassword, setCreateRoomPassword] = useState('');
     const [joinRoomPassword, setJoinRoomPassword] = useState('');
     const [networkUiError, setNetworkUiError] = useState<string | null>(null);
-    const [showPveDifficultyPanel, setShowPveDifficultyPanel] = useState(false);
     const helloSentKeyRef = useRef('');
 
     const {
@@ -154,11 +149,8 @@ const GameModals: React.FC<GameModalsProps> = ({
         localPeer: isZh ? '本機 Peer ID' : 'Local Peer ID',
         remotePeer: isZh ? '遠端 Peer ID' : 'Remote Peer ID',
         joinedRoom: isZh ? '已加入房間' : 'Joined Room',
-        noRoomYet: isZh ? '還沒有房間？' : 'No room yet?',
-        allowDevTools: isZh ? '允許開發者工具' : 'Allow Dev Tools'
+        noRoomYet: isZh ? '還沒有房間？' : 'No room yet?'
     };
-
-    const pveDifficultyTitle = isZh ? '選擇AI難度' : 'Choose AI Difficulty';
 
     useEffect(() => {
         if (joinMode !== 'create') {
@@ -276,7 +268,6 @@ const GameModals: React.FC<GameModalsProps> = ({
         setNetworkUiError(null);
         setRoomCode('');
         setJoinRoomPassword('');
-        setAllowDevToolsInPvp(false);
         helloSentKeyRef.current = '';
     };
 
@@ -299,7 +290,6 @@ const GameModals: React.FC<GameModalsProps> = ({
             const openedId = await openPeer(preferredRoomId);
             setRoomId(openedId);
             setIsHost(true);
-            setAllowDevToolsInPvp(false);
             setJoinedRoomName(roomName);
             setShowJoinModal(false);
         } catch (openError) {
@@ -321,7 +311,6 @@ const GameModals: React.FC<GameModalsProps> = ({
             connectToPeer(targetRoomId);
             setRoomId(targetRoomId);
             setIsHost(false);
-            setAllowDevToolsInPvp(false);
             setJoinedRoomName(LOBBY_PREVIEW_ROOMS.find((room) => room.id === targetRoomId)?.name || '');
             setShowJoinModal(false);
         } catch (openError) {
@@ -375,50 +364,26 @@ const GameModals: React.FC<GameModalsProps> = ({
                             {t('sandbox_mode')}
                         </button>
 
-                        <div className="flex flex-wrap items-stretch justify-center gap-3">
-                            <button
-                                onClick={() => setShowPveDifficultyPanel(prev => !prev)}
-                                className="min-w-[220px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
-                            >
-                                <Cpu size={22} />
-                                {t('pve_mode')}
-                            </button>
+                        <button
+                            onClick={() => onStartGame('pve')}
+                            className="min-w-[220px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
+                        >
+                            <Cpu size={22} />
+                            {t('pve_mode')}
+                        </button>
 
-                            <div
-                                className={`overflow-hidden transition-all duration-300 ease-out ${showPveDifficultyPanel
-                                    ? 'max-w-[240px] opacity-100 translate-x-0'
-                                    : 'max-w-0 opacity-0 -translate-x-2 pointer-events-none'
-                                    }`}
-                            >
-                                <div className="w-[220px] px-4 py-2.5 bg-slate-900/70 border border-violet-400/35 rounded-xl flex flex-col items-center justify-center gap-2 shadow-2xl shadow-violet-500/20">
-                                    <div className="text-sm font-black text-slate-200">{pveDifficultyTitle}</div>
-                                    <div className="flex items-center gap-2">
-                                        {(['easy', 'normal', 'hard'] as AIDifficulty[]).map(level => (
-                                            <button
-                                                key={level}
-                                                onClick={() => {
-                                                    setAiDifficulty(level);
-                                                    onStartGame('pve');
-                                                }}
-                                                className={`px-3 py-1 rounded-lg text-xs font-black border transition-all ${
-                                                    level === 'easy'
-                                                        ? (aiDifficulty === level
-                                                            ? 'bg-sky-500 text-white border-sky-200 shadow-[0_0_10px_rgba(14,165,233,0.45)]'
-                                                            : 'bg-sky-600 text-white border-sky-400 hover:bg-sky-500')
-                                                        : level === 'normal'
-                                                            ? (aiDifficulty === level
-                                                                ? 'bg-emerald-500 text-white border-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.45)]'
-                                                                : 'bg-emerald-600 text-white border-emerald-400 hover:bg-emerald-500')
-                                                            : (aiDifficulty === level
-                                                                ? 'bg-violet-600 text-white border-violet-200 shadow-[0_0_10px_rgba(139,92,246,0.45)]'
-                                                                : 'bg-violet-700 text-white border-violet-400 hover:bg-violet-600')
-                                                }`}
-                                            >
-                                                {t(level)}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                        <div className="min-w-[200px] px-4 py-3 bg-slate-900/70 border border-violet-400/35 rounded-xl flex flex-col items-center justify-center gap-2 shadow-2xl shadow-violet-500/20">
+                            <div className="text-sm font-black text-slate-200">{t('ai_difficulty')}</div>
+                            <div className="flex items-center gap-2">
+                                {(['easy', 'normal', 'hard'] as AIDifficulty[]).map(level => (
+                                    <button
+                                        key={level}
+                                        onClick={() => setAiDifficulty(level)}
+                                        className={`px-3 py-1 rounded-lg text-xs font-black border transition-colors ${aiDifficulty === level ? 'bg-violet-600 text-white border-violet-300' : 'bg-slate-800 text-slate-300 border-slate-600 hover:border-slate-400'}`}
+                                    >
+                                        {t(level)}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -454,32 +419,21 @@ const GameModals: React.FC<GameModalsProps> = ({
                         </div>
 
                         {isHost ? (
-                            <div className="flex flex-col items-center gap-3">
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={resetLobbyNetworkState}
-                                        className="px-8 py-4 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold text-white text-lg transition-all border-2 border-slate-500"
-                                    >
-                                        {uiText.leave}
-                                    </button>
-                                    <button
-                                        onClick={handleStartMultiplayerGame}
-                                        disabled={!isConnected || !remotePeerId}
-                                        className="px-10 py-4 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 rounded-xl font-black text-lg shadow-2xl shadow-orange-500/50 transition-all duration-200 flex items-center gap-3 border-2 border-orange-400 disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <Swords size={22} />
-                                        {uiText.startGame}
-                                    </button>
-                                </div>
-                                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-500 bg-slate-900/70 text-sm text-slate-100 font-semibold">
-                                    <input
-                                        type="checkbox"
-                                        checked={allowDevToolsInPvp}
-                                        onChange={(event) => setAllowDevToolsInPvp(event.target.checked)}
-                                        className="accent-cyan-400 w-4 h-4"
-                                    />
-                                    {uiText.allowDevTools}
-                                </label>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={resetLobbyNetworkState}
+                                    className="px-8 py-4 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold text-white text-lg transition-all border-2 border-slate-500"
+                                >
+                                    {uiText.leave}
+                                </button>
+                                <button
+                                    onClick={handleStartMultiplayerGame}
+                                    disabled={!isConnected || !remotePeerId}
+                                    className="px-10 py-4 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 rounded-xl font-black text-lg shadow-2xl shadow-orange-500/50 transition-all duration-200 flex items-center gap-3 border-2 border-orange-400 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <Swords size={22} />
+                                    {uiText.startGame}
+                                </button>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center gap-3">

@@ -42,14 +42,8 @@ export const usePlayerActions = ({
     setSelectedMineType,
     setShowEvolutionTree,
     addVFX,
+    addLog,
 }: UsePlayerActionsProps) => {
-
-    const addLog = useCallback((messageKey: string, type: GameLog['type'] = 'info', params?: Record<string, any>, owner?: PlayerID) => {
-        setGameState(prev => ({
-            ...prev,
-            logs: [{ turn: prev.turnCount, messageKey, params, type, owner }, ...prev.logs].slice(0, 100)
-        }));
-    }, [setGameState]);
 
     const getLocalizedUnitName = useCallback((type: UnitType) => getUnitNameKey(type), []);
 
