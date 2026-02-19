@@ -1491,7 +1491,7 @@ export default function App() {
             const pState = prev.players[pId];
 
             // Tier 2: Hub disappears when Ranger teleports. Tier 3.2: Hub persists? 
-            // Description says "銝??賡?嚗?撱箇?瘨仃" for Lv2 Ranger.
+            // Description indicates the Lv2 Ranger teleport consumes the hub.
             const levelA = gameState.players[unit.owner].evolutionLevels[UnitType.RANGER].a;
             const variantA = gameState.players[unit.owner].evolutionLevels[UnitType.RANGER].aVariant;
 

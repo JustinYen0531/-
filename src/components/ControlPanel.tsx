@@ -87,7 +87,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         !gameState.gameOver &&
         !gameState.isPaused;
 
-    // 雿?挾??賡?閬??嚗?隞乩???嚗?刻?????畾菜??寞?????
+    // During placement both sides can interact; lock only in thinking/action when it's not your turn.
     const isInteractionDisabled = isPlacement ? false : (isAiTurnLocked || !isLocalPlayerTurn);
 
     // PvP: local player already confirmed; waiting for opponent confirmation.
@@ -442,7 +442,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                 <button onClick={() => handleDisarmAction(unit, unit.r, unit.c)} className="w-[82px] h-[74px] rounded flex flex-col items-center justify-center gap-1 transition-all relative font-bold border-2 bg-pink-900/40 hover:bg-pink-800/60 border-pink-800/50 text-pink-100/70 hover:border-pink-400 hover:text-white">
                                                                     <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('custom_dismantle', unit)}</div>
                                                                     <Unlock size={28} />
-                                                                    <span className="text-xs">?撱箇?</span>
+                                                                    <span className="text-xs">拆除建築</span>
                                                                 </button>
                                                                 <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {helpers.getDisplayCost(unit, 2, gameState, 'dismantle')}</div>
                                                             </div>
@@ -527,7 +527,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                             );
                                                         }
 
-                                                        // Path A Level 3-2: Detonate Tower (??誘)
+                                                        // Path A Level 3-2: Detonate Tower (爆破指令)
                                                         const hasTower = gameState.buildings.some(b => b.owner === unit.owner && b.type === 'tower');
                                                         if (swpLevelA === 3 && swpVariantA === 2 && hasTower) {
                                                             buttons.push(
@@ -538,7 +538,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                     >
                                                                         <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('detonate_tower', unit)}</div>
                                                                         <Radiation size={28} />
-                                                                        <span className="text-xs">??誘</span>
+                                                                        <span className="text-xs">爆破指令</span>
                                                                     </button>
                                                                     <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {helpers.getDisplayCost(unit, 2, gameState, 'detonate_tower')}</div>
                                                                 </div>
@@ -713,7 +713,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                             </div>
                                                         );
 
-                                                        // Path B Lv 2+: Move Mine (蝛粹?蝵格? / ?衣?頧?)
+                                                        // Path B Lv 2+: Move Mine
                                                         if (defLevelB >= 2) {
                                                             const isDamageMode = (defLevelB === 3 && defVariantB === 2);
                                                             buttons.push(
@@ -734,7 +734,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                             );
                                                         }
 
-                                                        // Path B Lv 3-1: Convert Mine (??靘萄左)
+                                                        // Path B Lv 3-1: Convert Mine
                                                         if (defLevelB === 3 && defVariantB === 1) {
                                                             buttons.push(
                                                                 <div key="convert_mine" className="flex flex-col items-center gap-1">
@@ -999,7 +999,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                     if (isAiTurnLocked) {
                                                         const decisionUnit = aiDecision?.unitId ? helpers.getUnit(aiDecision.unitId) : null;
                                                         const decisionLabel = aiDecision
-                                                            ? `${decisionUnit ? t(getUnitNameKey(decisionUnit.type)) : aiDecision.unitId} 繚 ${aiDecision.action.toUpperCase()}`
+                                                            ? `${decisionUnit ? t(getUnitNameKey(decisionUnit.type)) : aiDecision.unitId} · ${aiDecision.action.toUpperCase()}`
                                                             : t('ai_thinking');
                                                         const targetText = aiDecision?.target?.kind === 'cell'
                                                             ? `(${aiDecision.target.r + 1},${aiDecision.target.c + 1})`
@@ -1012,7 +1012,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                 aiDecision.breakdown.flag ? `FLAG ${aiDecision.breakdown.flag}` : null,
                                                                 aiDecision.breakdown.safety ? `SAFE ${aiDecision.breakdown.safety}` : null,
                                                                 aiDecision.breakdown.utility ? `UTIL ${aiDecision.breakdown.utility}` : null
-                                                            ].filter(Boolean).join(' 繚 ')
+                                                            ].filter(Boolean).join(' · ')
                                                             : '';
                                                         return (
                                                             <div className="w-full flex flex-col items-center justify-center gap-3 py-5">
