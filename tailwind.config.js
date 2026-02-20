@@ -6,6 +6,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Roboto Mono', 'monospace'],
+        mono: ['Roboto Mono', 'monospace']
+      },
       colors: {
         gray: {
           750: '#374151',
@@ -43,3 +47,4 @@ export default {
   },
   plugins: [],
 }
+

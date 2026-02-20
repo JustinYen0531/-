@@ -1,19 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
+:root {
+  --global-neon-color: #00ffff;
+  --global-neon-rgb: 0, 255, 255;
+  --global-neon-text-color: #eaffff;
+  --global-neon-glow-inner: 0 0 3px rgba(var(--global-neon-rgb), 0.6);
+  --global-neon-glow-outer: 0 0 20px rgba(var(--global-neon-rgb), 0.2);
+  --global-neon-heading-color: #f8ffff;
+  --global-neon-heading-inner: 0 0 4px rgba(var(--global-neon-rgb), 0.78);
+  --global-neon-heading-outer: 0 0 20px rgba(var(--global-neon-rgb), 0.2);
+  --global-neon-title-color: #fbffff;
+  --global-neon-title-inner: 0 0 4px rgba(var(--global-neon-rgb), 0.82);
+  --global-neon-title-outer: 0 0 20px rgba(var(--global-neon-rgb), 0.2);
+}
+
+html,
+body,
+#root {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Roboto Mono', monospace !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color: var(--global-neon-text-color);
+  text-shadow: var(--global-neon-glow-inner), var(--global-neon-glow-outer);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--global-neon-heading-color);
+  text-shadow: var(--global-neon-heading-inner), var(--global-neon-heading-outer);
+}
+
+.neon-title {
+  color: var(--global-neon-title-color);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  text-shadow: var(--global-neon-title-inner), var(--global-neon-title-outer);
+  animation: neonTitleBreathe 2.2s ease-in-out infinite;
+  will-change: text-shadow, filter;
+}
+
+.no-neon-text,
+.no-neon-text * {
+  text-shadow: none !important;
+}
+
+@keyframes neonTitleBreathe {
+
+  0%,
+  100% {
+    text-shadow:
+      0 0 3px rgba(var(--global-neon-rgb), 0.68),
+      0 0 14px rgba(var(--global-neon-rgb), 0.18);
+    filter: brightness(1);
+  }
+
+  50% {
+    text-shadow:
+      0 0 8px rgba(var(--global-neon-rgb), 0.95),
+      0 0 28px rgba(var(--global-neon-rgb), 0.34);
+    filter: brightness(1.1);
+  }
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: 'Roboto Mono', monospace;
 }
 
 /* Custom pattern for obstacles */
@@ -507,3 +573,5 @@ code {
     left: calc(100% - 10rem);
   }
 }
+
+

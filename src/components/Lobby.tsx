@@ -55,10 +55,10 @@ const Lobby: React.FC<LobbyProps> = ({
     return (
         <div className="flex flex-col items-center justify-center h-full gap-8 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 p-4 relative">
             <div className="text-center space-y-2 z-10">
-                <h1 className="text-7xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 drop-shadow-2xl animate-pulse">
+                <h1 className="neon-title text-7xl font-black drop-shadow-2xl">
                     {t('app_title')}
                 </h1>
-                <p className="text-cyan-300 max-w-md mx-auto font-semibold">{t('lobby_desc')}</p>
+                <p className="text-cyan-300 max-w-md mx-auto font-semibold tracking-[0.08em]">{t('lobby_desc')}</p>
             </div>
 
             <div className="flex gap-6 z-10">
@@ -68,21 +68,21 @@ const Lobby: React.FC<LobbyProps> = ({
                         <div className="flex gap-4">
                             <button
                                 onClick={() => handleStartGame('sandbox')}
-                                className="px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 rounded-xl font-black text-lg shadow-2xl shadow-yellow-500/50 transform hover:scale-110 transition-all duration-200 flex items-center gap-3 border-2 border-amber-300"
+                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 rounded-xl font-black text-lg shadow-2xl shadow-yellow-500/50 transform hover:scale-110 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-amber-300"
                             >
                                 <FlaskConical size={24} />
                                 {t('sandbox_mode')}
                             </button>
                             <button
                                 onClick={() => handleStartGame('pve')}
-                                className="px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform hover:scale-110 transition-all duration-200 flex items-center gap-3 border-2 border-violet-300"
+                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform hover:scale-110 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
                             >
                                 <Cpu size={24} />
                                 {t('pve_mode')}
                             </button>
                             <button
                                 onClick={() => setShowJoinModal(true)}
-                                className="px-8 py-4 bg-gradient-to-r from-slate-600 to-slate-500 hover:from-slate-500 hover:to-slate-400 rounded-xl font-black text-lg shadow-2xl shadow-slate-500/50 transform hover:scale-110 transition-all duration-200 flex items-center gap-3 border-2 border-slate-400 text-white"
+                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 rounded-xl font-black text-lg shadow-2xl shadow-indigo-500/45 transform hover:scale-110 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-indigo-300 text-white"
                             >
                                 <DoorOpen size={24} />
                                 {language === 'zh_tw' ? '加入大廳' : 'Join Lobby'}
@@ -91,7 +91,7 @@ const Lobby: React.FC<LobbyProps> = ({
                         {/* 第二排：教學 */}
                         <button
                             onClick={() => setShowTutorial(true)}
-                            className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-xl font-black text-lg shadow-2xl shadow-emerald-500/50 transform hover:scale-110 transition-all duration-200 flex items-center gap-3 border-2 border-emerald-300"
+                            className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-xl font-black text-lg shadow-2xl shadow-emerald-500/50 transform hover:scale-110 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-emerald-300"
                         >
                             <HelpCircle size={24} />
                             {language === 'zh_tw' ? '新手教學' : 'Tutorial'}

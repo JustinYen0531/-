@@ -45,15 +45,15 @@ const DevToolsPanel: React.FC<DevToolsPanelProps> = ({
     const rejectedSummary = aiDecision?.rejectedReasonSummary ?? { energy: 0, risk: 0, rules: 0 };
 
     return (
-        <div className="fixed top-20 right-4 z-[90] font-sans pointer-events-auto">
+        <div className="fixed top-20 right-4 z-[90] font-sans pointer-events-auto no-neon-text">
             <button
                 onClick={onToggle}
-                className="mb-2 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-widest border-2 border-cyan-400 bg-slate-900/90 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.6)]"
+                className="mb-2 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-widest border-2 border-cyan-400 bg-slate-900/90 text-cyan-200"
             >
                 {open ? 'DEVTOOLS - ON' : 'DEVTOOLS'}
             </button>
             {open && (
-                <div className="w-[25rem] p-3 rounded-xl border-2 border-cyan-400/70 bg-slate-900/90 text-cyan-100 shadow-2xl shadow-cyan-500/30 space-y-3">
+                <div className="w-[25rem] p-3 rounded-xl border-2 border-cyan-400/70 bg-slate-900/90 text-cyan-100 space-y-3">
                     <div className="text-xs font-black uppercase tracking-widest text-cyan-300">
                         PvE Dev Tools
                     </div>

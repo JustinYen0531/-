@@ -141,7 +141,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
 
     return (
         <div
-            className={`fixed top-20 left-4 z-[60] bg-slate-900/95 border-2 border-yellow-500 rounded-xl shadow-2xl flex flex-col backdrop-blur-md animate-fade-in ${isSandboxCollapsed ? 'w-12 h-12 p-0 cursor-pointer hover:bg-slate-800' : 'p-4 min-w-[200px]'} transition-[width,height,padding,background-color] duration-300`}
+            className={`fixed top-20 left-4 z-[60] bg-slate-900/95 border-2 border-yellow-500 rounded-xl flex flex-col backdrop-blur-md animate-fade-in no-neon-text ${isSandboxCollapsed ? 'w-12 h-12 p-0 cursor-pointer hover:bg-slate-800' : 'p-4 min-w-[200px]'} transition-[width,height,padding,background-color] duration-300`}
             style={{
                 transform: `translate3d(${sandboxPos.x}px, ${sandboxPos.y}px, 0)`,
                 willChange: 'transform'
@@ -185,39 +185,39 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
 
             {!isSandboxCollapsed && (
                 <div className="grid grid-cols-1 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <button onClick={addEnergy} className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95 shadow-lg shadow-yellow-500/20">
+                    <button onClick={addEnergy} className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95">
                         <Zap size={14} />
                         {language === 'zh_tw' ? '增加 100 能量' : '+100 Energy'}
                     </button>
 
-                    <button onClick={healAll} className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95 shadow-lg shadow-emerald-500/20">
+                    <button onClick={healAll} className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95">
                         <Shield size={14} />
                         {language === 'zh_tw' ? '治療全員' : 'Heal All'}
                     </button>
                     <button
                         onClick={toggleGodMode}
-                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-black text-xs transition-all transform active:scale-95 shadow-lg ${gameState.isGodMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20' : 'bg-slate-700 hover:bg-slate-600 text-slate-300 shadow-slate-900/20'}`}
+                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-black text-xs transition-all transform active:scale-95 ${gameState.isGodMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}
                     >
                         <ShieldAlert size={14} />
                         {language === 'zh_tw' ? (gameState.isGodMode ? '關閉上帝模式' : '開啟上帝模式') : 'God Mode'}
                     </button>
                     <button
                         onClick={skipToNextRound}
-                        className="flex items-center justify-center gap-2 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95 shadow-lg shadow-rose-500/20"
+                        className="flex items-center justify-center gap-2 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95"
                     >
                         <RefreshCw size={14} />
                         {language === 'zh_tw' ? '跳過回合' : 'New Round'}
                     </button>
                     <button
                         onClick={() => setGameState(prev => ({ ...prev, isSandboxTimerPaused: !prev.isSandboxTimerPaused }))}
-                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-black text-xs transition-all transform active:scale-95 shadow-lg ${gameState.isSandboxTimerPaused ? 'bg-green-600 hover:bg-green-500 text-white shadow-green-500/20' : 'bg-orange-600 hover:bg-orange-500 text-white shadow-orange-500/20'}`}
+                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-black text-xs transition-all transform active:scale-95 ${gameState.isSandboxTimerPaused ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-orange-600 hover:bg-orange-500 text-white'}`}
                     >
                         {gameState.isSandboxTimerPaused ? <Play size={14} /> : <Pause size={14} />}
                         {gameState.isSandboxTimerPaused ? (language === 'zh_tw' ? '恢復計時' : 'Resume Timer') : (language === 'zh_tw' ? '暫停計時' : 'Pause Timer')}
                     </button>
                     <button
                         onClick={() => setTargetMode(targetMode === 'teleport' ? null : 'teleport')}
-                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-black text-xs transition-all transform active:scale-95 shadow-lg ${targetMode === 'teleport' ? 'bg-purple-500 text-white ring-2 ring-purple-300 shadow-purple-500/40' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300 shadow-slate-900/20'}`}
+                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-black text-xs transition-all transform active:scale-95 ${targetMode === 'teleport' ? 'bg-purple-500 text-white ring-2 ring-purple-300' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300'}`}
                     >
                         <Hand size={14} />
                         {language === 'zh_tw' ? '移動單位' : 'Drag Unit'}
@@ -236,7 +236,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                                     <div className="flex gap-1 items-center">
                                         <span className="text-[9px] font-black w-4 text-blue-400">A</span>
                                         {levels.a < 2 ? (
-                                            <button onClick={() => evolveCurrentUnit('a')} className="flex-1 px-1 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[10px] transition-all transform active:scale-95 shadow-lg shadow-blue-500/10">
+                                            <button onClick={() => evolveCurrentUnit('a')} className="flex-1 px-1 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[10px] transition-all transform active:scale-95">
                                                 {language === 'zh_tw' ? `進化 A (LV${levels.a}→${levels.a + 1})` : `LV${levels.a} →${levels.a + 1}`}
                                             </button>
                                         ) : levels.a === 2 ? (
@@ -255,7 +255,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                                     <div className="flex gap-1 items-center">
                                         <span className="text-[9px] font-black w-4 text-orange-400">B</span>
                                         {levels.b < 2 ? (
-                                            <button onClick={() => evolveCurrentUnit('b')} className="flex-1 px-1 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-black text-[10px] transition-all transform active:scale-95 shadow-lg shadow-orange-500/10">
+                                            <button onClick={() => evolveCurrentUnit('b')} className="flex-1 px-1 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-black text-[10px] transition-all transform active:scale-95">
                                                 {language === 'zh_tw' ? `進化 B (LV${levels.b}→${levels.b + 1})` : `LV${levels.b} →${levels.b + 1}`}
                                             </button>
                                         ) : levels.b === 2 ? (

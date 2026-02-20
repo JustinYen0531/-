@@ -281,7 +281,7 @@ export default function App() {
     const [targetMode, setTargetMode] = useState<TargetMode>(null);
     const [selectedMineId, setSelectedMineId] = useState<string | null>(null);
     const [showEvolutionTree, setShowEvolutionTree] = useState(false);
-    const [language, setLanguage] = useState<Language>('zh_tw');
+    const [language, setLanguage] = useState<Language>('en');
     const [musicVolume, setMusicVolume] = useState(0.3);
     const [showGameStartAnimation, setShowGameStartAnimation] = useState(false);
     const [showLog, setShowLog] = useState(true);

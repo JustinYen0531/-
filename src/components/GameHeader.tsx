@@ -24,6 +24,12 @@ const GameHeader: React.FC<GameHeaderProps> = ({
     onExitGame,
     t
 }) => {
+    const modeLabel = gameState.gameMode === 'pvp'
+        ? t('pvp_mode')
+        : gameState.gameMode === 'sandbox'
+            ? t('sandbox_mode')
+            : t('pve_mode');
+
     return (
         <div className="h-12 bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 border-b-2 border-cyan-500 flex items-center justify-between px-4 shrink-0 z-30 shadow-2xl shadow-cyan-500/20">
             <div className="flex items-center gap-3">
@@ -33,12 +39,12 @@ const GameHeader: React.FC<GameHeaderProps> = ({
                 >
                     <LogOut size={20} />
                 </button>
-                <span className="text-lg font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
+                <span className="text-lg font-black text-white no-neon-text">
                     {t('app_title')}
                 </span>
 
                 <span className="text-xs font-bold text-white bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/50 ml-2">
-                    {gameState.gameMode === 'pvp' ? t('pvp_mode') : t('pve_mode')}
+                    {modeLabel}
                 </span>
             </div>
 

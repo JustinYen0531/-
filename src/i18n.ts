@@ -3,9 +3,9 @@
 export const TRANSLATIONS = {
   en: {
     app_title: "MINE CHESS",
-    lobby_desc: "A strategic turn-based game featuring mines, evolution, and capture-the-flag mechanics.",
+    lobby_desc: "Strategy, evolution, capture the flag - redefining classic mine warfare.",
     pvp_mode: "PvP (2 Players)",
-    pve_mode: "PvE (Vs AI)",
+    pve_mode: "AI Challenge",
     sandbox_mode: "Single Player Sandbox",
     sandbox_desc: "Developer testing mode with shortcuts.",
     exit: "Exit",
@@ -352,9 +352,9 @@ export const TRANSLATIONS = {
   },
   zh_tw: {
     app_title: "地雷棋",
-    lobby_desc: "一款結合地雷、進化與奪旗機制的戰略回合制遊戲。",
+    lobby_desc: "策略、進化、奪旗——重新定義經典地雷戰。",
     pvp_mode: "玩家對戰 (2人)",
-    pve_mode: "人機對戰 (Vs AI)",
+    pve_mode: "人機對戰",
     sandbox_mode: "單人沙盒",
     sandbox_desc: "開發者測試模式，提供各種快捷功能。",
     exit: "離開",
@@ -684,9 +684,9 @@ export const TRANSLATIONS = {
   },
   zh_cn: {
     app_title: "地雷棋",
-    lobby_desc: "一款结合地雷、进化与夺旗机制的战略回合制游戏。",
+    lobby_desc: "策略、进化、夺旗——重新定义经典地雷战。",
     pvp_mode: "玩家对战 (2人)",
-    pve_mode: "人机对战 (Vs AI)",
+    pve_mode: "人机对战",
     sandbox_mode: "单人沙盒",
     sandbox_desc: "开发者测试模式，提供各种快捷功能。",
     exit: "离开",

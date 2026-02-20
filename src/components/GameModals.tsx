@@ -359,10 +359,10 @@ const GameModals: React.FC<GameModalsProps> = ({
                 </div>
 
                 <div className="relative z-10 text-center space-y-2">
-                    <h1 className="text-5xl md:text-7xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 drop-shadow-2xl">
+                    <h1 className="neon-title text-5xl md:text-7xl font-black drop-shadow-2xl">
                         {t('app_title')}
                     </h1>
-                    <p className="text-cyan-300 max-w-xl mx-auto font-semibold">{t('lobby_desc')}</p>
+                    <p className="text-cyan-300 max-w-xl mx-auto font-semibold tracking-[0.08em]">{t('lobby_desc')}</p>
                 </div>
 
                 {!roomId ? (
@@ -378,7 +378,7 @@ const GameModals: React.FC<GameModalsProps> = ({
                         <div className="flex flex-wrap items-stretch justify-center gap-3">
                             <button
                                 onClick={() => setShowPveDifficultyPanel(prev => !prev)}
-                                className="min-w-[220px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
+                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
                             >
                                 <Cpu size={22} />
                                 {t('pve_mode')}
@@ -430,7 +430,7 @@ const GameModals: React.FC<GameModalsProps> = ({
                                 setJoinedRoomName('');
                                 setShowJoinModal(true);
                             }}
-                            className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-slate-600 to-slate-500 hover:from-slate-500 hover:to-slate-400 rounded-xl font-black text-lg shadow-2xl shadow-slate-500/40 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-slate-400 text-white"
+                            className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 rounded-xl font-black text-lg shadow-2xl shadow-indigo-500/45 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-indigo-300 text-white"
                         >
                             <DoorOpen size={22} />
                             {uiText.joinLobby}
