@@ -9,8 +9,6 @@ import { AuthResultPayload } from '../network/protocol';
 import developerLogOverviewRaw from '../../遊戲文章總覽.MD?raw';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
-
 
 
 interface GameModalsProps {
@@ -83,52 +81,35 @@ const normalizeDeveloperLogPreview = (content: string): string => {
 };
 
 const parseDeveloperLogs = (rawContent: string): DeveloperLogEntry[] => {
-    const normalizedRaw = rawContent.replace(/\r\n/g, '\n');
-
-    // Find all starting positions of headers
-    const headerIndices: number[] = [];
-    let match;
-    const regex = new RegExp(DEVELOPER_LOG_HEADER_PATTERN);
-    while ((match = regex.exec(normalizedRaw)) !== null) {
-        headerIndices.push(match.index);
+    const matches = [...rawContent.matchAll(DEVELOPER_LOG_HEADER_PATTERN)];
+    if (matches.length === 0) {
+        return [];
     }
 
-    if (headerIndices.length === 0) return [];
+    return matches
+        .map((match, index) => {
+            const start = match.index ?? 0;
+            const end = matches[index + 1]?.index ?? rawContent.length;
+            const articleContentFull = rawContent.slice(start, end).trim();
+            // Remove the first line which is the header pattern itself
+            const contentLines = articleContentFull.split('\n');
+            const articleContent = contentLines.slice(1).join('\n').trim();
+            const month = Number(match[2]);
+            const day = Number(match[3]);
 
-    const logs: DeveloperLogEntry[] = [];
-
-    for (let i = 0; i < headerIndices.length; i++) {
-        const start = headerIndices[i];
-        const end = i + 1 < headerIndices.length ? headerIndices[i + 1] : normalizedRaw.length;
-        const rawArticle = normalizedRaw.slice(start, end).trim();
-
-        // Extract title and date from the first line
-        // We remove the '$' anchor because rawArticle contains the entire body
-        const singleHeaderPattern = /^(\d+)\.\((\d{1,2})\/(\d{1,2})\)(.+)/;
-        const headerMatch = rawArticle.match(singleHeaderPattern);
-        if (headerMatch) {
-            const id = headerMatch[1];
-            const month = Number(headerMatch[2]);
-            const day = Number(headerMatch[3]);
-            const title = headerMatch[4].trim();
-
-            // Content starts after the first line
-            const contentLines = rawArticle.split('\n');
-            const content = contentLines.slice(1).join('\n').trim();
-
-            logs.push({
-                id,
-                title,
-                dateLabel: `${headerMatch[2]}/${headerMatch[3]}`,
+            return {
+                id: match[1],
+                title: match[4].trim(),
+                dateLabel: `${match[2]}/${match[3]}`,
                 dateSortValue: month * 100 + day,
-                content: content,
-                preview: normalizeDeveloperLogPreview(content)
-            });
-        }
-    }
-
-    return logs.sort((a, b) => b.dateSortValue - a.dateSortValue || Number(b.id) - Number(a.id));
+                content: articleContent,
+                preview: normalizeDeveloperLogPreview(articleContentFull)
+            };
+        })
+        .sort((a, b) => b.dateSortValue - a.dateSortValue || Number(b.id) - Number(a.id));
 };
+
+const DEVELOPER_LOGS = parseDeveloperLogs(developerLogOverviewRaw);
 
 const normalizePeerIdInput = (value: string): string => (
     value.replace(/\D/g, '').slice(0, 4)
@@ -169,38 +150,6 @@ const GameModals: React.FC<GameModalsProps> = ({
     setAllowDevToolsInPvp,
     t
 }) => {
-    // Dynamically derive DEVELOPER_LOGS to support localization from i18n.ts
-    const derivedLogs: DeveloperLogEntry[] = (() => {
-        // If the language is Traditional Chinese, always use the raw markdown file
-        // to ensure the full original content is visible.
-        if (language === 'zh_tw') {
-            return parseDeveloperLogs(developerLogOverviewRaw);
-        }
-
-        const translatedLogs: DeveloperLogEntry[] = [];
-        for (let i = 1; i <= 10; i++) {
-            const title = t(`dev_log_${i}_title`);
-            // If the key is returned same as key name, it's missing (usually t function behavior)
-            // Or if it returns empty/missing.
-            if (!title || title === `dev_log_${i}_title`) continue;
-
-            translatedLogs.push({
-                id: t(`dev_log_${i}_id`),
-                title,
-                dateLabel: t(`dev_log_${i}_date`),
-                dateSortValue: i, // Simple sort for predefined ones
-                content: t(`dev_log_${i}_content`),
-                preview: normalizeDeveloperLogPreview(t(`dev_log_${i}_content`))
-            });
-        }
-
-        if (translatedLogs.length > 0) {
-            return translatedLogs.sort((a, b) => Number(b.id) - Number(a.id));
-        }
-
-        // Fallback to parsing the raw markdown file if no translations are found
-        return parseDeveloperLogs(developerLogOverviewRaw);
-    })();
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
     const [joinMode, setJoinMode] = useState<'join' | 'create'>('join');
@@ -278,7 +227,7 @@ const GameModals: React.FC<GameModalsProps> = ({
     };
 
     const pveDifficultyTitle = isZh ? '選擇AI難度' : 'Choose AI Difficulty';
-    const latestDeveloperLog = derivedLogs[0] ?? null;
+    const latestDeveloperLog = DEVELOPER_LOGS[0] ?? null;
 
     useEffect(() => {
         if (joinMode !== 'create') {
@@ -478,7 +427,7 @@ const GameModals: React.FC<GameModalsProps> = ({
                     <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-red-500/5" />
                 </div>
 
-                <div className="relative z-10 text-center space-y-3 pt-32 lg:pt-40">
+                <div className="relative z-10 text-center space-y-2">
                     <h1 className="neon-title text-5xl md:text-7xl font-black drop-shadow-2xl">
                         {t('app_title')}
                     </h1>
@@ -486,8 +435,8 @@ const GameModals: React.FC<GameModalsProps> = ({
                 </div>
 
                 {!roomId ? (
-                    <div className="relative z-10 mt-10 flex w-full max-w-5xl flex-col items-center gap-6">
-                        <div className="flex flex-wrap items-stretch justify-center gap-6">
+                    <div className="relative z-10 mt-8 flex w-full max-w-5xl flex-col items-center gap-4">
+                        <div className="flex flex-wrap items-stretch justify-center gap-4">
                             <button
                                 onClick={() => onStartGame('sandbox')}
                                 className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 rounded-xl font-black text-lg shadow-2xl shadow-yellow-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-amber-300"
@@ -555,34 +504,38 @@ const GameModals: React.FC<GameModalsProps> = ({
                                 <DoorOpen size={22} />
                                 {uiText.joinLobby}
                             </button>
+
+                            <button
+                                onClick={() => setShowTutorial(true)}
+                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-xl font-black text-lg shadow-2xl shadow-emerald-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-emerald-300"
+                            >
+                                <HelpCircle size={22} />
+                                {uiText.tutorial}
+                            </button>
                         </div>
 
                         {latestDeveloperLog && (
                             <button
                                 onClick={() => setShowDeveloperLogModal(true)}
-                                className="w-full max-w-lg rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-center shadow-lg transition-all hover:bg-white/10 hover:scale-[1.01]"
+                                className="w-full max-w-3xl rounded-2xl border-2 border-cyan-400/60 bg-gradient-to-r from-slate-900/90 via-cyan-950/60 to-slate-900/90 px-5 py-4 text-left shadow-2xl shadow-cyan-500/20 transition-all hover:border-cyan-300 hover:scale-[1.01] hover:shadow-cyan-500/30"
                             >
-                                <div className="flex flex-col items-center gap-0.5">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[9px] font-black tracking-widest text-cyan-400 uppercase opacity-80">LATEST LOG</span>
-                                        <span className="w-1 h-1 bg-white/20 rounded-full" />
-                                        <span className="text-[9px] font-bold text-slate-400 font-mono">{latestDeveloperLog.dateLabel}</span>
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="rounded-lg bg-cyan-500/20 p-2 text-cyan-300 border border-cyan-400/40 shrink-0">
+                                            <Info size={18} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="text-[11px] font-bold tracking-[0.08em] text-cyan-200/90 uppercase">{uiText.latestArticle}</div>
+                                            <div className="text-base font-black text-white truncate">{latestDeveloperLog.title}</div>
+                                        </div>
                                     </div>
-                                    <h3 className="text-sm font-black text-white/90 truncate w-full">{latestDeveloperLog.title}</h3>
-                                    <p className="text-[10px] text-slate-400 truncate w-full opacity-70">
-                                        {latestDeveloperLog.preview}
-                                    </p>
+                                    <div className="rounded-md border border-cyan-400/40 bg-cyan-950/60 px-2.5 py-1 text-xs font-mono text-cyan-100 shrink-0">
+                                        {latestDeveloperLog.dateLabel}
+                                    </div>
                                 </div>
+                                <div className="mt-2 text-sm text-slate-200/90">{latestDeveloperLog.preview}</div>
                             </button>
                         )}
-
-                        <button
-                            onClick={() => setShowTutorial(true)}
-                            className="min-w-[150px] px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-xl font-black text-base shadow-xl shadow-emerald-500/30 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 border-2 border-emerald-300"
-                        >
-                            <HelpCircle size={20} />
-                            {uiText.tutorial}
-                        </button>
                     </div>
                 ) : (
                     <div className="relative z-10 mt-8 flex flex-col items-center gap-4">
@@ -897,23 +850,22 @@ const GameModals: React.FC<GameModalsProps> = ({
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {derivedLogs.length === 0 && (
+                                {DEVELOPER_LOGS.length === 0 && (
                                     <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-5 text-slate-300">
                                         {uiText.emptyDeveloperLogs}
                                     </div>
                                 )}
-                                {derivedLogs.map((article: DeveloperLogEntry) => (
+                                {DEVELOPER_LOGS.map((article) => (
                                     <article key={article.id} className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
                                         <div className="flex items-center justify-between gap-3">
                                             <h3 className="text-lg font-black text-white">{article.title}</h3>
                                             <span className="rounded-md border border-cyan-400/35 bg-cyan-950/60 px-2.5 py-1 text-xs font-mono text-cyan-100">{article.dateLabel}</span>
                                         </div>
                                         <div className="mt-3 text-xs leading-relaxed text-slate-200 font-sans markdown-content">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                 {article.content}
                                             </ReactMarkdown>
                                         </div>
-
 
                                     </article>
                                 ))}

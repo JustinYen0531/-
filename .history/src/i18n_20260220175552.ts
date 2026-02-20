@@ -465,6 +465,8 @@ export const TRANSLATIONS = {
     hide_log: "收起日誌",
 
     // Evolution Descriptions & Rewards
+
+    // Evolution Descriptions & Rewards
     evol_gen_a_desc: "武器進化",
     evol_gen_a_subtitle: "【征服者武裝】",
     evol_gen_a_req: "造成 4/12/20 傷害",

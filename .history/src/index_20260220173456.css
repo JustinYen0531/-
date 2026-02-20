@@ -421,36 +421,19 @@ code {
 }
 
 .shader-planet-turn-active {
-  --shader-planet-glow-near: 58px;
-  --shader-planet-glow-far: 200px;
-  --shader-planet-breathe-scale: 1.14;
-  --shader-planet-breathe-y: -53.4%;
-  --shader-planet-breathe-duration: 4.3s;
-  --shader-planet-halo-duration: 3.1s;
-  --shader-planet-halo-min: 0.8;
+  --shader-planet-glow-near: 42px;
+  --shader-planet-glow-far: 140px;
+  --shader-planet-breathe-scale: 1.08;
+  --shader-planet-breathe-y: -52.2%;
+  --shader-planet-breathe-duration: 5.8s;
+  --shader-planet-halo-duration: 4.5s;
+  --shader-planet-halo-min: 0.72;
   --shader-planet-halo-max: 1;
-  --shader-planet-halo-scale-min: 1.08;
-  --shader-planet-halo-scale-max: 1.42;
-  --shader-planet-halo-blur-min: 22px;
-  --shader-planet-halo-blur-max: 44px;
-  filter: saturate(1.32) brightness(1.2);
-}
-
-.shader-planet-turn-inactive {
-  --shader-planet-glow-near: 14px;
-  --shader-planet-glow-far: 44px;
-  --shader-planet-breathe-scale: 1.03;
-  --shader-planet-breathe-y: -51%;
-  --shader-planet-breathe-duration: 8.4s;
-  --shader-planet-halo-duration: 7.1s;
-  --shader-planet-halo-min: 0.4;
-  --shader-planet-halo-max: 0.64;
-  --shader-planet-halo-scale-min: 0.9;
-  --shader-planet-halo-scale-max: 1.02;
-  --shader-planet-halo-blur-min: 8px;
-  --shader-planet-halo-blur-max: 14px;
-  opacity: 0.76;
-  filter: saturate(0.98) brightness(0.86);
+  --shader-planet-halo-scale-min: 1.02;
+  --shader-planet-halo-scale-max: 1.25;
+  --shader-planet-halo-blur-min: 18px;
+  --shader-planet-halo-blur-max: 32px;
+  filter: saturate(1.24) brightness(1.12);
 }
 
 .shader-planet-canvas {

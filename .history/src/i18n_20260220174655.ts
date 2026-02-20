@@ -91,30 +91,6 @@ export const TRANSLATIONS = {
     show_log: "Show Log",
     hide_log: "Hide Log",
 
-    // Developer Logs - Article 1: GDD
-    dev_log_1_id: "1",
-    dev_log_1_date: "1/29",
-    dev_log_1_title: "Game Design Document (GDD)",
-    dev_log_1_content: "# 🎮 MINE CHESS - Post-Development GDD\n\n> **Version**: v1.0  \n> **Last Update**: 2026-02-05  \n> **Stage**: Post-Development Analysis\n\n---\n\n## 📝 Concept\n\n**Mine Chess** is a unique fusion of **Minesweeper**, **Turn-Based tactics**, and **Capture the Flag**. Players control a squad of five specialized classes on a battlefield filled with hidden mines. The goal is to capture the enemy flag or eliminate the opposition. Mines are transformed from passive obstacles into active tactical resources.\n\n---\n\n## 🏛️ Design Pillars\n\n### 1. 🧠 Information War & Mind Games\nThe tension comes from **incomplete information**. Enemy mines are hidden and must be revealed by the Sweeper. Players must balance 'risky advancement' with 'careful detection'.\n\n### 2. ⚖️ Energy Economy\nEvery action consumes **Energy**. Players must manage:\n- **Energy Cap** per unit (1/3 of total)\n- **Interest** (+1 per 10 energy, max 10)\n- Extra income from kills and mining.\n\n### 3. 🌳 Branching Evolution\nEach class has **two paths (A & B)** with 3 tiers. Tier 3 features a final branch choice, creating deep customization.\n\n### 4. 🏁 Dynamic CTF\nCapturing the flag is just the start; escorting it back while facing increased movement costs is the real challenge.\n\n---\n\n## 🎯 Genre Definition\nMine Chess combines elements of Tactics, Minesweeper, CTF, MOBA-style class design, and Roguelite progression.\n\n---\n\n## 💎 Unique Selling Points (USP)\n1. **Bidirectional Mines**: Use mines as both obstacles and weapons (pick up, throw, convert).\n2. **Specialized Classes**: 5 distinct roles (General, Sweeper, Ranger, Maker, Defuser).\n3. **Tactical Structures**: Place Towers, Hubs, and Factories to control territory.\n4. **Readable Intent**: Evolution choices are public, enabling strategic counter-play.",
-
-    // Developer Logs - Article 2: Origins
-    dev_log_2_id: "2",
-    dev_log_2_date: "2/5",
-    dev_log_2_title: "Dev Journey: Vibe Coding with AI",
-    dev_log_2_content: "\"We started not because it was easy, but because we thought it would be.\"\n\nCreated during the 2026 winter break, Mine Chess is a result of \"Vibe Coding\"—using natural language to guide AI agents to build complex software. It began with Google AI Studio but moved to local IDE agents (Kiro/Claude) for better precision, and finally to **Google Antigravity (Gemini 3 Pro)** for superior UI consistency.\n\n### Key Lessons:\n- **Avoid Overconfidence**: Large models can hallucinate or overwrite code. Strict system prompts are essential.\n- **Version Control**: Manual backups and Git history are lifesavers when AI deletes 6000 lines of code.\n- **Modularize**: Don't let your main file become a \"monster\". Split logic into components.",
-
-    // Developer Logs - Article 3: Design
-    dev_log_3_id: "3",
-    dev_log_3_date: "2/8",
-    dev_log_3_title: "Design Specs: Aesthetics of Contrast",
-    dev_log_3_content: "### 🎭 Core Visuals: Red vs Blue\nThe design emphasizes strong contrast between Blue and Red. The background is a dark starry sky with dynamic auroras and shooting stars to create an epic cosmic scale.\n\n### ✨ Symbolic Language\n- **Neon Style**: Simple pencil strokes with neon glows emphasize the 'IO game' accessibility.\n- **Breathing Effects**: Hidden mines use transparency 'breathing' to signal hidden danger.\n- **Satellite Upgrades**: Evolution icons are surrounded by orbiting satellite markers, changing color from orange to 'Platinum' or 'Purple' at final tiers.",
-
-    // Developer Logs - Article 4: Lore
-    dev_log_4_id: "4",
-    dev_log_4_date: "2/13",
-    dev_log_4_title: "Lore: The Century Protocol",
-    dev_log_4_content: "\"In space, there are no mines—only space junk.\"\n\nIn the distant future, the Blue and Red planets entered a strange colonial competition. Instead of full-scale war, they agreed on a protocol: whoever plants their flag on the other's territory wins. They deployed specialists and bypass space weapon bans by calling their mines \"accidental space junk.\"\n\nRumor has it, the two opposing Generals are actually grumpy brothers in a century-long sibling rivalry. Today, their conflict has become a legendary sport enjoyed by tourists from both worlds.",
-
     // Evolution Descriptions & Rewards
     evol_gen_a_desc: "Weapon Damage",
     evol_gen_a_subtitle: "Conqueror Arsenal",

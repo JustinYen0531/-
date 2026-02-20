@@ -464,6 +464,18 @@ export const TRANSLATIONS = {
     show_log: "展開日誌",
     hide_log: "收起日誌",
 
+    // Developer Logs - Article 1
+    dev_log_1_id: "1",
+    dev_log_1_date: "1/29",
+    dev_log_1_title: "遊戲設計GDD",
+    dev_log_1_content: "# 🎮 地雷棋 (Mine Chess) - 開發後設計文檔\n\n(內容同原 MD 檔摘要...)",
+
+    // Developer Logs - Article 2
+    dev_log_2_id: "2",
+    dev_log_2_date: "2/5",
+    dev_log_2_title: "開發歷程：AI 輔助開發",
+    dev_log_2_content: "(內容同原 MD 檔摘要...)",
+
     // Evolution Descriptions & Rewards
     evol_gen_a_desc: "武器進化",
     evol_gen_a_subtitle: "【征服者武裝】",

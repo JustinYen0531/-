@@ -130,6 +130,8 @@ const parseDeveloperLogs = (rawContent: string): DeveloperLogEntry[] => {
     return logs.sort((a, b) => b.dateSortValue - a.dateSortValue || Number(b.id) - Number(a.id));
 };
 
+const DEVELOPER_LOGS = parseDeveloperLogs(developerLogOverviewRaw);
+
 const normalizePeerIdInput = (value: string): string => (
     value.replace(/\D/g, '').slice(0, 4)
 );
@@ -169,38 +171,6 @@ const GameModals: React.FC<GameModalsProps> = ({
     setAllowDevToolsInPvp,
     t
 }) => {
-    // Dynamically derive DEVELOPER_LOGS to support localization from i18n.ts
-    const derivedLogs: DeveloperLogEntry[] = (() => {
-        // If the language is Traditional Chinese, always use the raw markdown file
-        // to ensure the full original content is visible.
-        if (language === 'zh_tw') {
-            return parseDeveloperLogs(developerLogOverviewRaw);
-        }
-
-        const translatedLogs: DeveloperLogEntry[] = [];
-        for (let i = 1; i <= 10; i++) {
-            const title = t(`dev_log_${i}_title`);
-            // If the key is returned same as key name, it's missing (usually t function behavior)
-            // Or if it returns empty/missing.
-            if (!title || title === `dev_log_${i}_title`) continue;
-
-            translatedLogs.push({
-                id: t(`dev_log_${i}_id`),
-                title,
-                dateLabel: t(`dev_log_${i}_date`),
-                dateSortValue: i, // Simple sort for predefined ones
-                content: t(`dev_log_${i}_content`),
-                preview: normalizeDeveloperLogPreview(t(`dev_log_${i}_content`))
-            });
-        }
-
-        if (translatedLogs.length > 0) {
-            return translatedLogs.sort((a, b) => Number(b.id) - Number(a.id));
-        }
-
-        // Fallback to parsing the raw markdown file if no translations are found
-        return parseDeveloperLogs(developerLogOverviewRaw);
-    })();
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
     const [joinMode, setJoinMode] = useState<'join' | 'create'>('join');
@@ -278,7 +248,7 @@ const GameModals: React.FC<GameModalsProps> = ({
     };
 
     const pveDifficultyTitle = isZh ? '選擇AI難度' : 'Choose AI Difficulty';
-    const latestDeveloperLog = derivedLogs[0] ?? null;
+    const latestDeveloperLog = DEVELOPER_LOGS[0] ?? null;
 
     useEffect(() => {
         if (joinMode !== 'create') {
@@ -487,22 +457,22 @@ const GameModals: React.FC<GameModalsProps> = ({
 
                 {!roomId ? (
                     <div className="relative z-10 mt-10 flex w-full max-w-5xl flex-col items-center gap-6">
-                        <div className="flex flex-wrap items-stretch justify-center gap-6">
+                        <div className="flex flex-wrap items-stretch justify-center gap-5">
                             <button
                                 onClick={() => onStartGame('sandbox')}
-                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 rounded-xl font-black text-lg shadow-2xl shadow-yellow-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-amber-300"
+                                className="w-[180px] px-4 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 rounded-xl font-black text-lg shadow-2xl shadow-yellow-500/50 transform hover:scale-105 transition-all duration-200 flex flex-col items-center justify-center gap-1 border-2 border-amber-300"
                             >
                                 <FlaskConical size={22} />
-                                {t('sandbox_mode')}
+                                <span className="whitespace-nowrap">{t('sandbox_mode')}</span>
                             </button>
 
                             <div className="flex flex-wrap items-stretch justify-center gap-3">
                                 <button
                                     onClick={() => setShowPveDifficultyPanel(prev => !prev)}
-                                    className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
+                                    className="w-[180px] px-4 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform hover:scale-105 transition-all duration-200 flex flex-col items-center justify-center gap-1 border-2 border-violet-300"
                                 >
                                     <Cpu size={22} />
-                                    {t('pve_mode')}
+                                    <span className="whitespace-nowrap">{t('pve_mode')}</span>
                                 </button>
 
                                 <div
@@ -550,10 +520,10 @@ const GameModals: React.FC<GameModalsProps> = ({
                                     setJoinedRoomName('');
                                     setShowJoinModal(true);
                                 }}
-                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 rounded-xl font-black text-lg shadow-2xl shadow-indigo-500/45 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-indigo-300 text-white"
+                                className="w-[180px] px-4 py-4 bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 rounded-xl font-black text-lg shadow-2xl shadow-indigo-500/45 transform hover:scale-105 transition-all duration-200 flex flex-col items-center justify-center gap-1 border-2 border-indigo-300 text-white"
                             >
                                 <DoorOpen size={22} />
-                                {uiText.joinLobby}
+                                <span className="whitespace-nowrap">{uiText.joinLobby}</span>
                             </button>
                         </div>
 
@@ -578,10 +548,10 @@ const GameModals: React.FC<GameModalsProps> = ({
 
                         <button
                             onClick={() => setShowTutorial(true)}
-                            className="min-w-[150px] px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-xl font-black text-base shadow-xl shadow-emerald-500/30 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 border-2 border-emerald-300"
+                            className="w-[180px] px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-xl font-black text-base shadow-xl shadow-emerald-500/30 transform hover:scale-105 transition-all duration-200 flex flex-col items-center justify-center gap-1 border-2 border-emerald-300"
                         >
                             <HelpCircle size={20} />
-                            {uiText.tutorial}
+                            <span className="whitespace-nowrap">{uiText.tutorial}</span>
                         </button>
                     </div>
                 ) : (
@@ -897,12 +867,12 @@ const GameModals: React.FC<GameModalsProps> = ({
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {derivedLogs.length === 0 && (
+                                {DEVELOPER_LOGS.length === 0 && (
                                     <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-5 text-slate-300">
                                         {uiText.emptyDeveloperLogs}
                                     </div>
                                 )}
-                                {derivedLogs.map((article: DeveloperLogEntry) => (
+                                {DEVELOPER_LOGS.map((article) => (
                                     <article key={article.id} className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
                                         <div className="flex items-center justify-between gap-3">
                                             <h3 className="text-lg font-black text-white">{article.title}</h3>

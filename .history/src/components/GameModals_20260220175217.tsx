@@ -130,24 +130,6 @@ const parseDeveloperLogs = (rawContent: string): DeveloperLogEntry[] => {
     return logs.sort((a, b) => b.dateSortValue - a.dateSortValue || Number(b.id) - Number(a.id));
 };
 
-const normalizePeerIdInput = (value: string): string => (
-    value.replace(/\D/g, '').slice(0, 4)
-);
-
-const isValidPeerId = (value: string): boolean => PEER_ID_PATTERN.test(value);
-
-const isAuthResultPayload = (payload: unknown): payload is AuthResultPayload => {
-    if (!payload || typeof payload !== 'object') {
-        return false;
-    }
-    const candidate = payload as Partial<AuthResultPayload>;
-    return (
-        typeof candidate.accepted === 'boolean' &&
-        (candidate.reason === undefined || typeof candidate.reason === 'string') &&
-        (candidate.roomName === undefined || typeof candidate.roomName === 'string')
-    );
-};
-
 const GameModals: React.FC<GameModalsProps> = ({
     view,
     gameState,
@@ -171,12 +153,7 @@ const GameModals: React.FC<GameModalsProps> = ({
 }) => {
     // Dynamically derive DEVELOPER_LOGS to support localization from i18n.ts
     const derivedLogs: DeveloperLogEntry[] = (() => {
-        // If the language is Traditional Chinese, always use the raw markdown file
-        // to ensure the full original content is visible.
-        if (language === 'zh_tw') {
-            return parseDeveloperLogs(developerLogOverviewRaw);
-        }
-
+        // Find how many logs are in the i18n (we check up to 10 for safety)
         const translatedLogs: DeveloperLogEntry[] = [];
         for (let i = 1; i <= 10; i++) {
             const title = t(`dev_log_${i}_title`);
@@ -278,7 +255,7 @@ const GameModals: React.FC<GameModalsProps> = ({
     };
 
     const pveDifficultyTitle = isZh ? '選擇AI難度' : 'Choose AI Difficulty';
-    const latestDeveloperLog = derivedLogs[0] ?? null;
+    const latestDeveloperLog = DEVELOPER_LOGS[0] ?? null;
 
     useEffect(() => {
         if (joinMode !== 'create') {
@@ -897,12 +874,12 @@ const GameModals: React.FC<GameModalsProps> = ({
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {derivedLogs.length === 0 && (
+                                {DEVELOPER_LOGS.length === 0 && (
                                     <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-5 text-slate-300">
                                         {uiText.emptyDeveloperLogs}
                                     </div>
                                 )}
-                                {derivedLogs.map((article: DeveloperLogEntry) => (
+                                {DEVELOPER_LOGS.map((article) => (
                                     <article key={article.id} className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
                                         <div className="flex items-center justify-between gap-3">
                                             <h3 className="text-lg font-black text-white">{article.title}</h3>

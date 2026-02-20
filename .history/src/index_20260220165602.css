@@ -421,36 +421,19 @@ code {
 }
 
 .shader-planet-turn-active {
-  --shader-planet-glow-near: 58px;
-  --shader-planet-glow-far: 200px;
-  --shader-planet-breathe-scale: 1.14;
+  --shader-planet-glow-near: 54px;
+  --shader-planet-glow-far: 220px;
+  --shader-planet-breathe-scale: 1.1;
   --shader-planet-breathe-y: -53.4%;
-  --shader-planet-breathe-duration: 4.3s;
-  --shader-planet-halo-duration: 3.1s;
-  --shader-planet-halo-min: 0.8;
+  --shader-planet-breathe-duration: 2.8s;
+  --shader-planet-halo-duration: 2.1s;
+  --shader-planet-halo-min: 0.86;
   --shader-planet-halo-max: 1;
   --shader-planet-halo-scale-min: 1.08;
-  --shader-planet-halo-scale-max: 1.42;
+  --shader-planet-halo-scale-max: 1.5;
   --shader-planet-halo-blur-min: 22px;
-  --shader-planet-halo-blur-max: 44px;
-  filter: saturate(1.32) brightness(1.2);
-}
-
-.shader-planet-turn-inactive {
-  --shader-planet-glow-near: 14px;
-  --shader-planet-glow-far: 44px;
-  --shader-planet-breathe-scale: 1.03;
-  --shader-planet-breathe-y: -51%;
-  --shader-planet-breathe-duration: 8.4s;
-  --shader-planet-halo-duration: 7.1s;
-  --shader-planet-halo-min: 0.4;
-  --shader-planet-halo-max: 0.64;
-  --shader-planet-halo-scale-min: 0.9;
-  --shader-planet-halo-scale-max: 1.02;
-  --shader-planet-halo-blur-min: 8px;
-  --shader-planet-halo-blur-max: 14px;
-  opacity: 0.76;
-  filter: saturate(0.98) brightness(0.86);
+  --shader-planet-halo-blur-max: 46px;
+  filter: saturate(1.3) brightness(1.16);
 }
 
 .shader-planet-canvas {
@@ -714,7 +697,6 @@ code {
 }
 
 @media (max-width: 768px) {
-
   .neon-planet,
   .shader-planet {
     opacity: 0.82;
@@ -748,8 +730,8 @@ code {
   color: #e2e8f0;
 }
 
-.markdown-content h1,
-.markdown-content h2,
+.markdown-content h1, 
+.markdown-content h2, 
 .markdown-content h3 {
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
@@ -757,25 +739,15 @@ code {
   color: #ffffff;
 }
 
-.markdown-content h1 {
-  font-size: 1.5rem;
-  border-bottom: 1px solid rgba(var(--global-neon-rgb), 0.3);
-  padding-bottom: 0.25rem;
-}
-
-.markdown-content h2 {
-  font-size: 1.25rem;
-}
-
-.markdown-content h3 {
-  font-size: 1.1rem;
-}
+.markdown-content h1 { font-size: 1.5rem; border-bottom: 1px solid rgba(var(--global-neon-rgb), 0.3); padding-bottom: 0.25rem; }
+.markdown-content h2 { font-size: 1.25rem; }
+.markdown-content h3 { font-size: 1.1rem; }
 
 .markdown-content p {
   margin-bottom: 1rem;
 }
 
-.markdown-content ul,
+.markdown-content ul, 
 .markdown-content ol {
   margin-bottom: 1rem;
   padding-left: 1.25rem;
@@ -835,7 +807,7 @@ code {
   margin-bottom: 1rem;
 }
 
-.markdown-content th,
+.markdown-content th, 
 .markdown-content td {
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 0.5rem;

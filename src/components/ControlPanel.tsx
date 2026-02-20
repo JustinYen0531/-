@@ -77,7 +77,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     handleRangerAction, swapUnits, isLocalPlayerTurn, localPlayerId
 }) => {
     // Flipped card state moved to EvolutionTree component
-    const player = gameState.gameMode === 'pvp' ? gameState.players[localPlayerId] : gameState.players[PlayerID.P1];
+    const panelPlayerId = gameState.gameMode === 'pvp'
+        ? localPlayerId
+        : gameState.gameMode === 'sandbox'
+            ? gameState.currentPlayer
+            : PlayerID.P1;
+    const player = gameState.players[panelPlayerId];
     const isThinking = gameState.phase === 'thinking';
     const isPlacement = gameState.phase === 'placement';
     const isAiTurnLocked =
@@ -92,7 +97,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
     // PvP: local player already confirmed; waiting for opponent confirmation.
     const isWaitingForOpponent = gameState.gameMode === 'pvp'
-        && gameState.pvpReadyState?.[localPlayerId] === true;
+        && gameState.pvpReadyState?.[panelPlayerId] === true;
     const isSetupMineLimitReached = player.placementMinesPlaced >= PLACEMENT_MINE_LIMIT;
 
     // End Turn confirmation state
@@ -206,7 +211,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
                     <UnitInfoPanel
                         gameState={gameState}
-                        localPlayerId={localPlayerId}
+                        localPlayerId={panelPlayerId}
                         language={language as any}
                         t={t}
                         onUnitClick={handleUnitClick}

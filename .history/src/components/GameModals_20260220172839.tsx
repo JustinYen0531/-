@@ -130,6 +130,8 @@ const parseDeveloperLogs = (rawContent: string): DeveloperLogEntry[] => {
     return logs.sort((a, b) => b.dateSortValue - a.dateSortValue || Number(b.id) - Number(a.id));
 };
 
+const DEVELOPER_LOGS = parseDeveloperLogs(developerLogOverviewRaw);
+
 const normalizePeerIdInput = (value: string): string => (
     value.replace(/\D/g, '').slice(0, 4)
 );
@@ -169,38 +171,6 @@ const GameModals: React.FC<GameModalsProps> = ({
     setAllowDevToolsInPvp,
     t
 }) => {
-    // Dynamically derive DEVELOPER_LOGS to support localization from i18n.ts
-    const derivedLogs: DeveloperLogEntry[] = (() => {
-        // If the language is Traditional Chinese, always use the raw markdown file
-        // to ensure the full original content is visible.
-        if (language === 'zh_tw') {
-            return parseDeveloperLogs(developerLogOverviewRaw);
-        }
-
-        const translatedLogs: DeveloperLogEntry[] = [];
-        for (let i = 1; i <= 10; i++) {
-            const title = t(`dev_log_${i}_title`);
-            // If the key is returned same as key name, it's missing (usually t function behavior)
-            // Or if it returns empty/missing.
-            if (!title || title === `dev_log_${i}_title`) continue;
-
-            translatedLogs.push({
-                id: t(`dev_log_${i}_id`),
-                title,
-                dateLabel: t(`dev_log_${i}_date`),
-                dateSortValue: i, // Simple sort for predefined ones
-                content: t(`dev_log_${i}_content`),
-                preview: normalizeDeveloperLogPreview(t(`dev_log_${i}_content`))
-            });
-        }
-
-        if (translatedLogs.length > 0) {
-            return translatedLogs.sort((a, b) => Number(b.id) - Number(a.id));
-        }
-
-        // Fallback to parsing the raw markdown file if no translations are found
-        return parseDeveloperLogs(developerLogOverviewRaw);
-    })();
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
     const [joinMode, setJoinMode] = useState<'join' | 'create'>('join');
@@ -278,7 +248,7 @@ const GameModals: React.FC<GameModalsProps> = ({
     };
 
     const pveDifficultyTitle = isZh ? '選擇AI難度' : 'Choose AI Difficulty';
-    const latestDeveloperLog = derivedLogs[0] ?? null;
+    const latestDeveloperLog = DEVELOPER_LOGS[0] ?? null;
 
     useEffect(() => {
         if (joinMode !== 'create') {
@@ -897,12 +867,12 @@ const GameModals: React.FC<GameModalsProps> = ({
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {derivedLogs.length === 0 && (
+                                {DEVELOPER_LOGS.length === 0 && (
                                     <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-5 text-slate-300">
                                         {uiText.emptyDeveloperLogs}
                                     </div>
                                 )}
-                                {derivedLogs.map((article: DeveloperLogEntry) => (
+                                {DEVELOPER_LOGS.map((article) => (
                                     <article key={article.id} className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
                                         <div className="flex items-center justify-between gap-3">
                                             <h3 className="text-lg font-black text-white">{article.title}</h3>

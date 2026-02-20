@@ -3240,15 +3240,11 @@ export default function App() {
         : 0;
     // Only the current side's planet accelerates; the other side stays at normal spin speed.
     const bluePlanetSpinSpeed = (gameState.phase === 'action' && gameState.currentPlayer === PlayerID.P1)
-        ? 1 + Math.pow(actionUrgencyProgress, 1.2) * 1.9
+        ? 1 + Math.pow(actionUrgencyProgress, 1.28) * 1.1
         : 1;
     const redPlanetSpinSpeed = (gameState.phase === 'action' && gameState.currentPlayer === PlayerID.P2)
-        ? 1 + Math.pow(actionUrgencyProgress, 1.32) * 2.1
+        ? 1 + Math.pow(actionUrgencyProgress, 1.42) * 1.45
         : 1;
-    const isLeftPlanetTurnActive = leftPlanetTheme === activeTurnPlanetTheme;
-    const isRightPlanetTurnActive = rightPlanetTheme === activeTurnPlanetTheme;
-    const isLeftPlanetTurnInactive = activeTurnPlanetTheme !== null && !isLeftPlanetTurnActive;
-    const isRightPlanetTurnInactive = activeTurnPlanetTheme !== null && !isRightPlanetTurnActive;
     const rightAuraCenter = showLog ? '52% 42%' : '70% 42%';
     const neutralAuraCenter = showLog ? '41% 20%' : '50% 20%';
     const isLocalPlayerTurn = gameState.gameMode === 'pvp'
@@ -3429,16 +3425,16 @@ export default function App() {
                                 <ShaderPlanet
                                     theme={leftPlanetTheme}
                                     spinDirection={leftPlanetTheme === 'red' ? -1 : 1}
-                                    isTurnActive={isLeftPlanetTurnActive}
+                                    isTurnActive={leftPlanetTheme === activeTurnPlanetTheme}
                                     motionSpeed={leftPlanetTheme === 'blue' ? bluePlanetSpinSpeed : redPlanetSpinSpeed}
-                                    className={`planet-left ${isLeftPlanetTurnInactive ? 'shader-planet-turn-inactive' : ''}`.trim()}
+                                    className="planet-left"
                                 />
                                 <ShaderPlanet
                                     theme={rightPlanetTheme}
                                     spinDirection={rightPlanetTheme === 'red' ? -1 : 1}
-                                    isTurnActive={isRightPlanetTurnActive}
+                                    isTurnActive={rightPlanetTheme === activeTurnPlanetTheme}
                                     motionSpeed={rightPlanetTheme === 'blue' ? bluePlanetSpinSpeed : redPlanetSpinSpeed}
-                                    className={`planet-right ${isRightPlanetTurnInactive ? 'shader-planet-turn-inactive' : ''}`.trim()}
+                                    className="planet-right"
                                 />
                             </div>
 

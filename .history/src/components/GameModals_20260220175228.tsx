@@ -171,12 +171,7 @@ const GameModals: React.FC<GameModalsProps> = ({
 }) => {
     // Dynamically derive DEVELOPER_LOGS to support localization from i18n.ts
     const derivedLogs: DeveloperLogEntry[] = (() => {
-        // If the language is Traditional Chinese, always use the raw markdown file
-        // to ensure the full original content is visible.
-        if (language === 'zh_tw') {
-            return parseDeveloperLogs(developerLogOverviewRaw);
-        }
-
+        // Find how many logs are in the i18n (we check up to 10 for safety)
         const translatedLogs: DeveloperLogEntry[] = [];
         for (let i = 1; i <= 10; i++) {
             const title = t(`dev_log_${i}_title`);

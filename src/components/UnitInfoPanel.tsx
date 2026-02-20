@@ -18,11 +18,13 @@ const HOVER_PREVIEW_DELAY_MS = 500;
 const PREVIEW_HIDE_ANIMATION_MS = 180;
 
 const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId, t, onUnitClick, language, onSwapUnits }) => {
-    const isPvp = gameState.gameMode === 'pvp';
     const canShowEnemyPreview = true;
-    const localPlayer = isPvp ? localPlayerId : PlayerID.P1;
+    const localPlayer = localPlayerId;
     const enemyPlayer = localPlayer === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
     const isPlacement = gameState.phase === 'placement';
+    const isActionPhase = gameState.phase === 'action';
+    const isLocalTurn = isActionPhase && gameState.currentPlayer === localPlayer;
+    const isEnemyTurn = isActionPhase && gameState.currentPlayer === enemyPlayer;
     const [isPreviewMounted, setIsPreviewMounted] = useState(false);
     const [isPreviewVisible, setIsPreviewVisible] = useState(false);
     const previewShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,8 +165,8 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                                 const levelB = enemyState.evolutionLevels[u.type].b;
                                 const tier = Math.max(levelA, levelB);
                                 const isActed = u.hasActedThisRound;
-                                const isActive = !isPlacement && gameState.phase === 'action' && u.id === enemyActiveUnit?.id;
-                                const isWaiting = !isPlacement && gameState.phase === 'action' && !isActed && !isActive && !u.isDead;
+                                const isActive = !isPlacement && isEnemyTurn && u.id === enemyActiveUnit?.id;
+                                const isWaiting = !isPlacement && isEnemyTurn && !isActed && !isActive && !u.isDead;
                                 const enemyCanReorderInAction =
                                     gameState.phase === 'action' &&
                                     gameState.currentPlayer === enemyPlayer &&
@@ -320,8 +322,8 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                         // Waiting: in waitingUnits list
 
                         const isActed = u.hasActedThisRound;
-                        const isActive = !isPlacement && gameState.phase === 'action' && u.id === activeUnit?.id;
-                        const isWaiting = !isPlacement && gameState.phase === 'action' && !isActed && !isActive && !u.isDead;
+                        const isActive = !isPlacement && isLocalTurn && u.id === activeUnit?.id;
+                        const isWaiting = !isPlacement && isLocalTurn && !isActed && !isActive && !u.isDead;
                         const canReorderInAction =
                             gameState.phase === 'action' &&
                             gameState.currentPlayer === localPlayer &&
