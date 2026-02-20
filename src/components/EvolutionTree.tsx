@@ -175,7 +175,7 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                 const isFlipped = flippedCardId === cardId;
                                                                 const isUnlocked = currentLevel >= 1;
                                                                 return (
-                                                                        <div onClick={() => setFlippedCardId(isFlipped ? null : cardId)}
+                                                                    <div onClick={() => setFlippedCardId(isFlipped ? null : cardId)}
                                                                         className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? `${flippedCardShellClass} bg-[#0a0f1a] border-indigo-400 shadow-2xl` : `h-full ${isUnlocked ? 'bg-blue-950/40 border-blue-600/80 text-blue-100' : 'bg-gray-800/50 border-gray-600 text-gray-500 opacity-60'}`}`}>
                                                                         {isFlipped ? (
                                                                             <FlippedCardDetail
@@ -297,16 +297,18 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                                                 textClassName="text-gray-100"
                                                                                             />
                                                                                         ) : (
-                                                                                            <div className="grid grid-cols-[1fr_auto] gap-1 items-center h-full">
-                                                                                                <div className="flex flex-col justify-center min-w-0">
-                                                                                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                                                                            <div className="flex items-center h-full gap-1 overflow-hidden">
+                                                                                                <div className="flex flex-col justify-center min-w-0 flex-1">
+                                                                                                    <div className="flex items-center gap-1.5 mb-0.5 shrink-0">
                                                                                                         <span className={`text-[9px] ${isUnlocked ? 'text-orange-400' : 'text-gray-500'} font-bold`}>LV3-{subLevel}</span>
-                                                                                                        {isUnlocked && <span className="text-[7px] px-1 bg-orange-600 text-white rounded-sm font-black animate-pulse">ACTIVED</span>}
+                                                                                                        {isUnlocked && <span className="text-[6px] px-1 bg-orange-600 text-white rounded-[2px] font-black animate-pulse">ACT</span>}
                                                                                                     </div>
-                                                                                                    <div className={`text-[9px] leading-tight font-bold ${rewardTextClampClass}`}>{t(config[branch].rewardText[idx])}</div>
+                                                                                                    <div className={`text-[8.5px] sm:text-[9px] leading-[1.1] font-bold ${rewardTextClampClass}`}>{t(config[branch].rewardText[idx])}</div>
                                                                                                 </div>
-                                                                                                <div className="text-[9px] text-gray-400 font-bold italic shrink-0 ml-1 text-right leading-tight">
-                                                                                                    {translateWithFallback(`${evolutionKeyBase}_r3_req`, [`${evolutionKeyBase}_req`])}
+                                                                                                <div className="flex flex-col justify-center min-w-[35%] w-[42%] text-right shrink-0 h-full ml-0.5">
+                                                                                                    <div className="text-[8px] text-gray-400 font-bold italic leading-[1.1] break-words whitespace-normal">
+                                                                                                        {translateWithFallback(`${evolutionKeyBase}_r3_req`, [`${evolutionKeyBase}_req`])}
+                                                                                                    </div>
                                                                                                     {!selectedVariant && currentLevel === 2 && currentVal >= config[branch].thresholds[2] && <div className="text-green-400 font-black animate-bounce mt-0.5 text-[8px]">SELECT</div>}
                                                                                                 </div>
                                                                                             </div>

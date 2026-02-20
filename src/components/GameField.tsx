@@ -74,7 +74,8 @@ const GameField: React.FC<GameFieldProps> = ({
                     gridTemplateColumns: `repeat(${colCount || 15}, 48px)`,
                     gridTemplateRows: `repeat(${rowCount || 15}, 48px)`,
                     animation: 'gentleBreathe 4s ease-in-out infinite',
-                    transformStyle: 'preserve-3d'
+                    transformStyle: 'preserve-3d',
+                    filter: 'drop-shadow(0 0 15px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 30px rgba(0, 255, 255, 0.4)) drop-shadow(0 0 45px rgba(255, 0, 255, 0.4))'
                 }}>
 
                 {/* Center Divider Line */}
@@ -90,132 +91,132 @@ const GameField: React.FC<GameFieldProps> = ({
                             return null;
                         }
 
-                    const smokesAtCell = gameState.smokes.filter(s => s.r === r && s.c === c);
-                    const isSmoked = smokesAtCell.length > 0;
-                    const isSmokedByEnemy = smokesAtCell.some(s => s.owner !== viewerPlayer);
+                        const smokesAtCell = gameState.smokes.filter(s => s.r === r && s.c === c);
+                        const isSmoked = smokesAtCell.length > 0;
+                        const isSmokedByEnemy = smokesAtCell.some(s => s.owner !== viewerPlayer);
 
-                    const realUnit = [...gameState.players[PlayerID.P1].units, ...gameState.players[PlayerID.P2].units]
-                        .find(u => u.r === r && u.c === c && !u.isDead);
-                    const isUnitStealthed = realUnit?.status.isStealthed;
-                    const isVisible = realUnit && (
-                        realUnit.owner === viewerPlayer ||
-                        (!isSmokedByEnemy && !isUnitStealthed)
-                    );
-                    const unit = isVisible ? realUnit : undefined;
+                        const realUnit = [...gameState.players[PlayerID.P1].units, ...gameState.players[PlayerID.P2].units]
+                            .find(u => u.r === r && u.c === c && !u.isDead);
+                        const isUnitStealthed = realUnit?.status.isStealthed;
+                        const isVisible = realUnit && (
+                            realUnit.owner === viewerPlayer ||
+                            (!isSmokedByEnemy && !isUnitStealthed)
+                        );
+                        const unit = isVisible ? realUnit : undefined;
 
-                    const minesAtCell = gameState.mines.filter(m => m.r === r && m.c === c);
-                    const visibleMine = gameState.sandboxShowAllMines
-                        ? minesAtCell[0]
-                        : minesAtCell.find(m => m.owner === viewerPlayer) ||
-                          minesAtCell.find(m => m.revealedTo.includes(viewerPlayer)) ||
-                          undefined;
-                    const mine = visibleMine;
+                        const minesAtCell = gameState.mines.filter(m => m.r === r && m.c === c);
+                        const visibleMine = gameState.sandboxShowAllMines
+                            ? minesAtCell[0]
+                            : minesAtCell.find(m => m.owner === viewerPlayer) ||
+                            minesAtCell.find(m => m.revealedTo.includes(viewerPlayer)) ||
+                            undefined;
+                        const mine = visibleMine;
 
-                    const building = gameState.buildings.find(b => b.r === r && b.c === c);
+                        const building = gameState.buildings.find(b => b.r === r && b.c === c);
 
-                    const selectedUnit = gameState.selectedUnitId ? getUnit(gameState.selectedUnitId) : undefined;
-                    const selectedUnitOwner = selectedUnit ? gameState.players[selectedUnit.owner] : null;
-                    // For attack range: if selected unit is General, use its Path A level; otherwise use team's General Path A level
-                    const selectedGeneralLevelA = selectedUnitOwner ? selectedUnitOwner.evolutionLevels[UnitType.GENERAL].a : 0;
+                        const selectedUnit = gameState.selectedUnitId ? getUnit(gameState.selectedUnitId) : undefined;
+                        const selectedUnitOwner = selectedUnit ? gameState.players[selectedUnit.owner] : null;
+                        // For attack range: if selected unit is General, use its Path A level; otherwise use team's General Path A level
+                        const selectedGeneralLevelA = selectedUnitOwner ? selectedUnitOwner.evolutionLevels[UnitType.GENERAL].a : 0;
 
-                    // For unit display: use the unit at this cell's Path A level
-                    const cellUnitLevelA = unit ? gameState.players[unit.owner].evolutionLevels[unit.type].a : 0;
+                        // For unit display: use the unit at this cell's Path A level
+                        const cellUnitLevelA = unit ? gameState.players[unit.owner].evolutionLevels[unit.type].a : 0;
 
-                    const cellSensorResults = gameState.sensorResults?.filter(sr =>
-                        sr.r === r && sr.c === c && sr.owner === viewerPlayer
-                    ) || [];
-                    const countResult = [...cellSensorResults].reverse().find(sr => (sr.kind ?? 'count') === 'count');
-                    const markResult = [...cellSensorResults].reverse().find(sr => sr.kind === 'mark');
+                        const cellSensorResults = gameState.sensorResults?.filter(sr =>
+                            sr.r === r && sr.c === c && sr.owner === viewerPlayer
+                        ) || [];
+                        const countResult = [...cellSensorResults].reverse().find(sr => (sr.kind ?? 'count') === 'count');
+                        const markResult = [...cellSensorResults].reverse().find(sr => sr.kind === 'mark');
 
-                    return (
-                        <div key={`${displayR}-${displayC}`} className="relative">
-                            <GridCell
-                                cell={cell}
-                                unit={unit}
-                                mine={mine}
-                                scanMarkSuccess={markResult ? !!markResult.success : null}
-                                building={building}
-                                isSelected={gameState.selectedUnitId === unit?.id}
-                                isValidMove={false}
-                                isAttackTarget={false}
-                                isSkillTarget={false}
-                                currentPlayer={viewerPlayer}
-                                isUnitStealthed={!!(isUnitStealthed && realUnit?.owner === viewerPlayer)}
-                                onClick={() => {
-                                    // Always route MISS-cell clicks through board logic so dismiss is immediate,
-                                    // even when a visible unit occupies the same cell.
-                                    if (markResult?.success === false) {
-                                        handleCellClick(r, c);
-                                        return;
-                                    }
-                                    const isSkillTargeting = targetMode && targetMode !== 'move';
-                                    if (isSkillTargeting) {
-                                        handleCellClick(r, c);
-                                    } else if (unit) {
-                                        handleUnitClick(unit);
-                                    } else {
-                                        handleCellClick(r, c);
-                                    }
-                                }}
-                                p1FlagLoc={gameState.players[PlayerID.P1].flagPosition}
-                                p2FlagLoc={gameState.players[PlayerID.P2].flagPosition}
-                                targetMode={targetMode}
-                                selectedUnit={selectedUnit}
-                                selectedGeneralLevelA={selectedGeneralLevelA}
-                                evolutionLevelA={cellUnitLevelA}
-                                evolutionLevelB={unit ? gameState.players[unit.owner].evolutionLevels[unit.type].b : 0}
-                                evolutionVariantA={unit ? gameState.players[unit.owner].evolutionLevels[unit.type].aVariant : undefined}
-                                evolutionVariantB={unit ? gameState.players[unit.owner].evolutionLevels[unit.type].bVariant : undefined}
-                                p1GeneralLevelB={gameState.players[PlayerID.P1].evolutionLevels[UnitType.GENERAL].b}
-                                p2GeneralLevelB={gameState.players[PlayerID.P2].evolutionLevels[UnitType.GENERAL].b}
-                                p1GeneralVariantB={gameState.players[PlayerID.P1].evolutionLevels[UnitType.GENERAL].bVariant}
-                                p2GeneralVariantB={gameState.players[PlayerID.P2].evolutionLevels[UnitType.GENERAL].bVariant}
-                                selectedUnitLevelB={selectedUnit ? gameState.players[selectedUnit.owner].evolutionLevels[selectedUnit.type].b : 0}
-                                buildings={gameState.buildings}
-                                isSmoked={isSmoked}
-                                smokeOwner={smokesAtCell[0]?.owner}
-                                forceShowMines={gameState.sandboxShowAllMines}
-                                onDismissMiss={markResult?.success === false && onDismissMiss ? () => onDismissMiss(r, c) : undefined}
-                            />
-                            {countResult && (
-                                <div className="absolute inset-0 pointer-events-none z-[60] flex flex-col items-center justify-center">
-                                    {/* Map Pin Floating Container */}
-                                    <div className="relative mb-6 animate-float-pin flex flex-col items-center opacity-85">
-                                        {/* Pin Body (SVG) */}
-                                        <div className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]">
-                                            <button
-                                                type="button"
-                                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-900/85 border border-cyan-200/80 text-cyan-100 text-[10px] leading-none font-black flex items-center justify-center pointer-events-auto hover:bg-slate-800"
-                                                onMouseDown={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                }}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    onDismissCount?.(r, c, viewerPlayer);
-                                                }}
-                                                aria-label="Dismiss marker"
-                                                title="Dismiss marker"
-                                            >
-                                                x
-                                            </button>
-                                            <svg width="28" height="36" viewBox="0 0 384 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M172.268 501.67C26.97 291.031 0 269.413 0 192C0 85.961 85.961 0 192 0C298.039 0 384 85.961 384 192C384 269.413 357.03 291.031 211.732 501.67C191.95 530.41 152.48 530.41 172.268 501.67Z" fill="#22d3ee" fillOpacity="0.8" />
-                                                <circle cx="192" cy="192" r="120" fill="white" fillOpacity="0.9" />
-                                            </svg>
-                                            {/* Number inside the pin */}
-                                            <div className="absolute top-0 left-0 w-full h-[28px] flex items-center justify-center text-cyan-800 font-extrabold text-base">
-                                                {countResult.count}
+                        return (
+                            <div key={`${displayR}-${displayC}`} className="relative">
+                                <GridCell
+                                    cell={cell}
+                                    unit={unit}
+                                    mine={mine}
+                                    scanMarkSuccess={markResult ? !!markResult.success : null}
+                                    building={building}
+                                    isSelected={gameState.selectedUnitId === unit?.id}
+                                    isValidMove={false}
+                                    isAttackTarget={false}
+                                    isSkillTarget={false}
+                                    currentPlayer={viewerPlayer}
+                                    isUnitStealthed={!!(isUnitStealthed && realUnit?.owner === viewerPlayer)}
+                                    onClick={() => {
+                                        // Always route MISS-cell clicks through board logic so dismiss is immediate,
+                                        // even when a visible unit occupies the same cell.
+                                        if (markResult?.success === false) {
+                                            handleCellClick(r, c);
+                                            return;
+                                        }
+                                        const isSkillTargeting = targetMode && targetMode !== 'move';
+                                        if (isSkillTargeting) {
+                                            handleCellClick(r, c);
+                                        } else if (unit) {
+                                            handleUnitClick(unit);
+                                        } else {
+                                            handleCellClick(r, c);
+                                        }
+                                    }}
+                                    p1FlagLoc={gameState.players[PlayerID.P1].flagPosition}
+                                    p2FlagLoc={gameState.players[PlayerID.P2].flagPosition}
+                                    targetMode={targetMode}
+                                    selectedUnit={selectedUnit}
+                                    selectedGeneralLevelA={selectedGeneralLevelA}
+                                    evolutionLevelA={cellUnitLevelA}
+                                    evolutionLevelB={unit ? gameState.players[unit.owner].evolutionLevels[unit.type].b : 0}
+                                    evolutionVariantA={unit ? gameState.players[unit.owner].evolutionLevels[unit.type].aVariant : undefined}
+                                    evolutionVariantB={unit ? gameState.players[unit.owner].evolutionLevels[unit.type].bVariant : undefined}
+                                    p1GeneralLevelB={gameState.players[PlayerID.P1].evolutionLevels[UnitType.GENERAL].b}
+                                    p2GeneralLevelB={gameState.players[PlayerID.P2].evolutionLevels[UnitType.GENERAL].b}
+                                    p1GeneralVariantB={gameState.players[PlayerID.P1].evolutionLevels[UnitType.GENERAL].bVariant}
+                                    p2GeneralVariantB={gameState.players[PlayerID.P2].evolutionLevels[UnitType.GENERAL].bVariant}
+                                    selectedUnitLevelB={selectedUnit ? gameState.players[selectedUnit.owner].evolutionLevels[selectedUnit.type].b : 0}
+                                    buildings={gameState.buildings}
+                                    isSmoked={isSmoked}
+                                    smokeOwner={smokesAtCell[0]?.owner}
+                                    forceShowMines={gameState.sandboxShowAllMines}
+                                    onDismissMiss={markResult?.success === false && onDismissMiss ? () => onDismissMiss(r, c) : undefined}
+                                />
+                                {countResult && (
+                                    <div className="absolute inset-0 pointer-events-none z-[60] flex flex-col items-center justify-center">
+                                        {/* Map Pin Floating Container */}
+                                        <div className="relative mb-6 animate-float-pin flex flex-col items-center opacity-85">
+                                            {/* Pin Body (SVG) */}
+                                            <div className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]">
+                                                <button
+                                                    type="button"
+                                                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-900/85 border border-cyan-200/80 text-cyan-100 text-[10px] leading-none font-black flex items-center justify-center pointer-events-auto hover:bg-slate-800"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        onDismissCount?.(r, c, viewerPlayer);
+                                                    }}
+                                                    aria-label="Dismiss marker"
+                                                    title="Dismiss marker"
+                                                >
+                                                    x
+                                                </button>
+                                                <svg width="28" height="36" viewBox="0 0 384 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M172.268 501.67C26.97 291.031 0 269.413 0 192C0 85.961 85.961 0 192 0C298.039 0 384 85.961 384 192C384 269.413 357.03 291.031 211.732 501.67C191.95 530.41 152.48 530.41 172.268 501.67Z" fill="#22d3ee" fillOpacity="0.8" />
+                                                    <circle cx="192" cy="192" r="120" fill="white" fillOpacity="0.9" />
+                                                </svg>
+                                                {/* Number inside the pin */}
+                                                <div className="absolute top-0 left-0 w-full h-[28px] flex items-center justify-center text-cyan-800 font-extrabold text-base">
+                                                    {countResult.count}
+                                                </div>
                                             </div>
                                         </div>
+                                        {/* Ground Shadow */}
+                                        <div className="absolute bottom-2 w-3 h-1 bg-black/30 rounded-[100%] blur-[1px] animate-shadow-pulse"></div>
                                     </div>
-                                    {/* Ground Shadow */}
-                                    <div className="absolute bottom-2 w-3 h-1 bg-black/30 rounded-[100%] blur-[1px] animate-shadow-pulse"></div>
-                                </div>
-                            )}
-                        </div>
-                    );
+                                )}
+                            </div>
+                        );
                     })
                 ))}
 

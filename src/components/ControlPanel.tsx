@@ -453,6 +453,19 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                             </div>
                                                         );
                                                     }
+                                                    // Index: Universal Dismantle (if on enemy building)
+                                                    if (gameState.buildings.some(b => b.r === unit.r && b.c === unit.c && b.owner !== unit.owner)) {
+                                                        buttons.push(
+                                                            <div key="custom_dismantle" className="flex flex-col items-center gap-1">
+                                                                <button onClick={() => handleDisarmAction(unit, unit.r, unit.c)} className="w-[82px] h-[74px] rounded flex flex-col items-center justify-center gap-1 transition-all relative font-bold border-2 bg-pink-900/40 hover:bg-pink-800/60 border-pink-800/50 text-pink-100/70 hover:border-pink-400 hover:text-white">
+                                                                    <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('custom_dismantle', unit)}</div>
+                                                                    <Unlock size={28} />
+                                                                    <span className="text-xs">拆除建築</span>
+                                                                </button>
+                                                                <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {helpers.getDisplayCost(unit, 2, gameState, 'dismantle')}</div>
+                                                            </div>
+                                                        );
+                                                    }
 
                                                     // Index: Unit-specific actions
                                                     if (unit.type === UnitType.GENERAL) {
