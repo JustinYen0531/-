@@ -4,6 +4,7 @@ import {
 } from '../icons';
 import { Language } from '../i18n';
 import Tutorial from './Tutorial';
+import CircularMeteorShower from './CircularMeteorShower';
 
 interface Room {
     id: string;
@@ -54,6 +55,7 @@ const Lobby: React.FC<LobbyProps> = ({
 
     return (
         <div className="flex flex-col items-center justify-center h-full gap-8 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 p-4 relative">
+            <CircularMeteorShower className="z-0 opacity-100" />
             <div className="text-center space-y-2 z-10">
                 <h1 className="neon-title text-7xl font-black drop-shadow-2xl">
                     {t('app_title')}
@@ -342,7 +344,7 @@ const Lobby: React.FC<LobbyProps> = ({
             )}
 
             {/* Animated Background Elements */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-[1]">
                 {/* Top-left Crown with Cloud */}
                 <div className="absolute top-20 left-20">
                     <div className="absolute inset-0 bg-cyan-500/20 blur-[50px] rounded-full scale-150 animate-pulse" style={{ animation: 'cloud-flow 6s ease-in-out infinite' }}></div>

@@ -33,6 +33,7 @@ import GameField from './components/GameField';
 import ControlPanel from './components/ControlPanel';
 import GameModals from './components/GameModals';
 import ShaderPlanet from './components/ShaderPlanet';
+import CommonSettingsModal from './components/CommonSettingsModal';
 import { useConnection } from './network/ConnectionProvider';
 import {
     AttackPayload,
@@ -189,6 +190,34 @@ const PRIVATE_HINT_LOG_KEYS = new Set([
     'log_scan_smoke_blocked'
 ]);
 
+type SfxName = 'click' | 'place_mine' | 'attack' | 'mine_hit' | 'error' | 'victory' | 'defeat';
+
+const SFX_SOURCE: Record<SfxName, string> = {
+    click: '/sfx/click.wav',
+    place_mine: '/sfx/place-mine.wav',
+    attack: '/sfx/attack.wav',
+    mine_hit: '/sfx/mine-hit.wav',
+    error: '/sfx/error.wav',
+    victory: '/sfx/victory.wav',
+    defeat: '/sfx/defeat.wav'
+};
+
+const LOG_SFX_MAP: Partial<Record<string, { sound: SfxName; cooldownMs?: number; volume?: number }>> = {
+    log_select_action: { sound: 'click', cooldownMs: 60, volume: 0.7 },
+    log_move_action: { sound: 'click', cooldownMs: 60, volume: 0.75 },
+    log_skip_turn: { sound: 'click', cooldownMs: 60, volume: 0.7 },
+    log_pass_turn: { sound: 'click', cooldownMs: 60, volume: 0.7 },
+    log_place_mine: { sound: 'place_mine', cooldownMs: 120, volume: 0.9 },
+    log_mine_placed: { sound: 'place_mine', cooldownMs: 120, volume: 0.9 },
+    log_mine_disarmed: { sound: 'click', cooldownMs: 120, volume: 0.8 },
+    log_pickup_mine: { sound: 'click', cooldownMs: 120, volume: 0.85 },
+    log_attack_hit: { sound: 'attack', cooldownMs: 140, volume: 0.95 },
+    log_evol_def_reflect_hit: { sound: 'attack', cooldownMs: 140, volume: 0.95 },
+    log_hit_mine: { sound: 'mine_hit', cooldownMs: 220, volume: 1 },
+    log_chain_aoe: { sound: 'mine_hit', cooldownMs: 220, volume: 1 },
+    log_evol_nuke_blast_hit: { sound: 'mine_hit', cooldownMs: 220, volume: 1 }
+};
+
 const serializeLogParams = (params?: Record<string, any>) => JSON.stringify(params ?? {});
 
 const upsertPlacementLogs = (logs: GameLog[], state: GameState, playerId: PlayerID): GameLog[] => {
@@ -284,6 +313,8 @@ export default function App() {
     const [showEvolutionTree, setShowEvolutionTree] = useState(false);
     const [language, setLanguage] = useState<Language>('en');
     const [musicVolume, setMusicVolume] = useState(0.3);
+    const [showCommonSettings, setShowCommonSettings] = useState(false);
+    const [disableBoardShake, setDisableBoardShake] = useState(false);
     const [showGameStartAnimation, setShowGameStartAnimation] = useState(false);
     const [showLog, setShowLog] = useState(true);
     const [pvpPerspectivePlayer, setPvpPerspectivePlayer] = useState<PlayerID | null>(null);
@@ -297,8 +328,13 @@ export default function App() {
     const [aiDebug] = useState(false);
     const [aiDecision, setAiDecision] = useState<AIDecisionInfo | null>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
+    const sfxAudioRef = useRef<Map<SfxName, HTMLAudioElement>>(new Map());
+    const sfxLastPlayedRef = useRef<Map<SfxName, number>>(new Map());
+    const lastSfxLogRef = useRef<string>('');
+    const lastWinnerSfxRef = useRef<string>('');
     const applyingRemoteActionRef = useRef(false);
     const lastHandledPacketSeqRef = useRef<number | null>(null);
+    const lastLogEmitRef = useRef<Map<string, number>>(new Map());
     const {
         isConnected: isNetworkConnected,
         lastIncomingPacket,
@@ -309,7 +345,7 @@ export default function App() {
     const [sandboxPos, setSandboxPos] = useState({ x: 0, y: 0 });
     const [isSandboxCollapsed, setIsSandboxCollapsed] = useState(false);
     const [showDevTools, setShowDevTools] = useState(false);
-    const [allowDevToolsInPvp, setAllowDevToolsInPvp] = useState(false);
+    const [allowDevToolsInAiChallenge, setAllowDevToolsInAiChallenge] = useState(false);
     const sandboxDragRef = useRef({ isDragging: false, startX: 0, startY: 0 });
     const clampSandboxPos = useCallback((pos: { x: number; y: number }) => {
         if (typeof window === 'undefined') {
@@ -367,8 +403,20 @@ export default function App() {
         return () => window.removeEventListener('resize', onResize);
     }, [view, clampSandboxPos]);
 
-    const isDevToolsAllowedInCurrentMatch = gameState.gameMode !== 'pvp' || allowDevToolsInPvp;
-    const isSandboxToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox' || (gameState.gameMode === 'pvp' && allowDevToolsInPvp);
+    useEffect(() => {
+        const cache = sfxAudioRef.current;
+        (Object.keys(SFX_SOURCE) as SfxName[]).forEach((sound) => {
+            if (cache.has(sound)) return;
+            const audio = new Audio(SFX_SOURCE[sound]);
+            audio.preload = 'auto';
+            cache.set(sound, audio);
+        });
+    }, []);
+
+    const isDevToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox'
+        || (gameState.gameMode === 'pve' && allowDevToolsInAiChallenge);
+    const isSandboxToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox'
+        || (gameState.gameMode === 'pve' && allowDevToolsInAiChallenge);
 
     useEffect(() => {
         if (!isDevToolsAllowedInCurrentMatch && showDevTools) {
@@ -443,6 +491,28 @@ export default function App() {
     // --- Timer Logic (Moved to useGameLoop) ---
     // See useGameLoop hook at the bottom of the component
 
+    const playSfx = useCallback((sound: SfxName, cooldownMs: number = 100, volumeMultiplier: number = 1) => {
+        if (view !== 'game' || musicVolume <= 0) return;
+        const now = Date.now();
+        const lastPlayed = sfxLastPlayedRef.current.get(sound) ?? 0;
+        if (cooldownMs > 0 && now - lastPlayed < cooldownMs) return;
+
+        const cache = sfxAudioRef.current;
+        let audio = cache.get(sound);
+        if (!audio) {
+            audio = new Audio(SFX_SOURCE[sound]);
+            audio.preload = 'auto';
+            cache.set(sound, audio);
+        }
+
+        sfxLastPlayedRef.current.set(sound, now);
+        audio.currentTime = 0;
+        audio.volume = Math.min(1, Math.max(0, musicVolume * volumeMultiplier));
+        audio.play().catch(() => {
+            // Browser autoplay policy may block playback before first user interaction.
+        });
+    }, [view, musicVolume]);
+
 
     const addLog = (messageKey: string, type: GameLog['type'] = 'info', params?: Record<string, any>, owner?: PlayerID) => {
         // Private hint logs should only be generated for local actions, never while replaying remote packets.
@@ -457,26 +527,94 @@ export default function App() {
             return state.currentPlayer;
         })();
         const resolvedOwner = owner ?? (PRIVATE_HINT_LOG_KEYS.has(messageKey) ? localActor : undefined);
+        const paramSignature = serializeLogParams(params);
+        const logSignature = `${messageKey}|${resolvedOwner ?? 'global'}|${paramSignature}`;
+        const now = Date.now();
+        const lastEmitAt = lastLogEmitRef.current.get(logSignature) ?? 0;
+        // Prevent rapid duplicate spam from repeated clicks/network echoes.
+        if (now - lastEmitAt < 1200) {
+            return;
+        }
         setGameState(prev => {
+            if (
+                messageKey === 'log_mine_limit' &&
+                prev.logs.some(log => log.messageKey === 'log_mine_limit' && log.owner === resolvedOwner)
+            ) {
+                return prev;
+            }
+
+            const latestLog = prev.logs[0];
+            if (
+                latestLog &&
+                latestLog.messageKey === messageKey &&
+                latestLog.owner === resolvedOwner &&
+                serializeLogParams(latestLog.params) === paramSignature
+            ) {
+                return prev;
+            }
+
             if (PRIVATE_HINT_LOG_KEYS.has(messageKey)) {
-                const targetParams = serializeLogParams(params);
                 const existsInCurrentTurn = prev.logs.some(log =>
                     log.turn === prev.turnCount &&
                     log.messageKey === messageKey &&
                     log.owner === resolvedOwner &&
-                    serializeLogParams(log.params) === targetParams
+                    serializeLogParams(log.params) === paramSignature
                 );
                 if (existsInCurrentTurn) {
                     return prev;
                 }
             }
 
+            lastLogEmitRef.current.set(logSignature, now);
             return {
                 ...prev,
                 logs: [{ turn: prev.turnCount, messageKey, params, type, owner: resolvedOwner }, ...prev.logs].slice(0, 100)
             };
         });
     };
+
+    useEffect(() => {
+        if (view !== 'game') return;
+        const latestLog = gameState.logs[0];
+        if (!latestLog) return;
+
+        const signature = [
+            latestLog.turn,
+            latestLog.messageKey,
+            latestLog.owner ?? 'global',
+            latestLog.type,
+            serializeLogParams(latestLog.params)
+        ].join('|');
+
+        if (lastSfxLogRef.current === signature) return;
+        lastSfxLogRef.current = signature;
+
+        const mapped = LOG_SFX_MAP[latestLog.messageKey];
+        if (mapped) {
+            playSfx(mapped.sound, mapped.cooldownMs ?? 100, mapped.volume ?? 1);
+            return;
+        }
+
+        if (latestLog.type === 'error') {
+            playSfx('error', 250, 0.85);
+        }
+    }, [gameState.logs, playSfx, view]);
+
+    useEffect(() => {
+        if (!gameState.gameOver || !gameState.winner) {
+            lastWinnerSfxRef.current = '';
+            return;
+        }
+
+        const winnerSignature = `${gameState.turnCount}|${gameState.winner}`;
+        if (lastWinnerSfxRef.current === winnerSignature) return;
+        lastWinnerSfxRef.current = winnerSignature;
+
+        const localPlayer = gameState.gameMode === 'pvp'
+            ? (isHost ? PlayerID.P1 : PlayerID.P2)
+            : PlayerID.P1;
+        playSfx(gameState.winner === localPlayer ? 'victory' : 'defeat', 0, 1);
+    }, [gameState.gameMode, gameState.gameOver, gameState.turnCount, gameState.winner, isHost, playSfx]);
 
     const addVFX = (type: VFXEffect['type'], r: number, c: number, size: VFXEffect['size'] = 'medium') => {
         setGameState(prev => ({
@@ -529,8 +667,7 @@ export default function App() {
                 turn: 1,
                 payload: {
                     mode: 'pvp',
-                    initialState: toSerializableGameState(initialState),
-                    allowDevTools: allowDevToolsInPvp
+                    initialState: toSerializableGameState(initialState)
                 }
             });
         }
@@ -539,7 +676,7 @@ export default function App() {
         setTimeout(() => {
             setShowGameStartAnimation(false);
         }, 3000);
-    }, [allowDevToolsInPvp, isHost, roomId, sendActionPacket]);
+    }, [isHost, roomId, sendActionPacket]);
 
     const handleExitGame = useCallback((origin: 'local' | 'remote' = 'local') => {
         const state = gameStateRef.current;
@@ -2351,11 +2488,10 @@ export default function App() {
             turn: state.turnCount,
             payload: {
                 reason,
-                state: toSerializableGameState(state),
-                allowDevTools: allowDevToolsInPvp
+                state: toSerializableGameState(state)
             }
         });
-    }, [allowDevToolsInPvp, isNetworkConnected, roomId, sendActionPacket]);
+    }, [isNetworkConnected, roomId, sendActionPacket]);
 
     const sendGameStateDeferred = useCallback((reason: string) => {
         // Lower-latency default sync.
@@ -2718,7 +2854,6 @@ export default function App() {
 
         if (lastIncomingPacket.type === 'START_GAME') {
             const payload = lastIncomingPacket.payload as StartGamePayload;
-            setAllowDevToolsInPvp(payload.allowDevTools === true);
             if (!isHost && view === 'lobby') {
                 const syncedInitialState = payload.initialState ? fromSerializableGameState(payload.initialState) : null;
                 handleStartGame('pvp', syncedInitialState || undefined);
@@ -2745,9 +2880,6 @@ export default function App() {
             if (type === 'STATE_SYNC') {
                 if (!isStateSyncPayload(payload)) {
                     return;
-                }
-                if (typeof payload.allowDevTools === 'boolean') {
-                    setAllowDevToolsInPvp(payload.allowDevTools);
                 }
                 const syncedState = fromSerializableGameState(payload.state);
                 if (!syncedState) {
@@ -3395,9 +3527,6 @@ export default function App() {
                 view={view}
                 gameState={gameState}
                 language={language}
-                setLanguage={setLanguage}
-                musicVolume={musicVolume}
-                setMusicVolume={setMusicVolume}
                 aiDifficulty={aiDifficulty}
                 setAiDifficulty={setAiDifficulty}
                 onStartGame={handleStartGame}
@@ -3408,9 +3537,21 @@ export default function App() {
                 setIsHost={setIsHost}
                 roomId={roomId}
                 setRoomId={setRoomId}
-                allowDevToolsInPvp={allowDevToolsInPvp}
-                setAllowDevToolsInPvp={setAllowDevToolsInPvp}
+                onOpenSettings={() => setShowCommonSettings(true)}
                 t={t}
+            />
+
+            <CommonSettingsModal
+                open={showCommonSettings}
+                onClose={() => setShowCommonSettings(false)}
+                language={language}
+                setLanguage={setLanguage}
+                musicVolume={musicVolume}
+                setMusicVolume={setMusicVolume}
+                allowDevToolsInAiChallenge={allowDevToolsInAiChallenge}
+                setAllowDevToolsInAiChallenge={setAllowDevToolsInAiChallenge}
+                disableBoardShake={disableBoardShake}
+                setDisableBoardShake={setDisableBoardShake}
             />
 
             {view === 'game' && (
@@ -3442,12 +3583,9 @@ export default function App() {
                     {/* Game Header */}
                     <GameHeader
                         gameState={gameState}
-                        language={language}
-                        setLanguage={setLanguage}
-                        musicVolume={musicVolume}
-                        setMusicVolume={setMusicVolume}
                         onPauseToggle={handlePause}
                         onExitGame={handleExitGame}
+                        onOpenSettings={() => setShowCommonSettings(true)}
                         t={t}
                     />
 
@@ -3593,6 +3731,7 @@ export default function App() {
                                     viewerPlayerId={pvpPerspectivePlayer || undefined}
                                     hoveredPos={hoveredPos}
                                     onHoverCell={handleHoverCell}
+                                    disableBoardShake={disableBoardShake}
                                 />
 
                                 {/* Timer Bar Below Board */}

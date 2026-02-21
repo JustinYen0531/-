@@ -13,6 +13,7 @@ interface GameFieldProps {
     viewerPlayerId?: PlayerID;
     hoveredPos: { r: number, c: number } | null;
     onHoverCell?: (r: number, c: number | null) => void;
+    disableBoardShake?: boolean;
 }
 
 const GameField: React.FC<GameFieldProps> = ({
@@ -25,7 +26,8 @@ const GameField: React.FC<GameFieldProps> = ({
     isFlipped = false,
     viewerPlayerId,
     hoveredPos,
-    onHoverCell
+    onHoverCell,
+    disableBoardShake = false
 }) => {
     const boardRef = useRef<HTMLDivElement>(null);
     const viewerPlayer = viewerPlayerId ?? gameState.currentPlayer;
@@ -62,6 +64,10 @@ const GameField: React.FC<GameFieldProps> = ({
             onHoverCell?.(null as any, null as any);
         }
 
+        if (disableBoardShake) {
+            return;
+        }
+
         // Tilt logic - use requestAnimationFrame or just direct style for best performance
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
@@ -70,14 +76,16 @@ const GameField: React.FC<GameFieldProps> = ({
 
         // Direct style update is faster than React state for this
         boardRef.current.style.transform = `perspective(2000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-    }, [rowCount, colCount, isFlipped, hoveredPos, onHoverCell]);
+    }, [rowCount, colCount, isFlipped, hoveredPos, onHoverCell, disableBoardShake]);
 
     const handleBoardMouseLeave = useCallback(() => {
         if (!boardRef.current) return;
-        boardRef.current.style.transform = `perspective(2000px) rotateX(0deg) rotateY(0deg)`;
-        boardRef.current.style.transition = 'transform 0.5s ease-out';
+        if (!disableBoardShake) {
+            boardRef.current.style.transform = `perspective(2000px) rotateX(0deg) rotateY(0deg)`;
+            boardRef.current.style.transition = 'transform 0.5s ease-out';
+        }
         onHoverCell?.(null as any, null as any);
-    }, [onHoverCell]);
+    }, [onHoverCell, disableBoardShake]);
 
     const toActualCol = (displayCol: number): number => (
         isFlipped ? colCount - 1 - displayCol : displayCol
@@ -93,13 +101,17 @@ const GameField: React.FC<GameFieldProps> = ({
                 style={{
                     gridTemplateColumns: `repeat(${colCount || 15}, 48px)`,
                     gridTemplateRows: `repeat(${rowCount || 15}, 48px)`,
-                    animation: "gentleBreathe 8s ease-in-out infinite",
+                    animation: disableBoardShake ? 'none' : "gentleBreathe 8s ease-in-out infinite",
                     transformStyle: 'preserve-3d',
                     filter: 'drop-shadow(0 0 15px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 30px rgba(0, 255, 255, 0.4)) drop-shadow(0 0 45px rgba(255, 0, 255, 0.4))'
                 }}>
 
                 {/* Center Divider Line */}
-                <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-slate-400/20 z-20 transform -translate-x-1/2 overflow-visible">
+                <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-white/35 z-20 transform -translate-x-1/2 overflow-visible">
+                    {/* Thin white center line */}
+                    <div className="absolute inset-0 bg-white/45"></div>
+                    <div className="absolute left-[-1px] right-[-1px] inset-y-0 bg-white/20 blur-[0.8px]"></div>
+                    {/* Keep subtle cyan motion accents */}
                     <div className="absolute inset-0 bg-cyan-400/10 blur-[1px]"></div>
                     <div className="absolute left-[-2px] right-[-2px] h-[30%] bg-gradient-to-b from-transparent via-cyan-400/60 to-transparent blur-[3px]"
                         style={{ animation: 'dividerFlow 12s cubic-bezier(0.4, 0, 0.2, 1) infinite' }}></div>

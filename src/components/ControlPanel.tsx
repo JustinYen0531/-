@@ -10,10 +10,11 @@ import {
 } from '../types';
 import { AIDecisionInfo } from '../ai/types';
 import {
-    MAX_INTEREST, ENERGY_REGEN, ORE_REWARDS,
+    MAX_INTEREST, ENERGY_REGEN,
     UNIT_STATS, PLACEMENT_MINE_LIMIT,
     EVOLUTION_COSTS, EVOLUTION_CONFIG
 } from '../constants';
+import { calculateOreReward } from '../gameEngine';
 import {
     getMineBaseCost,
     getUnitNameKey
@@ -130,7 +131,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         if (u.isDead) return acc;
         const cell = gameState.cells[u.r][u.c];
         if (cell.hasEnergyOre && cell.oreSize) {
-            return acc + ORE_REWARDS[cell.oreSize];
+            return acc + calculateOreReward(cell.oreSize, gameState.turnCount + 1);
         }
         return acc;
     }, 0);

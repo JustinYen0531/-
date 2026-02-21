@@ -186,6 +186,62 @@
   }
 }
 
+@keyframes flagBurst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.1);
+  }
+
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.75);
+  }
+
+  52% {
+    opacity: 0.95;
+    transform: translate(calc(-50% + calc(var(--tx) * 0.82)), calc(-50% + calc(var(--ty) * 0.82))) scale(0.72);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + calc(var(--tx) * 1.2)), calc(-50% + calc(var(--ty) * 1.2))) scale(0.15);
+  }
+}
+
+@keyframes flagBurstFlash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.55);
+  }
+
+  22% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.35);
+  }
+}
+
+@keyframes flagBurstRing {
+  0% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+
+  65% {
+    opacity: 0.65;
+    transform: translate(-50%, -50%) scale(2.8);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(3.8);
+  }
+}
+
 /* Accessory Breathing Animation */
 @keyframes rangePerimeterBreathe {
 
@@ -539,14 +595,37 @@
 
 .energy-crystal-container {
   animation: crystalFloat 4s ease-in-out infinite;
-  filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
+  filter: drop-shadow(0 2px 2px rgba(18, 8, 34, 0.5)) drop-shadow(0 0 8px rgba(192, 132, 252, 0.55));
 }
 
 .crystal-outline {
-  stroke: #c084fc;
-  stroke-width: 2;
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 2.5;
   fill: none;
   animation: crystalOutlineGlow 3s ease-in-out infinite;
+}
+
+.crystal-outline-strong {
+  stroke: rgba(255, 255, 255, 1);
+  stroke-width: 2.2;
+  fill: none;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.85));
+  vector-effect: non-scaling-stroke;
+}
+
+.crystal-outline-thin {
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 1.6;
+  fill: none;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
+  vector-effect: non-scaling-stroke;
+}
+
+.crystal-center-cut {
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 1.25;
+  fill: none;
+  opacity: 0.9;
 }
 
 .crystal-facet {
@@ -555,11 +634,11 @@
 }
 
 .crystal-facet-main {
-  fill: #7e22ce;
+  fill: #a855f7;
 }
 
 .crystal-facet-light {
-  fill: #a855f7;
+  fill: #f0abfc;
 }
 
 .crystal-facet-dark {
@@ -573,7 +652,109 @@
 }
 
 .crystal-hollow-center {
-  fill: rgba(0, 0, 0, 0.4);
+  fill: rgba(26, 8, 44, 0.42);
+}
+
+/* Unified palette + depth by level */
+.crystal-small .crystal-outline {
+  stroke-width: 1.6;
+}
+
+.crystal-small .crystal-outline-strong {
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.7));
+}
+
+.crystal-small .crystal-outline-thin {
+  stroke-width: 0.95;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.65));
+}
+
+.crystal-small .crystal-facet-main {
+  fill: #c084fc;
+}
+
+.crystal-small .crystal-facet-light {
+  fill: #f5d0fe;
+}
+
+.crystal-small .crystal-facet-dark {
+  fill: #7e22ce;
+}
+
+.crystal-medium .crystal-outline {
+  stroke-width: 1.9;
+}
+
+.crystal-medium .crystal-outline-strong {
+  stroke-width: 1.6;
+}
+
+.crystal-medium .crystal-outline-thin {
+  stroke-width: 1.05;
+}
+
+.crystal-medium .crystal-facet-main {
+  fill: #a855f7;
+}
+
+.crystal-medium .crystal-facet-light {
+  fill: #f0abfc;
+}
+
+.crystal-medium .crystal-facet-dark {
+  fill: #6b21a8;
+}
+
+.crystal-large .crystal-outline {
+  stroke-width: 2.2;
+}
+
+.crystal-large .crystal-outline-strong {
+  stroke-width: 1.85;
+}
+
+.crystal-large .crystal-outline-thin {
+  stroke-width: 1.2;
+}
+
+.crystal-large .crystal-facet-main {
+  fill: #9333ea;
+}
+
+.crystal-large .crystal-facet-light {
+  fill: #f5d0fe;
+}
+
+.crystal-large .crystal-facet-dark {
+  fill: #581c87;
+}
+
+.crystal-small-innerline {
+  fill: none;
+  stroke: rgba(250, 232, 255, 0.95);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 3px rgba(244, 114, 182, 0.6));
+}
+
+.crystal-small-coreline {
+  fill: none;
+  stroke: rgba(253, 242, 255, 0.98);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px rgba(217, 70, 239, 0.65));
+}
+
+.crystal-small-crownline {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
 }
 
 /* Building Styles */
@@ -615,35 +796,66 @@
   opacity: 0.6;
 }
 
+@keyframes flagClothWave {
+  0% {
+    transform: translateY(0) skewX(0deg);
+  }
+  25% {
+    transform: translateY(-0.45px) skewX(1.2deg);
+  }
+  50% {
+    transform: translateY(0.35px) skewX(-1deg);
+  }
+  75% {
+    transform: translateY(-0.2px) skewX(0.8deg);
+  }
+  100% {
+    transform: translateY(0) skewX(0deg);
+  }
+}
+
+.flag-cloth {
+  transform-origin: 24.8px 17.6px;
+  animation: flagClothWave 2.8s ease-in-out infinite;
+}
+
+.flag-cloth-lv2 {
+  animation-duration: 2.45s;
+}
+
+.flag-cloth-lv3 {
+  animation-duration: 2.1s;
+}
+
 .building-range-indicator {
   position: absolute;
   pointer-events: none !important;
-  background: transparent !important;
+  background: transparent;
   border: 4px dashed rgba(255, 255, 255, 0.95);
-  opacity: 0.45;
-  /* Increased from 0.2 for better visibility */
-  filter: drop-shadow(0 0 12px currentColor) brightness(1.25);
-  /* Brighter and stronger shadow */
-  box-shadow: 0 0 12px currentColor;
+  opacity: 0.42;
+  filter: none;
+  box-shadow: none;
   z-index: 40;
+  mix-blend-mode: normal;
   border-radius: 16px !important;
   box-sizing: border-box;
-  transition: opacity 0.1s ease-out, filter 0.1s ease-out, transform 0.1s cubic-bezier(0.2, 0, 0.2, 1), border-width 0.1s;
-  background-clip: padding-box;
+  padding: 2px;
+  transition: opacity 0.12s ease-out, border-width 0.1s;
+  background-clip: content-box;
   will-change: transform, opacity;
 }
 
 /* Focused state for indicators */
 .building-range-indicator.range-focused {
   opacity: 0.9 !important;
-  filter: drop-shadow(0 0 20px currentColor) brightness(1.4) contrast(1.1);
+  filter: none;
   border-style: solid !important;
   border-width: 4px;
-  transform: scale(1.03);
+  transform: none;
   z-index: 100;
-  box-shadow: 0 0 20px currentColor, inset 0 0 12px currentColor;
-  transition: all 0.08s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: range-flicker 3s infinite;
+  box-shadow: none;
+  transition: opacity 0.08s ease-out, border-width 0.08s ease-out;
+  animation: none;
 }
 
 @keyframes range-flicker {
@@ -679,7 +891,7 @@
   bottom: -100%;
   width: auto;
   height: auto;
-  background-color: rgba(251, 146, 60, 0.1) !important;
+  background-color: transparent;
   background-clip: padding-box;
 }
 
@@ -690,7 +902,7 @@
   bottom: -200%;
   width: auto;
   height: auto;
-  background-color: rgba(34, 211, 238, 0.1) !important;
+  background-color: transparent;
   background-clip: padding-box;
 }
 
@@ -702,7 +914,7 @@
   width: auto;
   height: auto;
   border: 4px solid rgba(255, 255, 255, 0.95);
-  background-color: rgba(192, 132, 252, 0.1) !important;
+  background-color: transparent;
   background-clip: padding-box;
   border-radius: 0;
   clip-path: polygon(40% 0%, 60% 0%,
@@ -840,13 +1052,13 @@
 
 /* 麒麟領域專屬背景 */
 .building-range-indicator.kirin-domain {
-  background-color: rgba(255, 215, 0, 0.12) !important;
+  background-color: transparent;
   background-clip: padding-box;
 }
 
 /* 護盾領域專屬背景 */
 .building-range-indicator.shield-domain {
-  background-color: rgba(37, 99, 235, 0.1) !important;
+  background-color: transparent;
   background-clip: padding-box;
 }
 

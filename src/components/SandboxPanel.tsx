@@ -89,6 +89,34 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
         });
     };
 
+    const downgradeCurrentUnit = (branch: 'a' | 'b') => {
+        if (!gameState.selectedUnitId) return;
+        setGameState(prev => {
+            const unit = getUnit(prev.selectedUnitId || '', prev);
+            if (!unit) return prev;
+
+            const p = prev.players[unit.owner];
+            const newLevels = JSON.parse(JSON.stringify(p.evolutionLevels));
+            const curLevel = newLevels[unit.type][branch];
+
+            if (curLevel <= 0) return prev;
+
+            newLevels[unit.type][branch] = curLevel - 1;
+            if (curLevel === 3) {
+                if (branch === 'a') delete newLevels[unit.type].aVariant;
+                else delete newLevels[unit.type].bVariant;
+            }
+
+            return {
+                ...prev,
+                players: {
+                    ...prev.players,
+                    [unit.owner]: { ...p, evolutionLevels: newLevels }
+                }
+            };
+        });
+    };
+
     const toggleGodMode = () => {
         setGameState(prev => ({
             ...prev,
@@ -267,6 +295,14 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                                         ) : (
                                             <div className="flex-1 py-1 bg-blue-900/30 text-blue-400/50 rounded-lg font-black text-[10px] text-center border border-blue-500/20">{language === 'zh_tw' ? 'A 已滿級' : 'A MAX'}</div>
                                         )}
+                                        <button
+                                            onClick={() => downgradeCurrentUnit('a')}
+                                            disabled={levels.a <= 0}
+                                            className={`px-2 py-1.5 rounded-lg font-black text-[10px] transition-all border ${levels.a > 0 ? 'bg-slate-700 hover:bg-slate-600 text-white border-slate-500' : 'bg-slate-800/40 text-slate-500 border-slate-700 cursor-not-allowed'}`}
+                                            title="Downgrade A -1"
+                                        >
+                                            ↓
+                                        </button>
                                     </div>
                                     <div className="flex gap-1 items-center">
                                         <span className="text-[9px] font-black w-4 text-orange-400">B</span>
@@ -286,6 +322,14 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                                         ) : (
                                             <div className="flex-1 py-1 bg-orange-900/30 text-orange-400/50 rounded-lg font-black text-[10px] text-center border border-orange-500/20">{language === 'zh_tw' ? 'B 已滿級' : 'B MAX'}</div>
                                         )}
+                                        <button
+                                            onClick={() => downgradeCurrentUnit('b')}
+                                            disabled={levels.b <= 0}
+                                            className={`px-2 py-1.5 rounded-lg font-black text-[10px] transition-all border ${levels.b > 0 ? 'bg-slate-700 hover:bg-slate-600 text-white border-slate-500' : 'bg-slate-800/40 text-slate-500 border-slate-700 cursor-not-allowed'}`}
+                                            title="Downgrade B -1"
+                                        >
+                                            ↓
+                                        </button>
                                     </div>
                                     <div className="flex flex-col gap-1 border-t border-slate-700/50 pt-1.5 mt-0.5">
                                         <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1">{language === 'zh_tw' ? '屬性調整' : 'STATS ADJUST'}</div>

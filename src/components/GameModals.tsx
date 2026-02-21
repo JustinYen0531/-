@@ -2,8 +2,9 @@
 import { GameState, PlayerID } from '../types';
 import { AIDifficulty } from '../ai/types';
 import { Language } from '../i18n';
-import { FlaskConical, Cpu, DoorOpen, Swords, Globe, X, ArrowRight, HelpCircle, Crown, Bomb, Users, Volume2, VolumeX, Info } from '../icons';
+import { FlaskConical, Cpu, DoorOpen, Swords, X, ArrowRight, HelpCircle, Crown, Bomb, Users, Info, Settings } from '../icons';
 import Tutorial from './Tutorial';
+import CircularMeteorShower from './CircularMeteorShower';
 import { useConnection } from '../network/ConnectionProvider';
 import { AuthResultPayload } from '../network/protocol';
 import developerLogOverviewRaw from '../../遊戲文章總覽.MD?raw';
@@ -17,9 +18,6 @@ interface GameModalsProps {
     view: 'lobby' | 'game';
     gameState: GameState;
     language: Language;
-    setLanguage: (lang: Language) => void;
-    musicVolume: number;
-    setMusicVolume: (vol: number) => void;
     aiDifficulty: AIDifficulty;
     setAiDifficulty: (diff: AIDifficulty) => void;
     onStartGame: (mode: 'pvp' | 'pve' | 'sandbox') => void;
@@ -30,8 +28,7 @@ interface GameModalsProps {
     setIsHost: (val: boolean) => void;
     roomId: string | null;
     setRoomId: (id: string | null) => void;
-    allowDevToolsInPvp: boolean;
-    setAllowDevToolsInPvp: (val: boolean) => void;
+    onOpenSettings: () => void;
     t: (key: string, params?: Record<string, any>) => string;
 }
 
@@ -152,9 +149,6 @@ const GameModals: React.FC<GameModalsProps> = ({
     view,
     gameState,
     language,
-    setLanguage,
-    musicVolume,
-    setMusicVolume,
     aiDifficulty,
     setAiDifficulty,
     onStartGame,
@@ -165,8 +159,7 @@ const GameModals: React.FC<GameModalsProps> = ({
     setIsHost,
     roomId,
     setRoomId,
-    allowDevToolsInPvp,
-    setAllowDevToolsInPvp,
+    onOpenSettings,
     t
 }) => {
     // Dynamically derive DEVELOPER_LOGS to support localization from i18n.ts
@@ -273,8 +266,7 @@ const GameModals: React.FC<GameModalsProps> = ({
         localPeer: isZh ? '本機 Peer ID' : 'Local Peer ID',
         remotePeer: isZh ? '遠端 Peer ID' : 'Remote Peer ID',
         joinedRoom: isZh ? '已加入房間' : 'Joined Room',
-        noRoomYet: isZh ? '還沒有房間？' : 'No room yet?',
-        allowDevTools: isZh ? '允許開發者工具' : 'Allow Dev Tools'
+        noRoomYet: isZh ? '還沒有房間？' : 'No room yet?'
     };
 
     const pveDifficultyTitle = isZh ? '選擇AI難度' : 'Choose AI Difficulty';
@@ -396,7 +388,6 @@ const GameModals: React.FC<GameModalsProps> = ({
         setNetworkUiError(null);
         setRoomCode('');
         setJoinRoomPassword('');
-        setAllowDevToolsInPvp(false);
         helloSentKeyRef.current = '';
     };
 
@@ -419,7 +410,6 @@ const GameModals: React.FC<GameModalsProps> = ({
             const openedId = await openPeer(preferredRoomId);
             setRoomId(openedId);
             setIsHost(true);
-            setAllowDevToolsInPvp(false);
             setJoinedRoomName(roomName);
             setShowJoinModal(false);
         } catch (openError) {
@@ -441,7 +431,6 @@ const GameModals: React.FC<GameModalsProps> = ({
             connectToPeer(targetRoomId);
             setRoomId(targetRoomId);
             setIsHost(false);
-            setAllowDevToolsInPvp(false);
             setJoinedRoomName(LOBBY_PREVIEW_ROOMS.find((room) => room.id === targetRoomId)?.name || '');
             setShowJoinModal(false);
         } catch (openError) {
@@ -459,23 +448,49 @@ const GameModals: React.FC<GameModalsProps> = ({
 
     if (view === 'lobby') {
         return (
-            <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 p-4 relative w-full absolute inset-0 z-50 overflow-hidden">
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-16 left-6 md:top-20 md:left-20">
-                        <div className="absolute inset-0 bg-cyan-500/20 blur-[50px] rounded-full scale-150 animate-pulse" style={{ animation: 'cloud-flow 6s ease-in-out infinite' }} />
+            <div
+                className="flex flex-col items-center justify-center h-full p-4 relative w-full absolute inset-0 z-50 overflow-hidden"
+                style={{
+                    background: `
+                        radial-gradient(72% 120% at -8% 50%, rgba(0, 185, 255, 0.58) 0%, rgba(0, 120, 255, 0.26) 38%, rgba(0, 0, 0, 0) 70%),
+                        radial-gradient(72% 120% at 108% 50%, rgba(255, 40, 90, 0.62) 0%, rgba(255, 0, 80, 0.24) 38%, rgba(0, 0, 0, 0) 70%),
+                        linear-gradient(90deg, #061a4a 0%, #24004a 50%, #4a0018 100%)
+                    `
+                }}
+            >
+                <CircularMeteorShower className="z-0 opacity-100" />
+                <div className="absolute inset-0 overflow-hidden pointer-events-none z-[1]">
+                    <div className="absolute top-4 left-2 md:top-8 md:left-6 z-[1]">
+                        <div
+                            className="absolute inset-0 rounded-full bg-cyan-400/25 blur-[56px] scale-[1.85]"
+                            style={{ animation: 'cloud-flow 6s ease-in-out infinite' }}
+                        />
                         <div style={{ animation: 'fadeInOut 4s ease-in-out infinite' }}>
-                            <Crown size={200} className="h-28 w-28 md:h-[200px] md:w-[200px] text-cyan-400 drop-shadow-2xl relative z-10" />
+                            <Bomb size={220} className="text-cyan-300 drop-shadow-[0_0_28px_rgba(34,211,238,0.8)] relative z-10" />
                         </div>
                     </div>
 
-                    <div className="absolute bottom-16 right-6 md:bottom-20 md:right-20">
-                        <div className="absolute inset-0 bg-red-500/20 blur-[50px] rounded-full scale-150 animate-pulse" style={{ animation: 'cloud-flow 6s ease-in-out infinite reverse' }} />
+                    <div className="absolute bottom-4 right-2 md:bottom-8 md:right-6 z-[1]">
+                        <div
+                            className="absolute inset-0 rounded-full bg-red-500/25 blur-[56px] scale-[1.85]"
+                            style={{ animation: 'cloud-flow 6s ease-in-out infinite reverse' }}
+                        />
                         <div style={{ animation: 'fadeInOut 4s ease-in-out infinite' }}>
-                            <Bomb size={200} className="h-28 w-28 md:h-[200px] md:w-[200px] text-red-400 drop-shadow-2xl relative z-10" />
+                            <Crown size={240} className="text-red-400 drop-shadow-[0_0_30px_rgba(248,113,113,0.85)] relative z-10" />
                         </div>
                     </div>
 
-                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-red-500/5" />
+                    <div
+                        className="absolute inset-0 opacity-10"
+                        style={{
+                            backgroundImage: `
+                                linear-gradient(0deg, transparent 24%, rgba(0, 255, 255, 0.08) 25%, rgba(0, 255, 255, 0.08) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.08) 75%, rgba(0, 255, 255, 0.08) 76%, transparent 77%, transparent),
+                                linear-gradient(90deg, transparent 24%, rgba(0, 255, 255, 0.08) 25%, rgba(0, 255, 255, 0.08) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.08) 75%, rgba(0, 255, 255, 0.08) 76%, transparent 77%, transparent)
+                            `,
+                            backgroundSize: '60px 60px'
+                        }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-red-500/10" />
                 </div>
 
                 <div className="relative z-10 text-center space-y-3 pt-32 lg:pt-40">
@@ -611,15 +626,6 @@ const GameModals: React.FC<GameModalsProps> = ({
                                         {uiText.startGame}
                                     </button>
                                 </div>
-                                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-500 bg-slate-900/70 text-sm text-slate-100 font-semibold">
-                                    <input
-                                        type="checkbox"
-                                        checked={allowDevToolsInPvp}
-                                        onChange={(event) => setAllowDevToolsInPvp(event.target.checked)}
-                                        className="accent-cyan-400 w-4 h-4"
-                                    />
-                                    {uiText.allowDevTools}
-                                </label>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center gap-3">
@@ -652,33 +658,12 @@ const GameModals: React.FC<GameModalsProps> = ({
                 )}
 
                 <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
-                    <div className="flex items-center gap-2 bg-slate-900/70 border border-cyan-500/40 rounded-lg px-3 py-2 backdrop-blur-sm shadow-lg shadow-cyan-500/10">
-                        <div className="text-cyan-200">
-                            {musicVolume === 0 ? <VolumeX size={16} className="text-red-300" /> : <Volume2 size={16} className="text-cyan-300" />}
-                        </div>
-                        <span className="text-[11px] font-bold text-cyan-200 hidden sm:inline">
-                            {isZh ? '音量' : 'Volume'}
-                        </span>
-                        <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={musicVolume * 100}
-                            onChange={(e) => setMusicVolume(Number(e.target.value) / 100)}
-                            aria-label={isZh ? '音量' : 'Volume'}
-                            className="w-20 sm:w-24 h-2 bg-cyan-500/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                            style={{
-                                background: `linear-gradient(to right, rgb(34, 211, 238) 0%, rgb(34, 211, 238) ${musicVolume * 100}%, rgba(34, 211, 238, 0.2) ${musicVolume * 100}%, rgba(34, 211, 238, 0.2) 100%)`
-                            }}
-                        />
-                        <span className="text-[11px] text-cyan-300 font-bold w-8 hidden sm:inline">{Math.round(musicVolume * 100)}%</span>
-                    </div>
                     <button
-                        onClick={() => setLanguage(language === 'zh_tw' ? 'en' : 'zh_tw')}
-                        className="p-2.5 bg-slate-900/60 hover:bg-slate-800/70 rounded-lg border border-slate-500 transition-colors flex items-center gap-2"
+                        onClick={onOpenSettings}
+                        className="p-2.5 bg-slate-900/70 hover:bg-slate-800/80 rounded-lg border border-cyan-500/40 transition-colors flex items-center gap-2 text-cyan-100"
                     >
-                        <Globe size={16} />
-                        {language === 'zh_tw' ? 'EN' : '中'}
+                        <Settings size={16} />
+                        <span className="text-xs font-bold">{t('settings')}</span>
                     </button>
                 </div>
 

@@ -29,6 +29,7 @@ export const getStartingPositions = (pid: PlayerID) => {
 };
 
 export const createInitialState = (mode: 'pvp' | 'pve' | 'sandbox'): GameState => {
+    const MIN_INITIAL_ORE_COUNT = 2;
     // 1. Create Empty Grid
     const cells: Cell[][] = [];
     for (let r = 0; r < GRID_ROWS; r++) {
@@ -94,6 +95,7 @@ export const createInitialState = (mode: 'pvp' | 'pve' | 'sandbox'): GameState =
     }
 
     // 3. Ore Generation
+    let initialOreCount = 0;
     for (let r = 0; r < GRID_ROWS; r++) {
         for (let c = 0; c < GRID_COLS; c++) {
             if (!cells[r][c].isObstacle && !cells[r][c].isFlagBase) {
@@ -101,9 +103,29 @@ export const createInitialState = (mode: 'pvp' | 'pve' | 'sandbox'): GameState =
                     cells[r][c].hasEnergyOre = true;
                     const rand = Math.random();
                     cells[r][c].oreSize = rand < 0.6 ? 'small' : rand < 0.9 ? 'medium' : 'large';
+                    initialOreCount++;
                 }
             }
         }
+    }
+
+    // Ensure opening board is never empty of ore.
+    let oreAttempts = 0;
+    while (initialOreCount < MIN_INITIAL_ORE_COUNT && oreAttempts < 500) {
+        oreAttempts++;
+        const r = Math.floor(Math.random() * GRID_ROWS);
+        const c = Math.floor(Math.random() * GRID_COLS);
+        const canPlaceOre =
+            c > 5 &&
+            c < 18 &&
+            !cells[r][c].isObstacle &&
+            !cells[r][c].isFlagBase &&
+            !cells[r][c].hasEnergyOre;
+        if (!canPlaceOre) continue;
+        cells[r][c].hasEnergyOre = true;
+        const rand = Math.random();
+        cells[r][c].oreSize = rand < 0.6 ? 'small' : rand < 0.9 ? 'medium' : 'large';
+        initialOreCount++;
     }
 
     const createUnits = (pid: PlayerID): Unit[] => {

@@ -1,10 +1,10 @@
 import {
     Unit, Mine, UnitType, MineType, PlayerState, PlayerID,
-    UnitStatus, SmokeEffect, QuestStats
+    UnitStatus, SmokeEffect, QuestStats, Cell
 } from './types';
 import {
     UNIT_STATS, MINE_DAMAGE, ENERGY_CAP_RATIO,
-    MAX_INTEREST, ENERGY_REGEN, GRID_ROWS, GRID_COLS
+    MAX_INTEREST, ENERGY_REGEN, GRID_ROWS, GRID_COLS, ORE_REWARDS
 } from './constants';
 
 /**
@@ -55,6 +55,20 @@ export const calculateEnergyIncome = (
 
     const interest = Math.min(Math.floor(currentEnergy / 10), MAX_INTEREST);
     return currentEnergy + currentRegen + interest + oreIncome + killIncome;
+};
+
+/**
+ * Dynamic ore reward scaling by round to keep ore economy relevant in mid/late game.
+ */
+export const calculateOreReward = (
+    oreSize: NonNullable<Cell['oreSize']>,
+    turnCount: number
+): number => {
+    const base = ORE_REWARDS[oreSize];
+    if (turnCount >= 12) return Math.ceil(base * 1.6);
+    if (turnCount >= 8) return Math.ceil(base * 1.4);
+    if (turnCount >= 4) return Math.ceil(base * 1.2);
+    return base;
 };
 
 /**

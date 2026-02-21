@@ -44,3 +44,4 @@ export { default as Coins } from 'lucide-react/dist/esm/icons/coins';
 export { default as Building2 } from 'lucide-react/dist/esm/icons/building-2';
 export { default as Sparkles } from 'lucide-react/dist/esm/icons/sparkles';
 export { default as HelpCircle } from 'lucide-react/dist/esm/icons/help-circle';
+export { default as Settings } from 'lucide-react/dist/esm/icons/settings';

@@ -7,12 +7,13 @@ import {
     calculateAttackDamage,
     checkEnergyCap as engineCheckEnergyCap,
     calculateEnergyIncome,
+    calculateOreReward,
     calculateMineInteraction,
     shouldTriggerMine
 } from '../gameEngine';
 import {
     ENERGY_CAP_RATIO,
-    P1_FLAG_POS, P2_FLAG_POS, ORE_REWARDS, TURN_TIMER, THINKING_TIMER,
+    P1_FLAG_POS, P2_FLAG_POS, TURN_TIMER, THINKING_TIMER,
     EVOLUTION_COSTS, UNIT_STATS, GRID_ROWS, GRID_COLS
 } from '../constants';
 import {
@@ -100,7 +101,7 @@ export const usePlayerActions = ({
                 if (!u.isDead) {
                     const cell = newCells[u.r][u.c];
                     if (cell.hasEnergyOre && cell.oreSize) {
-                        income += ORE_REWARDS[cell.oreSize];
+                        income += calculateOreReward(cell.oreSize, nextTurn);
                         cell.hasEnergyOre = false;
                         cell.oreSize = null;
                     }
@@ -318,6 +319,48 @@ export const usePlayerActions = ({
             });
         }
 
+        const spawnRoundOres = () => {
+            const occupied = new Set<string>();
+            [...updatedP1Units, ...updatedP2Units].forEach(u => {
+                if (!u.isDead) occupied.add(`${u.r},${u.c}`);
+            });
+            prevState.buildings.forEach(b => {
+                occupied.add(`${b.r},${b.c}`);
+            });
+
+            const candidates: Array<{ r: number; c: number }> = [];
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    const cell = newCells[r][c];
+                    if (
+                        c > 5 &&
+                        c < 18 &&
+                        !cell.isObstacle &&
+                        !cell.isFlagBase &&
+                        !cell.hasEnergyOre &&
+                        !occupied.has(`${r},${c}`)
+                    ) {
+                        candidates.push({ r, c });
+                    }
+                }
+            }
+
+            if (candidates.length === 0) return;
+
+            // Guarantee at least one new ore each round; scale up slightly in longer games.
+            const spawnCount = Math.min(candidates.length, nextTurn >= 12 ? 2 : 1);
+            for (let i = 0; i < spawnCount; i++) {
+                const pick = Math.floor(Math.random() * candidates.length);
+                const { r, c } = candidates[pick];
+                candidates.splice(pick, 1);
+                newCells[r][c].hasEnergyOre = true;
+                const rand = Math.random();
+                newCells[r][c].oreSize = rand < 0.6 ? 'small' : rand < 0.9 ? 'medium' : 'large';
+            }
+        };
+
+        spawnRoundOres();
+
         setGameState({
             ...prevState,
             turnCount: nextTurn,
@@ -326,7 +369,7 @@ export const usePlayerActions = ({
             timeLeft: THINKING_TIMER,
             activeUnitId: null,
             selectedUnitId: null,
-            cells: prevState.cells, // Should update ore spawn if needed
+            cells: newCells,
             mines: prevState.mines,
             buildings: newBuildings,
             smokes: newSmokes,
