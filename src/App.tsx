@@ -317,6 +317,17 @@ const fromSerializableGameState = (input: unknown): GameState | null => {
     };
 };
 
+const mergePlacementMines = (localMines: Mine[], syncedMines: Mine[]): Mine[] => {
+    const merged = [...syncedMines];
+    const seenIds = new Set(merged.map(m => m.id));
+    for (const mine of localMines) {
+        if (seenIds.has(mine.id)) continue;
+        merged.push(mine);
+        seenIds.add(mine.id);
+    }
+    return merged;
+};
+
 export default function App() {
     const [view, setView] = useState<'lobby' | 'game'>('lobby');
     const [gameState, setGameState] = useState<GameState>(createInitialState('pvp'));
@@ -440,6 +451,20 @@ export default function App() {
             setShowDevTools(false);
         }
     }, [isDevToolsAllowedInCurrentMatch, showDevTools]);
+
+    useEffect(() => {
+        if (targetMode !== 'place_setup_mine' || gameState.phase !== 'placement') {
+            return;
+        }
+
+        const localPlayer = gameState.gameMode === 'pvp'
+            ? (isHost ? PlayerID.P1 : PlayerID.P2)
+            : gameState.currentPlayer;
+
+        if (gameState.players[localPlayer].placementMinesPlaced >= PLACEMENT_MINE_LIMIT) {
+            setTargetMode(null);
+        }
+    }, [gameState, isHost, targetMode]);
 
     // Safety: entering Planning (thinking) should not carry previous selections/active units
     const prevPhaseRef = useRef(gameState.phase);
@@ -2925,21 +2950,50 @@ export default function App() {
                 // CRITICAL: Merge synced state with local UI state to prevent "weird jumps"
                 // This keeps the player's current selection and perspective while updating global board state.
                 setGameState(prev => {
+                    let nextSyncedState = syncedState;
+                    if (syncedState.gameMode === 'pvp' && syncedState.phase === 'placement') {
+                        // Placement mines are monotonic in setup phase; never let an older sync remove local mines.
+                        const mergedPlacementMines = mergePlacementMines(prev.mines, syncedState.mines);
+                        const p1MineCount = mergedPlacementMines.filter(m => m.owner === PlayerID.P1).length;
+                        const p2MineCount = mergedPlacementMines.filter(m => m.owner === PlayerID.P2).length;
+                        const mergedReadyState = {
+                            [PlayerID.P1]: (prev.pvpReadyState?.[PlayerID.P1] ?? false) || (syncedState.pvpReadyState?.[PlayerID.P1] ?? false),
+                            [PlayerID.P2]: (prev.pvpReadyState?.[PlayerID.P2] ?? false) || (syncedState.pvpReadyState?.[PlayerID.P2] ?? false),
+                        };
+
+                        nextSyncedState = {
+                            ...syncedState,
+                            mines: mergedPlacementMines,
+                            pvpReadyState: mergedReadyState,
+                            players: {
+                                ...syncedState.players,
+                                [PlayerID.P1]: {
+                                    ...syncedState.players[PlayerID.P1],
+                                    placementMinesPlaced: p1MineCount
+                                },
+                                [PlayerID.P2]: {
+                                    ...syncedState.players[PlayerID.P2],
+                                    placementMinesPlaced: p2MineCount
+                                }
+                            }
+                        };
+                    }
+
                     const localPlayer = resolveLocalPlayer(prev);
                     const preservedLocalPrivateLogs = prev.logs.filter(
                         log => PRIVATE_HINT_LOG_KEYS.has(log.messageKey) && log.owner === localPlayer
                     );
 
-                    const mergedLogs = [...preservedLocalPrivateLogs, ...syncedState.logs].slice(0, 100);
+                    const mergedLogs = [...preservedLocalPrivateLogs, ...nextSyncedState.logs].slice(0, 100);
                     return {
-                        ...syncedState,
+                        ...nextSyncedState,
                         logs: mergedLogs,
                         // Preserve LOCAL UI state
                         selectedUnitId: prev.selectedUnitId,
                         activeUnitId: prev.activeUnitId,
                         // Do NOT preserve pause flags locally; sandbox pause must sync across both players.
-                        isPaused: syncedState.isPaused,
-                        isSandboxTimerPaused: syncedState.isSandboxTimerPaused,
+                        isPaused: nextSyncedState.isPaused,
+                        isSandboxTimerPaused: nextSyncedState.isSandboxTimerPaused,
 
                         // Preserve UI animation state
                         vfx: prev.vfx,

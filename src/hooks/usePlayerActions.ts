@@ -140,7 +140,21 @@ export const usePlayerActions = ({
         };
 
         const resetUnits = (units: Unit[], playerState: PlayerState, enemyPlayerState: PlayerState, playerLogs: GameLog[]) => {
+            const occupiedPositions = new Set<string>();
+            units.forEach(unit => {
+                if (!unit.isDead) {
+                    occupiedPositions.add(`${unit.r},${unit.c}`);
+                }
+            });
+            const isPositionAvailable = (r: number, c: number) => (
+                !occupiedPositions.has(`${r},${c}`) &&
+                !newCells[r][c].isObstacle
+            );
+
             return units.map((u, unitIndex) => {
+                if (!u.isDead) {
+                    occupiedPositions.delete(`${u.r},${u.c}`);
+                }
                 const newDuration = Math.max(0, (u.status.moveCostDebuffDuration || 0) - 1);
 
                 // Kirin's Domain Round End Damage
@@ -190,9 +204,7 @@ export const usePlayerActions = ({
                     const originalSpawnPos = spawnPositions[unitIndex];
                     let respawnPos = originalSpawnPos;
 
-                    const isOccupied = units.some((unit, idx) =>
-                        idx !== unitIndex && unit.r === originalSpawnPos.r && unit.c === originalSpawnPos.c && !unit.isDead
-                    );
+                    const isOccupied = !isPositionAvailable(originalSpawnPos.r, originalSpawnPos.c);
 
                     if (isOccupied) {
                         const candidates: { r: number, c: number }[] = [];
@@ -201,11 +213,7 @@ export const usePlayerActions = ({
                                 const nr = originalSpawnPos.r + dr;
                                 const nc = originalSpawnPos.c + dc;
                                 if (nr >= 0 && nr < GRID_ROWS && nc >= 0 && nc < GRID_COLS) {
-                                    const cellOccupied = units.some((unit, idx) =>
-                                        idx !== unitIndex && unit.r === nr && unit.c === nc && !unit.isDead
-                                    );
-                                    const cellObstacle = newCells[nr][nc].isObstacle;
-                                    if (!cellOccupied && !cellObstacle) {
+                                    if (isPositionAvailable(nr, nc)) {
                                         candidates.push({ r: nr, c: nc });
                                     }
                                 }
@@ -216,9 +224,7 @@ export const usePlayerActions = ({
                             respawnPos = candidates[Math.floor(Math.random() * candidates.length)];
                         } else {
                             const availableSpawns = spawnPositions.filter((pos) =>
-                                !units.some((unit, uidx) =>
-                                    uidx !== unitIndex && unit.r === pos.r && unit.c === pos.c && !unit.isDead
-                                )
+                                isPositionAvailable(pos.r, pos.c)
                             );
                             if (availableSpawns.length > 0) {
                                 respawnPos = availableSpawns[Math.floor(Math.random() * availableSpawns.length)];
@@ -244,6 +250,9 @@ export const usePlayerActions = ({
                         type: 'info' as const,
                         owner: playerState.id
                     });
+                }
+                if (!newU.isDead) {
+                    occupiedPositions.add(`${newU.r},${newU.c}`);
                 }
                 return newU;
             });
@@ -925,7 +934,7 @@ export const usePlayerActions = ({
                 ...finalPState,
                 units: finalPState.units.map((u: Unit) =>
                     u.id === unit.id
-                        ? { ...u, r, c, energyUsedThisTurn: u.energyUsedThisTurn + totalCost, carriedMineRevealed: false }
+                        ? { ...u, carriedMineRevealed: false }
                         : u)
             };
 

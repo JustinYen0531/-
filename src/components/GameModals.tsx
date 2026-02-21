@@ -565,10 +565,15 @@ const GameModals: React.FC<GameModalsProps> = ({
                             <div className="flex flex-wrap items-stretch justify-center gap-3">
                                 <button
                                     onClick={() => setShowPveDifficultyPanel(prev => !prev)}
-                                    className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform scale-[1.08] hover:scale-[1.12] transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
+                                    className="relative min-w-[170px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform scale-[1.08] hover:scale-[1.12] transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
                                 >
                                     <Cpu size={22} />
-                                    {t('pve_mode')}
+                                    <span className="relative">
+                                        <span>{t('pve_mode')}</span>
+                                        <span className="absolute left-0 top-full -mt-1.5 text-[10px] font-semibold text-violet-100/80 whitespace-nowrap">
+                                            {isZh ? '開發中' : 'In Development'}
+                                        </span>
+                                    </span>
                                 </button>
 
                                 <div

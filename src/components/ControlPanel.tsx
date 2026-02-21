@@ -239,7 +239,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 <div className="w-full h-full flex flex-col items-center justify-center gap-3">
                                     <div className="text-sm font-black text-white uppercase tracking-widest animate-pulse drop-shadow-lg">{t('placement_phase')}</div>
                                     <div className="text-[10px] text-white text-center font-semibold">{t('placement_guide')}</div>
-                                    <div className="flex gap-2 w-full">
+                                    <div className={`flex gap-2 w-full ${isSetupMineLimitReached ? 'justify-center' : ''}`}>
                                         {!isSetupMineLimitReached && (
                                             <button
                                                 disabled={isInteractionDisabled}
@@ -258,7 +258,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                 if (isInteractionDisabled) return;
                                                 phases.finishPlacementPhase();
                                             }}
-                                            className={`${isSetupMineLimitReached ? 'w-full' : 'flex-1'} py-2 px-1 rounded font-black text-xs flex items-center justify-center gap-1 border-2 shadow-lg transition-all ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-700 bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-emerald-500/50 text-white'}`}
+                                            className={`${isSetupMineLimitReached ? 'w-1/2' : 'flex-1'} py-2 px-1 rounded font-black text-xs flex items-center justify-center gap-1 border-2 shadow-lg transition-all ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-700 bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-emerald-500/50 text-white'}`}
                                         >
                                             <CheckCircle size={14} /> {t('confirm_placement')}
                                         </button>
