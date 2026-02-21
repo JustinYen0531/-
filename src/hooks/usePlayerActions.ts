@@ -724,8 +724,24 @@ export const usePlayerActions = ({
                                 // Accumulate damage for the triggering unit (handled by newHp later)
                                 dmg += (aoeDmg + vuln);
                             } else {
-                                // Apply immediate damage to other units
-                                u.hp = Math.max(0, u.hp - (aoeDmg + vuln));
+                                // Apply damage via victims array to avoid mutating state and handle death properly
+                                let currentHp = u.hp;
+                                const existingVictim = nukeAoeVictims.find(v => v.unitId === u.id);
+                                if (existingVictim) currentHp = existingVictim.newHp;
+
+                                const targetNewHp = Math.max(0, currentHp - (aoeDmg + vuln));
+                                const targetIsDead = targetNewHp === 0;
+                                const targetRespawnTimer = (targetIsDead && u.type !== UnitType.GENERAL) ? (state.turnCount <= 10 ? 2 : 3) : 0;
+
+                                if (existingVictim) {
+                                    existingVictim.newHp = targetNewHp;
+                                    existingVictim.isDead = targetIsDead;
+                                    existingVictim.respawnTimer = targetRespawnTimer;
+                                } else {
+                                    nukeAoeVictims.push({
+                                        unitId: u.id, owner: u.owner, newHp: targetNewHp, isDead: targetIsDead, respawnTimer: targetRespawnTimer
+                                    });
+                                }
                             }
                             addLog('log_chain_aoe', 'mine', { unit: getLocalizedUnitName(u.type), dmg: aoeDmg }, u.owner);
                         }
@@ -764,8 +780,8 @@ export const usePlayerActions = ({
                         const inNukeBlastRange = (targetR: number, targetC: number) =>
                             (Math.abs(targetR - mine.r) + Math.abs(targetC - mine.c)) <= 2;
 
-                        newMines = newMines.filter(m => !inNukeBlastRange(m.r, m.c));
-                        currentBuildings = currentBuildings.filter(b => !inNukeBlastRange(b.r, b.c));
+                        newMines = newMines.filter(m => m.owner === mine.owner || !inNukeBlastRange(m.r, m.c));
+                        currentBuildings = currentBuildings.filter(b => b.owner === mine.owner || !inNukeBlastRange(b.r, b.c));
                         const allUnits = [...state.players[PlayerID.P1].units, ...state.players[PlayerID.P2].units];
                         allUnits.forEach(targetUnit => {
                             if (!targetUnit.isDead && inNukeBlastRange(targetUnit.r, targetUnit.c)) {

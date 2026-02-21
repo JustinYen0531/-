@@ -131,7 +131,10 @@ const CommonSettingsModal: React.FC<CommonSettingsModalProps> = ({
                             }}
                         />
                         <div className="flex items-center justify-between">
-                            <span className="text-xs text-cyan-300 font-bold">{Math.round(sfxVolume * 100)}%</span>
+                            <span className="text-xs text-cyan-300 font-bold">
+                                {Math.round(sfxVolume * 100)}%
+                                {sfxVolume === 0 ? (isZh ? '（不推薦，仍在開發）' : ' (Not recommended, still in development)') : ''}
+                            </span>
                             <div className="flex gap-2">
                                 {[0, 40, 80].map((value) => (
                                     <button
@@ -148,7 +151,7 @@ const CommonSettingsModal: React.FC<CommonSettingsModalProps> = ({
 
                     <section className="space-y-2">
                         <label className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/70 px-4 py-3 text-sm text-slate-100">
-                            <span>{isZh ? 'AI 對戰開放 Dev Tools' : 'Allow "Dev Tools" in AI Challenge'}</span>
+                            <span>{isZh ? 'AI 對戰開放 Dev Tools/Sandbox' : 'Allow Dev Tools/Sandbox in AI'}</span>
                             <input
                                 type="checkbox"
                                 checked={allowDevToolsInAiChallenge}
@@ -157,7 +160,7 @@ const CommonSettingsModal: React.FC<CommonSettingsModalProps> = ({
                             />
                         </label>
                         <p className="text-xs text-slate-400">
-                            {isZh ? '開啟後，AI 對戰可使用 DevTools 與 Sandbox。' : 'When enabled, DevTools and sandbox utilities are available in AI Challenge.'}
+                            {isZh ? '開啟後，僅 AI 對戰可使用 DevTools 與 Sandbox。' : 'When enabled, DevTools and sandbox utilities are available only in AI matches.'}
                         </p>
                     </section>
 

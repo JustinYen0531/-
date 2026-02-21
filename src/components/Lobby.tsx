@@ -87,7 +87,7 @@ const Lobby: React.FC<LobbyProps> = ({
                                 className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 rounded-xl font-black text-lg shadow-2xl shadow-indigo-500/45 transform hover:scale-110 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-indigo-300 text-white"
                             >
                                 <DoorOpen size={24} />
-                                {language === 'zh_tw' ? '加入大廳' : 'Join Lobby'}
+                                {language === 'zh_tw' ? '雙人對戰' : '2P Battle'}
                             </button>
                         </div>
                         {/* 第二排：教學 */}

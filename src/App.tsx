@@ -313,8 +313,8 @@ export default function App() {
     const [selectedMineId, setSelectedMineId] = useState<string | null>(null);
     const [showEvolutionTree, setShowEvolutionTree] = useState(false);
     const [language, setLanguage] = useState<Language>('en');
-    const [musicVolume, setMusicVolume] = useState(0.3);
-    const [sfxVolume, setSfxVolume] = useState(0.7);
+    const [musicVolume, setMusicVolume] = useState(0.15);
+    const [sfxVolume, setSfxVolume] = useState(0);
     const [showCommonSettings, setShowCommonSettings] = useState(false);
     const [disableBoardShake, setDisableBoardShake] = useState(false);
     const [detailMode, setDetailMode] = useState<VisualDetailMode>('normal');
@@ -349,6 +349,7 @@ export default function App() {
     const [isSandboxCollapsed, setIsSandboxCollapsed] = useState(false);
     const [showDevTools, setShowDevTools] = useState(false);
     const [allowDevToolsInAiChallenge, setAllowDevToolsInAiChallenge] = useState(false);
+    const [allowDevToolsInPvpRoom, setAllowDevToolsInPvpRoom] = useState(false);
     const sandboxDragRef = useRef({ isDragging: false, startX: 0, startY: 0 });
     const clampSandboxPos = useCallback((pos: { x: number; y: number }) => {
         if (typeof window === 'undefined') {
@@ -417,9 +418,11 @@ export default function App() {
     }, []);
 
     const isDevToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox'
-        || (gameState.gameMode === 'pve' && allowDevToolsInAiChallenge);
+        || (gameState.gameMode === 'pve' && allowDevToolsInAiChallenge)
+        || (gameState.gameMode === 'pvp' && allowDevToolsInPvpRoom);
     const isSandboxToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox'
-        || (gameState.gameMode === 'pve' && allowDevToolsInAiChallenge);
+        || (gameState.gameMode === 'pve' && allowDevToolsInAiChallenge)
+        || (gameState.gameMode === 'pvp' && allowDevToolsInPvpRoom);
 
     useEffect(() => {
         if (!isDevToolsAllowedInCurrentMatch && showDevTools) {
@@ -541,7 +544,7 @@ export default function App() {
         setGameState(prev => {
             if (
                 messageKey === 'log_mine_limit' &&
-                prev.logs.some(log => log.messageKey === 'log_mine_limit' && log.owner === resolvedOwner)
+                prev.logs.some(log => log.messageKey === 'log_mine_limit')
             ) {
                 return prev;
             }
@@ -670,7 +673,8 @@ export default function App() {
                 turn: 1,
                 payload: {
                     mode: 'pvp',
-                    initialState: toSerializableGameState(initialState)
+                    initialState: toSerializableGameState(initialState),
+                    allowDevTools: allowDevToolsInPvpRoom
                 }
             });
         }
@@ -679,7 +683,7 @@ export default function App() {
         setTimeout(() => {
             setShowGameStartAnimation(false);
         }, 3000);
-    }, [isHost, roomId, sendActionPacket]);
+    }, [allowDevToolsInPvpRoom, isHost, roomId, sendActionPacket]);
 
     const handleExitGame = useCallback((origin: 'local' | 'remote' = 'local') => {
         const state = gameStateRef.current;
@@ -1758,7 +1762,7 @@ export default function App() {
 
             if (targetUnits.length > 0) {
                 targetUnits.forEach(tu => {
-                    const dmg = MINE_DAMAGE;
+                    const dmg = Math.floor(MINE_DAMAGE * 0.5);
                     const targetPId = tu.owner;
                     const targetP = newState.players[targetPId];
                     const damagedUnits = targetP.units.map(u => {
@@ -2077,7 +2081,12 @@ export default function App() {
 
         // Mine Limit Check (5 + 1 Logic)
         const ownMinesCount = gameState.mines.filter(m => m.owner === unit.owner).length;
-        if (ownMinesCount >= 6) {
+        const player = gameState.players[unit.owner];
+        const mkrLevelB = player.evolutionLevels[UnitType.MAKER].b;
+        const mkrVariantB = player.evolutionLevels[UnitType.MAKER].bVariant;
+        const factories = gameState.buildings.filter(b => b.owner === unit.owner && b.type === 'factory');
+        const maxPlacedLimit = (mkrLevelB === 3) ? (mkrVariantB === 2 ? 5 + factories.length * 2 : 8) : 5 + mkrLevelB;
+        if (ownMinesCount >= maxPlacedLimit + 1) {
             addLog('log_max_mines', 'error');
             return;
         }
@@ -2491,10 +2500,11 @@ export default function App() {
             turn: state.turnCount,
             payload: {
                 reason,
-                state: toSerializableGameState(state)
+                state: toSerializableGameState(state),
+                allowDevTools: allowDevToolsInPvpRoom
             }
         });
-    }, [isNetworkConnected, roomId, sendActionPacket]);
+    }, [allowDevToolsInPvpRoom, isNetworkConnected, roomId, sendActionPacket]);
 
     const sendGameStateDeferred = useCallback((reason: string) => {
         // Lower-latency default sync.
@@ -2858,6 +2868,9 @@ export default function App() {
         if (lastIncomingPacket.type === 'START_GAME') {
             const payload = lastIncomingPacket.payload as StartGamePayload;
             if (!isHost && view === 'lobby') {
+                if (typeof payload.allowDevTools === 'boolean') {
+                    setAllowDevToolsInPvpRoom(payload.allowDevTools);
+                }
                 const syncedInitialState = payload.initialState ? fromSerializableGameState(payload.initialState) : null;
                 handleStartGame('pvp', syncedInitialState || undefined);
             }
@@ -2883,6 +2896,9 @@ export default function App() {
             if (type === 'STATE_SYNC') {
                 if (!isStateSyncPayload(payload)) {
                     return;
+                }
+                if (!isHost && typeof payload.allowDevTools === 'boolean') {
+                    setAllowDevToolsInPvpRoom(payload.allowDevTools);
                 }
                 const syncedState = fromSerializableGameState(payload.state);
                 if (!syncedState) {
@@ -3207,16 +3223,21 @@ export default function App() {
                 }
 
                 if (player.placementMinesPlaced >= PLACEMENT_MINE_LIMIT) {
-                    addLog('log_mine_limit', 'error');
                     setTargetMode(null);
                     return;
                 }
 
                 let placedSuccessfully = false;
+                let placementFailReason: 'limit' | 'occupied' | null = null;
                 setGameState(prev => {
                     const p = prev.players[actingPlayerId];
                     const prevHasMineAtCell = prev.mines.some(m => m.r === r && m.c === c);
-                    if (p.placementMinesPlaced >= PLACEMENT_MINE_LIMIT || prevHasMineAtCell) {
+                    if (p.placementMinesPlaced >= PLACEMENT_MINE_LIMIT) {
+                        placementFailReason = 'limit';
+                        return prev;
+                    }
+                    if (prevHasMineAtCell) {
+                        placementFailReason = 'occupied';
                         return prev;
                     }
                     placedSuccessfully = true;
@@ -3230,8 +3251,10 @@ export default function App() {
                     }
                 });
                 if (!placedSuccessfully) {
-                    addLog('log_mine_limit', 'error');
-                    setTargetMode(null);
+                    if (placementFailReason === 'occupied') {
+                        addLog('log_space_has_mine', 'error');
+                    }
+                    // Keep placement mode active so player can continue placing without re-toggling.
                     return;
                 }
                 if (player.placementMinesPlaced + 1 >= PLACEMENT_MINE_LIMIT) {
@@ -3510,6 +3533,7 @@ export default function App() {
             ? true
             : (gameState.currentPlayer === PlayerID.P1);
     const filteredLogs = gameState.logs.filter((log) => {
+        if (log.messageKey === 'log_mine_limit') return false;
         if (gameState.gameMode === 'sandbox') return true;
         if (PRIVATE_HINT_LOG_KEYS.has(log.messageKey)) {
             return !!log.owner && log.owner === localLogOwnerPlayerId;
@@ -3545,8 +3569,8 @@ export default function App() {
                 roomId={roomId}
                 setRoomId={setRoomId}
                 onOpenSettings={() => setShowCommonSettings(true)}
-                allowDevToolsInAiChallenge={allowDevToolsInAiChallenge}
-                setAllowDevToolsInAiChallenge={setAllowDevToolsInAiChallenge}
+                allowDevToolsInPvpRoom={allowDevToolsInPvpRoom}
+                setAllowDevToolsInPvpRoom={setAllowDevToolsInPvpRoom}
                 detailMode={detailMode}
                 t={t}
             />

@@ -62,7 +62,6 @@ export const useGameLoop = ({
         const timer = setInterval(() => {
             const state = gameStateRef.current;
             if (state.gameOver || state.isPaused || state.isSandboxTimerPaused) return;
-
             const now = Date.now();
             // Check if we're in slow-mo period (action happened within 500ms)
             const timeSinceLastAction = state.lastActionTime ? (now - state.lastActionTime) : Infinity;

@@ -240,23 +240,25 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                     <div className="text-sm font-black text-white uppercase tracking-widest animate-pulse drop-shadow-lg">{t('placement_phase')}</div>
                                     <div className="text-[10px] text-white text-center font-semibold">{t('placement_guide')}</div>
                                     <div className="flex gap-2 w-full">
-                                        <button
-                                            disabled={isInteractionDisabled || isSetupMineLimitReached}
-                                            onClick={() => {
-                                                if (isInteractionDisabled || isSetupMineLimitReached) return;
-                                                setTargetMode(targetMode === 'place_setup_mine' ? null : 'place_setup_mine');
-                                            }}
-                                            className={`flex-1 py-2 px-1 rounded font-black text-xs flex items-center justify-center gap-1 border-2 transition-all ${(isInteractionDisabled || isSetupMineLimitReached) ? 'opacity-50 grayscale cursor-not-allowed border-slate-700 bg-slate-800' : (targetMode === 'place_setup_mine' ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/50' : 'bg-purple-900/40 border-purple-800/50 hover:bg-purple-800/60 text-purple-100/70')}`}
-                                        >
-                                            <Bomb size={14} /> {t('place_setup_mine')} ({player.placementMinesPlaced}/{PLACEMENT_MINE_LIMIT})
-                                        </button>
+                                        {!isSetupMineLimitReached && (
+                                            <button
+                                                disabled={isInteractionDisabled}
+                                                onClick={() => {
+                                                    if (isInteractionDisabled) return;
+                                                    setTargetMode(targetMode === 'place_setup_mine' ? null : 'place_setup_mine');
+                                                }}
+                                                className={`flex-1 py-2 px-1 rounded font-black text-xs flex items-center justify-center gap-1 border-2 transition-all ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-700 bg-slate-800' : (targetMode === 'place_setup_mine' ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/50' : 'bg-purple-900/40 border-purple-800/50 hover:bg-purple-800/60 text-purple-100/70')}`}
+                                            >
+                                                <Bomb size={14} /> {t('place_setup_mine')} ({player.placementMinesPlaced}/{PLACEMENT_MINE_LIMIT})
+                                            </button>
+                                        )}
                                         <button
                                             disabled={isInteractionDisabled}
                                             onClick={() => {
                                                 if (isInteractionDisabled) return;
                                                 phases.finishPlacementPhase();
                                             }}
-                                            className={`flex-1 py-2 px-1 rounded font-black text-xs flex items-center justify-center gap-1 border-2 shadow-lg transition-all ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-700 bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-emerald-500/50 text-white'}`}
+                                            className={`${isSetupMineLimitReached ? 'w-full' : 'flex-1'} py-2 px-1 rounded font-black text-xs flex items-center justify-center gap-1 border-2 shadow-lg transition-all ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-700 bg-slate-800' : 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-emerald-500/50 text-white'}`}
                                         >
                                             <CheckCircle size={14} /> {t('confirm_placement')}
                                         </button>

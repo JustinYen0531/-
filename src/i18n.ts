@@ -4,7 +4,7 @@ export const TRANSLATIONS = {
   en: {
     app_title: "MINE CHESS",
     lobby_desc: "Strategy, evolution, capture the flag - redefining classic mine warfare.",
-    pvp_mode: "PvP (2 Players)",
+    pvp_mode: "PvP",
     pve_mode: "AI Challenge",
     sandbox_mode: "The Sandbox",
     sandbox_desc: "Developer testing mode with shortcuts.",
@@ -381,7 +381,7 @@ export const TRANSLATIONS = {
   zh_tw: {
     app_title: "地雷棋",
     lobby_desc: "策略、進化、奪旗——重新定義經典地雷戰。",
-    pvp_mode: "玩家對戰 (2人)",
+    pvp_mode: "玩家對戰",
     pve_mode: "人機對戰",
     sandbox_mode: "單人沙盒",
     sandbox_desc: "開發者測試模式，提供各種快捷功能。",
@@ -717,7 +717,7 @@ export const TRANSLATIONS = {
   zh_cn: {
     app_title: "地雷棋",
     lobby_desc: "策略、进化、夺旗——重新定义经典地雷战。",
-    pvp_mode: "玩家对战 (2人)",
+    pvp_mode: "玩家对战",
     pve_mode: "人机对战",
     sandbox_mode: "单人沙盒",
     sandbox_desc: "开发者测试模式，提供各种快捷功能。",

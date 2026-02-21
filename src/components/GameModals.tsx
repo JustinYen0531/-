@@ -30,8 +30,8 @@ interface GameModalsProps {
     roomId: string | null;
     setRoomId: (id: string | null) => void;
     onOpenSettings: () => void;
-    allowDevToolsInAiChallenge: boolean;
-    setAllowDevToolsInAiChallenge: (value: boolean) => void;
+    allowDevToolsInPvpRoom: boolean;
+    setAllowDevToolsInPvpRoom: (value: boolean) => void;
     detailMode: VisualDetailMode;
     t: (key: string, params?: Record<string, any>) => string;
 }
@@ -164,8 +164,8 @@ const GameModals: React.FC<GameModalsProps> = ({
     roomId,
     setRoomId,
     onOpenSettings,
-    allowDevToolsInAiChallenge,
-    setAllowDevToolsInAiChallenge,
+    allowDevToolsInPvpRoom,
+    setAllowDevToolsInPvpRoom,
     detailMode,
     t
 }) => {
@@ -239,7 +239,7 @@ const GameModals: React.FC<GameModalsProps> = ({
         : 'Room ID must be exactly 4 digits.';
 
     const uiText = {
-        joinLobby: isZh ? '加入大廳' : 'Join Lobby',
+        joinLobby: isZh ? '雙人對戰' : '2P Battle',
         lobbyList: isZh ? '大廳列表' : 'Lobby List',
         tutorial: isZh ? '新手教學' : 'Tutorial',
         developerLog: isZh ? '開發者日誌' : 'Developer Log',
@@ -265,7 +265,7 @@ const GameModals: React.FC<GameModalsProps> = ({
         joinExistingRoom: isZh ? '加入既有房間' : 'Join Existing Room',
         roomId: isZh ? '房間 ID' : 'Room ID',
         roomName: isZh ? '房間名稱' : 'Room Name',
-        allowDevToolsInAiChallenge: isZh ? 'AI 對戰開放 Dev Tools/Sandbox' : 'Allow Dev Tools/Sandbox in AI Challenge',
+        allowDevToolsInPvpRoom: isZh ? 'PvP 對戰開放 Dev Tools/Sandbox' : 'Allow Dev Tools/Sandbox in PvP',
         waiting: isZh ? '等待中' : 'Waiting',
         playing: isZh ? '遊戲中' : 'Playing',
         createLobby: isZh ? '創建大廳' : 'Create Room',
@@ -527,10 +527,24 @@ const GameModals: React.FC<GameModalsProps> = ({
                         <div className="flex flex-wrap items-stretch justify-center gap-6">
                             <button
                                 onClick={() => onStartGame('sandbox')}
-                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 rounded-xl font-black text-lg shadow-2xl shadow-yellow-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-amber-300"
+                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 rounded-xl font-black text-lg shadow-2xl shadow-yellow-500/50 transform scale-[1.08] hover:scale-[1.12] transition-all duration-200 flex items-center justify-center gap-3 border-2 border-white/75"
                             >
                                 <FlaskConical size={22} />
                                 {t('sandbox_mode')}
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    setJoinMode('join');
+                                    setNetworkUiError(null);
+                                    setJoinRoomPassword('');
+                                    setJoinedRoomName('');
+                                    setShowJoinModal(true);
+                                }}
+                                className="mx-6 min-w-[170px] px-8 py-4 bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 rounded-xl font-black text-lg shadow-2xl shadow-indigo-500/45 transform scale-[1.3] hover:scale-[1.36] transition-all duration-200 flex items-center justify-center gap-3 border-2 border-indigo-300 text-white"
+                            >
+                                <DoorOpen size={22} />
+                                {uiText.joinLobby}
                             </button>
 
                             <div className="flex flex-wrap items-stretch justify-center gap-3">
@@ -579,19 +593,6 @@ const GameModals: React.FC<GameModalsProps> = ({
                                 </div>
                             </div>
 
-                            <button
-                                onClick={() => {
-                                    setJoinMode('join');
-                                    setNetworkUiError(null);
-                                    setJoinRoomPassword('');
-                                    setJoinedRoomName('');
-                                    setShowJoinModal(true);
-                                }}
-                                className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-indigo-700 to-blue-700 hover:from-indigo-600 hover:to-blue-600 rounded-xl font-black text-lg shadow-2xl shadow-indigo-500/45 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-indigo-300 text-white"
-                            >
-                                <DoorOpen size={22} />
-                                {uiText.joinLobby}
-                            </button>
                         </div>
 
                         {latestDeveloperLog && (
@@ -855,11 +856,11 @@ const GameModals: React.FC<GameModalsProps> = ({
                                                 />
                                             </label>
                                             <label className="flex items-center justify-between rounded border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-200">
-                                                <span>{uiText.allowDevToolsInAiChallenge}</span>
+                                                <span>{uiText.allowDevToolsInPvpRoom}</span>
                                                 <input
                                                     type="checkbox"
-                                                    checked={allowDevToolsInAiChallenge}
-                                                    onChange={(event) => setAllowDevToolsInAiChallenge(event.target.checked)}
+                                                    checked={allowDevToolsInPvpRoom}
+                                                    onChange={(event) => setAllowDevToolsInPvpRoom(event.target.checked)}
                                                     className="h-4 w-4 accent-cyan-500"
                                                 />
                                             </label>
