@@ -302,7 +302,8 @@ export default function App() {
     const {
         isConnected: isNetworkConnected,
         lastIncomingPacket,
-        sendActionPacket
+        sendActionPacket,
+        disconnect
     } = useConnection();
 
     const [sandboxPos, setSandboxPos] = useState({ x: 0, y: 0 });
@@ -379,6 +380,7 @@ export default function App() {
     const prevPhaseRef = useRef(gameState.phase);
     useEffect(() => {
         if (gameState.phase === 'thinking' && prevPhaseRef.current !== 'thinking') {
+            setTargetMode(null);
             setGameState(prev => ({ ...prev, selectedUnitId: null, activeUnitId: null, targetMode: null }));
         }
         prevPhaseRef.current = gameState.phase;
@@ -539,11 +541,41 @@ export default function App() {
         }, 3000);
     }, [allowDevToolsInPvp, isHost, roomId, sendActionPacket]);
 
-    const handleExitGame = () => {
+    const handleExitGame = useCallback((origin: 'local' | 'remote' = 'local') => {
+        const state = gameStateRef.current;
+        if (
+            origin === 'local' &&
+            state.gameMode === 'pvp' &&
+            roomId &&
+            isNetworkConnected &&
+            !applyingRemoteActionRef.current
+        ) {
+            sendActionPacket({
+                type: 'LEAVE_MATCH',
+                matchId: roomId,
+                turn: state.turnCount,
+                payload: {}
+            });
+            // Force leave room locally as well, so both sides cannot stay in-match.
+            setTimeout(() => disconnect(), 80);
+        } else if (state.gameMode === 'pvp') {
+            // Remote leave or fallback path: ensure local network session is also closed.
+            disconnect();
+        }
         setPvpPerspectivePlayer(null);
         setShowDevTools(false);
+        setRoomId(null);
+        setIsHost(false);
         setView('lobby');
-    };
+    }, [disconnect, isNetworkConnected, roomId, sendActionPacket]);
+
+    useEffect(() => {
+        if (view !== 'game') return;
+        const state = gameStateRef.current;
+        if (state.gameMode !== 'pvp') return;
+        if (isNetworkConnected) return;
+        handleExitGame('remote');
+    }, [handleExitGame, isNetworkConnected, view]);
 
     const handleRestart = () => {
         setPvpPerspectivePlayer(gameState.gameMode === 'pvp' ? (isHost ? PlayerID.P1 : PlayerID.P2) : null);
@@ -2326,14 +2358,25 @@ export default function App() {
     }, [allowDevToolsInPvp, isNetworkConnected, roomId, sendActionPacket]);
 
     const sendGameStateDeferred = useCallback((reason: string) => {
-        // Defer long enough for React state + gameStateRef to settle before snapshotting.
+        // Lower-latency default sync.
         setTimeout(() => {
             sendGameState(reason);
-        }, 24);
-        // One safety re-sync for racey turn/phase transitions (e.g. skip -> new round).
-        setTimeout(() => {
-            sendGameState(`${reason}_resync`);
-        }, 72);
+        }, 8);
+
+        // Keep a second sync only for race-prone transitions.
+        const needsResync =
+            reason.includes('skip_turn') ||
+            reason.includes('end_turn') ||
+            reason.includes('remote_') ||
+            reason.includes('ready_phase_mismatch') ||
+            reason.includes('sandbox_new_round') ||
+            reason.includes('sandbox_toggle_timer_pause');
+
+        if (needsResync) {
+            setTimeout(() => {
+                sendGameState(`${reason}_resync`);
+            }, 32);
+        }
     }, [sendGameState]);
 
     useEffect(() => {
@@ -2726,8 +2769,9 @@ export default function App() {
                         // Preserve LOCAL UI state
                         selectedUnitId: prev.selectedUnitId,
                         activeUnitId: prev.activeUnitId,
-                        isPaused: prev.isPaused,
-                        isSandboxTimerPaused: prev.isSandboxTimerPaused,
+                        // Do NOT preserve pause flags locally; sandbox pause must sync across both players.
+                        isPaused: syncedState.isPaused,
+                        isSandboxTimerPaused: syncedState.isSandboxTimerPaused,
 
                         // Preserve UI animation state
                         vfx: prev.vfx,
@@ -2898,6 +2942,11 @@ export default function App() {
                 return;
             }
 
+            if (type === 'LEAVE_MATCH') {
+                handleExitGame('remote');
+                return;
+            }
+
             if (type === 'END_TURN') {
                 if (!isEndTurnPayload(payload)) {
                     return;
@@ -3016,14 +3065,26 @@ export default function App() {
                 }
 
                 const player = state.players[actingPlayerId];
+                const hasMineAtCell = state.mines.some(m => m.r === r && m.c === c);
+                if (hasMineAtCell) {
+                    addLog('log_space_has_mine', 'error');
+                    return;
+                }
+
                 if (player.placementMinesPlaced >= PLACEMENT_MINE_LIMIT) {
                     addLog('log_mine_limit', 'error');
                     setTargetMode(null);
                     return;
                 }
 
+                let placedSuccessfully = false;
                 setGameState(prev => {
                     const p = prev.players[actingPlayerId];
+                    const prevHasMineAtCell = prev.mines.some(m => m.r === r && m.c === c);
+                    if (p.placementMinesPlaced >= PLACEMENT_MINE_LIMIT || prevHasMineAtCell) {
+                        return prev;
+                    }
+                    placedSuccessfully = true;
                     return {
                         ...prev,
                         mines: [...prev.mines, { id: `pm-${Date.now()}`, owner: actingPlayerId, type: MineType.NORMAL, r, c, revealedTo: [actingPlayerId] }],
@@ -3033,6 +3094,14 @@ export default function App() {
                         }
                     }
                 });
+                if (!placedSuccessfully) {
+                    addLog('log_mine_limit', 'error');
+                    setTargetMode(null);
+                    return;
+                }
+                if (player.placementMinesPlaced + 1 >= PLACEMENT_MINE_LIMIT) {
+                    setTargetMode(null);
+                }
                 if (state.gameMode === 'pvp' && roomId && isNetworkConnected && !applyingRemoteActionRef.current) {
                     sendGameStateDeferred('place_setup_mine');
                 }
@@ -3707,7 +3776,7 @@ export default function App() {
                             onSandboxDragStart={onSandboxDragStart}
                             targetMode={targetMode}
                             setTargetMode={setTargetMode}
-                            onStateMutated={(reason) => sendGameStateDeferred(`sandbox_${reason}`)}
+                            onStateMutated={(reason: string) => sendGameStateDeferred(`sandbox_${reason}`)}
                         />
                     )}
 

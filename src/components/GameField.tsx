@@ -167,6 +167,7 @@ const GameField: React.FC<GameFieldProps> = ({
                             <div key={`${displayR}-${displayC}`} className="relative">
                                 <GridCell
                                     cell={cell}
+                                    phase={gameState.phase}
                                     unit={unit}
                                     mine={mine}
                                     scanMarkSuccess={markResult ? !!markResult.success : null}

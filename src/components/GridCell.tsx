@@ -53,6 +53,7 @@ const EnergyCrystal: React.FC<{ size: number, oreSize?: 'small' | 'medium' | 'la
 
 interface GridCellProps {
   cell: Cell;
+  phase: 'placement' | 'thinking' | 'action';
   unit?: Unit;
   mine?: Mine;
   scanMarkSuccess?: boolean | null;
@@ -88,6 +89,7 @@ interface GridCellProps {
 
 const GridCell: React.FC<GridCellProps> = ({
   cell,
+  phase,
   unit,
   mine,
   scanMarkSuccess = null,
@@ -168,7 +170,7 @@ const GridCell: React.FC<GridCellProps> = ({
   let isInActionRange = false;
   let actionRangeColor = '';
 
-  if (selectedUnit && targetMode) {
+  if (phase !== 'thinking' && selectedUnit && targetMode) {
     const manhattanDist = Math.abs(selectedUnit.r - cell.r) + Math.abs(selectedUnit.c - cell.c);
     const chebyshevDist = Math.max(Math.abs(selectedUnit.r - cell.r), Math.abs(selectedUnit.c - cell.c));
 
@@ -265,7 +267,7 @@ const GridCell: React.FC<GridCellProps> = ({
         actionRangeColor = 'cell-range-indigo';
       }
     }
-  } else if (targetMode === 'place_setup_mine') {
+  } else if (phase === 'placement' && targetMode === 'place_setup_mine') {
     const isP1Zone = cell.c < 12;
     const isMyZone = currentPlayer === PlayerID.P1 ? isP1Zone : !isP1Zone;
     if (isMyZone && !cell.isObstacle && !unit) {

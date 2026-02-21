@@ -185,6 +185,11 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
         }
     }, []);
 
+    const clearReceivedSeqMemory = useCallback(() => {
+        receivedSeqSetRef.current.clear();
+        receivedSeqOrderRef.current = [];
+    }, []);
+
     const sendRawString = useCallback((rawPayload: string): boolean => {
         const connection = connectionRef.current;
         if (!connection || !connection.open) {
@@ -406,6 +411,7 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
 
         clearReconnectTimer();
         clearAllPendingPackets();
+        clearReceivedSeqMemory();
 
         if (connectionRef.current) {
             connectionRef.current.close();
@@ -678,12 +684,13 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
         setRemotePeerId(null);
         setError(null);
         setStatus(peerRef.current ? 'peer-ready' : 'idle');
-    }, [clearAllPendingPackets, clearReconnectTimer]);
+    }, [clearAllPendingPackets, clearReceivedSeqMemory, clearReconnectTimer]);
 
     const destroyPeer = useCallback(() => {
         manualDisconnectRef.current = true;
         clearReconnectTimer();
         clearAllPendingPackets();
+        clearReceivedSeqMemory();
 
         if (connectionRef.current) {
             connectionRef.current.close();
@@ -703,12 +710,13 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
         setRemotePeerId(null);
         setError(null);
         setStatus('idle');
-    }, [clearAllPendingPackets, clearReconnectTimer]);
+    }, [clearAllPendingPackets, clearReceivedSeqMemory, clearReconnectTimer]);
 
     useEffect(() => {
         return () => {
-            clearReconnectTimer();
-            clearAllPendingPackets();
+        clearReconnectTimer();
+        clearAllPendingPackets();
+        clearReceivedSeqMemory();
             if (connectionRef.current) {
                 connectionRef.current.close();
             }
@@ -716,7 +724,7 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
                 peerRef.current.destroy();
             }
         };
-    }, [clearAllPendingPackets, clearReconnectTimer]);
+    }, [clearAllPendingPackets, clearReceivedSeqMemory, clearReconnectTimer]);
 
     const value = useMemo<ConnectionContextValue>(() => ({
         status,

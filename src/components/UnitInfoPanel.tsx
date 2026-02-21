@@ -3,7 +3,7 @@ import { PlayerID, GameState, Unit, UnitType } from '../types';
 import { Star, Skull, Zap } from '../icons';
 import { getUnitIcon, getUnitNameKey } from '../gameHelpers';
 import { ENERGY_CAP_RATIO } from '../constants';
-import { Language } from '../i18n';
+import { Language, TRANSLATIONS } from '../i18n';
 
 interface UnitInfoPanelProps {
     gameState: GameState;
@@ -51,6 +51,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
             ...enemyWaitingUnits,
             ...enemyDeadUnits
         ];
+    const enemyPreviewLabel = language === 'en' ? TRANSLATIONS.en.enemy_preview : t('enemy_preview');
 
     useEffect(() => {
         return () => {
@@ -157,7 +158,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                 >
                     <div className="rounded-lg border border-cyan-400/40 bg-slate-900/75 backdrop-blur-[1px] px-2.5 py-1.5 shadow-[0_10px_22px_rgba(0,0,0,0.35)] pointer-events-none">
                         <div className="text-[10px] font-black tracking-widest text-slate-300 text-center mb-1.5">
-                            敵方預覽
+                            {enemyPreviewLabel}
                         </div>
                         <div className="flex gap-1.5 justify-center">
                             {enemyDisplayList.map((u) => {

@@ -4,6 +4,7 @@ export type ActionPacketType =
     | 'HELLO'
     | 'AUTH_RESULT'
     | 'START_GAME'
+    | 'LEAVE_MATCH'
     | 'MOVE'
     | 'ATTACK'
     | 'SCAN'

@@ -57,12 +57,12 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }
             }
         }));
-        notifyStateMutated('add_energy');
     };
 
     const evolveCurrentUnit = (branch: 'a' | 'b', variant?: 1 | 2) => {
         if (!gameState.selectedUnitId) return;
         setGameState(prev => {
+            // 直接查找單位，不限制於當前回合玩家
             const unit = getUnit(prev.selectedUnitId || '', prev);
             if (!unit) return prev;
 
@@ -87,7 +87,6 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 logs: [{ turn: prev.turnCount, messageKey: 'log_evolved', params: { unit: getUnitNameKey(unit.type), branch: branch.toUpperCase() + (variant ? `-${variant}` : ''), level: newLevels[unit.type][branch] }, type: 'evolution' as const }, ...prev.logs]
             };
         });
-        notifyStateMutated('evolve_selected');
     };
 
     const toggleGodMode = () => {
@@ -96,7 +95,6 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
             isGodMode: !prev.isGodMode,
             logs: [{ turn: prev.turnCount, messageKey: !prev.isGodMode ? 'God Mode Enabled' : 'God Mode Disabled', params: {}, type: 'info' as const }, ...prev.logs]
         }));
-        notifyStateMutated('toggle_god_mode');
     };
 
     const skipToNextRound = () => {
@@ -119,12 +117,12 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }
             }
         }));
-        notifyStateMutated('heal_all');
     };
 
     const updateUnitStat = (stat: 'hp' | 'maxHp', change: number) => {
         if (!gameState.selectedUnitId) return;
         setGameState(prev => {
+            // 直接查找單位，不限制於當前回合玩家
             const unit = getUnit(prev.selectedUnitId || '', prev);
             if (!unit) return prev;
 
@@ -152,7 +150,6 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }
             };
         });
-        notifyStateMutated(`update_${stat}`);
     };
 
     return (
