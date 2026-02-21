@@ -30,6 +30,8 @@ interface GameModalsProps {
     roomId: string | null;
     setRoomId: (id: string | null) => void;
     onOpenSettings: () => void;
+    allowDevToolsInAiChallenge: boolean;
+    setAllowDevToolsInAiChallenge: (value: boolean) => void;
     detailMode: VisualDetailMode;
     t: (key: string, params?: Record<string, any>) => string;
 }
@@ -162,6 +164,8 @@ const GameModals: React.FC<GameModalsProps> = ({
     roomId,
     setRoomId,
     onOpenSettings,
+    allowDevToolsInAiChallenge,
+    setAllowDevToolsInAiChallenge,
     detailMode,
     t
 }) => {
@@ -261,6 +265,7 @@ const GameModals: React.FC<GameModalsProps> = ({
         joinExistingRoom: isZh ? '加入既有房間' : 'Join Existing Room',
         roomId: isZh ? '房間 ID' : 'Room ID',
         roomName: isZh ? '房間名稱' : 'Room Name',
+        allowDevToolsInAiChallenge: isZh ? 'AI 對戰開放 Dev Tools/Sandbox' : 'Allow Dev Tools/Sandbox in AI Challenge',
         waiting: isZh ? '等待中' : 'Waiting',
         playing: isZh ? '遊戲中' : 'Playing',
         createLobby: isZh ? '創建大廳' : 'Create Room',
@@ -846,6 +851,15 @@ const GameModals: React.FC<GameModalsProps> = ({
                                                             setCreateRoomPassword('');
                                                         }
                                                     }}
+                                                    className="h-4 w-4 accent-cyan-500"
+                                                />
+                                            </label>
+                                            <label className="flex items-center justify-between rounded border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-200">
+                                                <span>{uiText.allowDevToolsInAiChallenge}</span>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={allowDevToolsInAiChallenge}
+                                                    onChange={(event) => setAllowDevToolsInAiChallenge(event.target.checked)}
                                                     className="h-4 w-4 accent-cyan-500"
                                                 />
                                             </label>

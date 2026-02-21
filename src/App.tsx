@@ -3545,6 +3545,8 @@ export default function App() {
                 roomId={roomId}
                 setRoomId={setRoomId}
                 onOpenSettings={() => setShowCommonSettings(true)}
+                allowDevToolsInAiChallenge={allowDevToolsInAiChallenge}
+                setAllowDevToolsInAiChallenge={setAllowDevToolsInAiChallenge}
                 detailMode={detailMode}
                 t={t}
             />
