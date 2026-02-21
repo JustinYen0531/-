@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700;900&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -314,9 +314,9 @@ code {
   width: calc(300% - 4px);
   height: calc(300% - 4px);
   border: 4px dashed;
-  border-radius: 12px;
+  border-radius: 16px !important;
   pointer-events: none;
-  animation: towerRangePulse 4s ease-in-out infinite;
+
   opacity: 0.2;
 }
 

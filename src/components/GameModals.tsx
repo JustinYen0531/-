@@ -922,9 +922,14 @@ const GameModals: React.FC<GameModalsProps> = ({
                     </div>
                 )}
 
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full border border-cyan-400/40 bg-slate-900/70 px-3 py-1.5 text-cyan-100 shadow-lg shadow-cyan-500/15 backdrop-blur-sm">
-                    <span className="text-xs font-bold tracking-wide">Ratio Studio製作</span>
-                </div>
+                <a
+                    href="https://ratiostudio.vercel.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full border border-cyan-400/40 bg-slate-900/70 px-4 py-1.5 text-cyan-100 shadow-lg shadow-cyan-500/15 backdrop-blur-sm hover:bg-slate-800 hover:border-cyan-300 transition-all cursor-pointer group"
+                >
+                    <span className="text-xs font-bold tracking-wide group-hover:text-white transition-colors">Ratio Studio</span>
+                </a>
 
                 {showTutorial && <Tutorial language={language} onClose={() => setShowTutorial(false)} />}
             </div>

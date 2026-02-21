@@ -29,3 +29,40 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Unity folders
+/[Mm]ine [Cc]hess/[Ll]ibrary/
+/[Mm]ine [Cc]hess/[Tt]emp/
+/[Mm]ine [Cc]hess/[Oo]bj/
+/[Mm]ine [Cc]hess/[Bb]uild/
+/[Mm]ine [Cc]hess/[Bb]uilds/
+/[Mm]ine [Cc]hess/[Ll]ogs/
+/[Mm]ine [Cc]hess/[Uu]serSettings/
+
+/My project/[Ll]ibrary/
+/My project/[Tt]emp/
+/My project/[Oo]bj/
+/My project/[Bb]uild/
+/My project/[Bb]uilds/
+/My project/[Ll]ogs/
+/My project/[Uu]serSettings/
+
+/My project (1)/[Ll]ibrary/
+/My project (1)/[Tt]emp/
+/My project (1)/[Oo]bj/
+/My project (1)/[Bb]uild/
+/My project (1)/[Bb]uilds/
+/My project (1)/[Ll]ogs/
+/My project (1)/[Uu]serSettings/
+
+# History & Artifacts
+.history/
+*.zip
+*.rar
+path.txt
+path-output.txt
+dev_output.txt
+
+# OS
+.DS_Store
+Thumbs.db

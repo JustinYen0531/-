@@ -1,6 +1,6 @@
 import React from 'react';
 import { GameState, PlayerID } from '../types';
-import { Language, TRANSLATIONS } from '../i18n';
+import { Language } from '../i18n';
 import { FlaskConical, X, Zap, Shield, ShieldAlert, RefreshCw, Play, Pause, Hand } from '../icons';
 import { getUnitNameKey } from '../gameHelpers';
 
@@ -29,8 +29,6 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
     targetMode,
     setTargetMode
 }) => {
-    const t = (key: string) => (TRANSLATIONS[language] as any)?.[key] ?? key;
-
     // Helper functions
     const getUnit = (id: string, state: GameState = gameState) => {
         const p1Unit = state.players[PlayerID.P1].units.find(u => u.id === id);
@@ -141,7 +139,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
 
     return (
         <div
-            className={`fixed top-20 left-4 z-[60] bg-slate-900/95 border-2 border-yellow-500 rounded-xl flex flex-col backdrop-blur-md animate-fade-in no-neon-text ${isSandboxCollapsed ? 'w-12 h-12 p-0 cursor-pointer hover:bg-slate-800' : 'p-4 min-w-[200px]'} transition-[width,height,padding,background-color] duration-300`}
+            className={`fixed top-20 left-4 z-[60] bg-slate-900/95 border-2 border-yellow-500 rounded-xl flex flex-col backdrop-blur-md no-neon-text ${isSandboxCollapsed ? 'w-12 h-12 p-0 cursor-pointer hover:bg-slate-800' : 'p-4 min-w-[200px]'} transition-[width,height,padding,background-color] duration-300`}
             style={{
                 transform: `translate3d(${sandboxPos.x}px, ${sandboxPos.y}px, 0)`,
                 willChange: 'transform'
@@ -184,7 +182,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
             </div>
 
             {!isSandboxCollapsed && (
-                <div className="grid grid-cols-1 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-1 gap-2">
                     <button onClick={addEnergy} className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95">
                         <Zap size={14} />
                         {language === 'zh_tw' ? '增加 100 能量' : '+100 Energy'}

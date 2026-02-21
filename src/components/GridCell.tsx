@@ -60,7 +60,6 @@ interface GridCellProps {
   isSelected: boolean;
   isValidMove: boolean;
   isAttackTarget: boolean;
-  isSkillTarget?: boolean;
   currentPlayer: PlayerID;
   onClick: () => void;
   onDismissMiss?: () => void;
@@ -83,6 +82,8 @@ interface GridCellProps {
   forceShowMines?: boolean;
   isUnitStealthed?: boolean;
   selectedUnitLevelB?: number;
+  hoveredPos?: { r: number, c: number } | null;
+  onHover?: (r: number, c: number) => void;
 }
 
 const GridCell: React.FC<GridCellProps> = ({
@@ -94,7 +95,6 @@ const GridCell: React.FC<GridCellProps> = ({
   isSelected,
   isValidMove,
   isAttackTarget,
-  isSkillTarget,
   currentPlayer,
   onClick,
   onDismissMiss,
@@ -116,7 +116,9 @@ const GridCell: React.FC<GridCellProps> = ({
   smokeOwner,
   forceShowMines = false,
   isUnitStealthed = false,
-  selectedUnitLevelB = 0
+  selectedUnitLevelB = 0,
+  hoveredPos = null,
+  onHover,
 }) => {
   const [particles, setParticles] = React.useState<Array<{ id: string, x: number, y: number, color: string, delay: number }>>([]);
   const [isLocallyDismissed, setIsLocallyDismissed] = React.useState(false);
@@ -172,72 +174,62 @@ const GridCell: React.FC<GridCellProps> = ({
 
     if (targetMode === 'move' && manhattanDist === 1 && !cell.isObstacle && !unit) {
       isInActionRange = true;
-      actionRangeColor = 'border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.6)]';
+      actionRangeColor = 'cell-range-emerald';
     } else if (targetMode === 'scan' && manhattanDist <= 3) {
       isInActionRange = true;
-      actionRangeColor = 'border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.6)]';
+      actionRangeColor = 'cell-range-blue';
     } else if (targetMode === 'sensor_scan' && chebyshevDist <= 2) {
       isInActionRange = true;
-      actionRangeColor = 'border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]';
+      actionRangeColor = 'cell-range-cyan';
     } else if ((targetMode === 'place_tower' || targetMode === 'place_hub' || targetMode === 'place_factory') && manhattanDist === 0) {
       isInActionRange = true;
-      actionRangeColor = 'action-range-on-spot';
-    } else if (targetMode === 'throw_mine' && manhattanDist <= 2) {
+      actionRangeColor = targetMode === 'place_tower' ? 'cell-range-orange' : targetMode === 'place_factory' ? 'cell-range-cyan' : 'cell-range-indigo';
+    } else if (targetMode === 'throw_mine' && manhattanDist <= 2 && !cell.isObstacle && !building && !mine && !unit) {
       isInActionRange = true;
-      actionRangeColor = 'border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.6)]';
+      actionRangeColor = 'cell-range-purple';
+    } else if (targetMode === 'teleport' && !cell.isObstacle && !unit && !building) {
+      isInActionRange = true;
+      actionRangeColor = 'cell-range-amber';
     } else if (targetMode === 'pickup_mine_select' && manhattanDist <= (selectedUnitLevelB >= 1 ? 2 : 0)) {
-      isInActionRange = true;
-      actionRangeColor = 'border-yellow-600 shadow-[0_0_10px_rgba(202,138,4,0.6)]';
+      if (mine && (mine.revealedTo.includes(currentPlayer) || mine.owner === currentPlayer)) {
+        isInActionRange = true;
+        actionRangeColor = 'cell-range-yellow';
+      }
     } else if (targetMode === 'disarm') {
       const dr = Math.abs(selectedUnit.r - cell.r);
       const dc = Math.abs(selectedUnit.c - cell.c);
       const chebyshevDist = Math.max(dr, dc);
 
-      // Check if selected unit is a Defuser
       if (selectedUnit.type === UnitType.DEFUSER) {
         const range = (selectedUnitLevelB >= 1) ? 3 : 2;
-        if (dr + dc <= range) {
+        if (dr + dc <= range && (mine || (building && building.owner !== currentPlayer))) {
           isInActionRange = true;
-          actionRangeColor = 'border-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.6)]';
+          actionRangeColor = 'cell-range-amber';
         }
       } else {
-        // Non-Defuser: Only on-spot
-        if (chebyshevDist === 0) {
+        if (chebyshevDist === 0 && building && building.owner !== currentPlayer) {
           isInActionRange = true;
-          actionRangeColor = 'border-orange-400 shadow-[0_0_10px_rgba(249,115,22,0.6)]';
+          actionRangeColor = 'cell-range-pink';
         }
       }
     } else if (targetMode === 'attack' && selectedUnit) {
-      // Calculate attack range based on selected unit type and evolution level
       let attackRange = 1;
-      // If selected unit is General, check its Path A evolution level
       if (selectedUnit.type === UnitType.GENERAL) {
-        // selectedGeneralLevelA contains the General's Path A level
         attackRange = selectedGeneralLevelA >= 2 ? 2 : 1;
       }
-
-      // For attack range, only allow cardinal directions (up, down, left, right)
-      // Not diagonal directions
       const dr = Math.abs(selectedUnit.r - cell.r);
       const dc = Math.abs(selectedUnit.c - cell.c);
-
-      // Check if target is in cardinal direction (either dr=0 or dc=0)
       const isCardinalDirection = dr === 0 || dc === 0;
 
       if (manhattanDist <= attackRange && isCardinalDirection) {
         isInActionRange = true;
-        actionRangeColor = 'border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.6)]';
+        actionRangeColor = 'cell-range-red';
       }
     } else if (targetMode === 'place_mine') {
-      // Updated Place Mine Highlighting Logic
       const factories = buildings.filter(b => b.owner === selectedUnit.owner && b.type === 'factory');
+      const manhattanDistLocal = Math.abs(selectedUnit.r - cell.r) + Math.abs(selectedUnit.c - cell.c);
+      let allowed = manhattanDistLocal <= 1;
 
-      // Self placement is always '+' range (Manhattan <= 1).
-      // Factory placement range is handled separately below.
-      const manhattanDist = Math.abs(selectedUnit.r - cell.r) + Math.abs(selectedUnit.c - cell.c);
-      let allowed = manhattanDist <= 1;
-
-      // Factory Range Extension
       const isInFactoryRange = factories.some(f =>
         f.level >= 2
           ? (Math.abs(f.r - cell.r) + Math.abs(f.c - cell.c) <= 2)
@@ -246,38 +238,41 @@ const GridCell: React.FC<GridCellProps> = ({
 
       if (isInFactoryRange) allowed = true;
 
-      if (allowed) {
+      // Obstacles, buildings, units, and other mines block placement
+      if (allowed && !cell.isObstacle && !building && !mine && !unit) {
         isInActionRange = true;
-        actionRangeColor = 'border-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.6)]';
+        actionRangeColor = 'cell-range-purple';
       }
-    } else if (targetMode === 'move_mine_start' || targetMode === 'move_mine_end' || targetMode === 'convert_mine') {
+    } else if (targetMode === 'move_mine_start') {
       const dr = Math.abs(selectedUnit.r - cell.r);
       const dc = Math.abs(selectedUnit.c - cell.c);
-      if (dr + dc <= 2) {
+      if (dr + dc <= 2 && mine) {
         isInActionRange = true;
-        actionRangeColor = (targetMode === 'convert_mine') ? 'border-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.6)]' : 'border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.6)]';
+        actionRangeColor = 'cell-range-rose';
+      }
+    } else if (targetMode === 'move_mine_end') {
+      const dr = Math.abs(selectedUnit.r - cell.r);
+      const dc = Math.abs(selectedUnit.c - cell.c);
+      if (dr + dc <= 2 && !cell.isObstacle && !building && !mine && !unit) {
+        isInActionRange = true;
+        actionRangeColor = 'cell-range-rose';
+      }
+    } else if (targetMode === 'convert_mine') {
+      const dr = Math.abs(selectedUnit.r - cell.r);
+      const dc = Math.abs(selectedUnit.c - cell.c);
+      if (dr + dc <= 2 && mine && mine.owner !== currentPlayer) {
+        isInActionRange = true;
+        actionRangeColor = 'cell-range-indigo';
       }
     }
+  } else if (targetMode === 'place_setup_mine') {
+    const isP1Zone = cell.c < 12;
+    const isMyZone = currentPlayer === PlayerID.P1 ? isP1Zone : !isP1Zone;
+    if (isMyZone && !cell.isObstacle && !unit) {
+      isInActionRange = true;
+      actionRangeColor = 'cell-range-purple';
+    }
   }
-
-  // Decide background color - P1 Zone (left) is blue, P2 Zone (right) is red
-  let bgColor = 'bg-slate-900 border border-slate-700/30';
-
-  if (cell.c < 12) {
-    // P1 Zone - Blue Neon
-    bgColor = 'bg-blue-950/80 border border-cyan-500/30 shadow-[inset_0_0_4px_#22d3ee,0_0_6px_rgba(34,211,238,0.1)]';
-  } else {
-    // P2 Zone - Red Neon
-    bgColor = 'bg-red-950/80 border border-red-500/30 shadow-[inset_0_0_4px_#ef4444,0_0_6px_rgba(239,68,68,0.1)]';
-  }
-
-  if (cell.isObstacle) bgColor = 'bg-slate-700 border-2 border-white/70 shadow-[0_0_6px_rgba(255,255,255,0.3),inset_0_0_6px_rgba(255,255,255,0.1)] animate-breathe pattern-diagonal-lines';
-  if (isInActionRange && targetMode === 'scan') bgColor = `bg-slate-900 border-2 ${actionRangeColor}`;
-  else if (isSelected && targetMode !== 'scan') bgColor = 'bg-yellow-900/60 ring-2 ring-yellow-400 border-2 border-yellow-400 shadow-lg shadow-yellow-500/50';
-  else if (isValidMove) bgColor = 'bg-emerald-900/60 ring-2 ring-emerald-400 border-2 border-emerald-400 cursor-pointer animate-pulse shadow-lg shadow-emerald-500/40';
-  else if (isAttackTarget) bgColor = 'bg-red-900/60 ring-2 ring-red-400 border-2 border-red-400 cursor-pointer shadow-lg shadow-red-500/40';
-  else if (isSkillTarget) bgColor = 'bg-purple-900/60 ring-2 ring-purple-400 border-2 border-purple-400 cursor-pointer animate-pulse shadow-lg shadow-purple-500/40';
-  else if (isInActionRange) bgColor = `bg-slate-900 border-2 ${actionRangeColor}`;
 
   // Base Flags
   const isP1Base = cell.r === P1_FLAG_POS.r && cell.c === P1_FLAG_POS.c;
@@ -287,37 +282,65 @@ const GridCell: React.FC<GridCellProps> = ({
   const isP1FlagHere = p1FlagLoc.r === cell.r && p1FlagLoc.c === cell.c;
   const isP2FlagHere = p2FlagLoc.r === cell.r && p2FlagLoc.c === cell.c;
 
+  // Determine if THIS cell is a center of a focused building or domain
+  // We need this to lift the center cell's Z-Index so its child range indicator overlays neighbors
+  const isThisCellFocusedCenter = (() => {
+    if (isSelected) return true;
+    if (!hoveredPos) return false;
+
+    const mouseR = hoveredPos.r;
+    const mouseC = hoveredPos.c;
+
+    // 1. Check if this cell has a building and that building's range is hovered
+    if (building) {
+      const dr = Math.abs(mouseR - cell.r);
+      const dc = Math.abs(mouseC - cell.c);
+      if (building.type === 'tower' && dr <= 1 && dc <= 1) return true;
+      if (building.type === 'hub' && dr + dc <= 2) return true;
+      if (building.type === 'factory') {
+        const isLvl3 = building.level >= 2;
+        if (isLvl3 && dr + dc <= 2) return true;
+        if (!isLvl3 && dr <= 1 && dc <= 1) return true;
+      }
+    }
+
+    // 2. Check if this cell has a flag and that flag's domain is hovered
+    if (isP1FlagHere) {
+      const dr = Math.abs(mouseR - cell.r);
+      const dc = Math.abs(mouseC - cell.c);
+      if (p1GeneralLevelB >= 2 && dr <= 2 && dc <= 2) return true; // 5x5 shield
+      if (p1GeneralLevelB >= 3 && p1GeneralVariantB === 2 && dr <= 1 && dc <= 1) return true; // 3x3 kirin
+    }
+    if (isP2FlagHere) {
+      const dr = Math.abs(mouseR - cell.r);
+      const dc = Math.abs(mouseC - cell.c);
+      if (p2GeneralLevelB >= 2 && dr <= 2 && dc <= 2) return true;
+      if (p2GeneralLevelB >= 3 && p2GeneralVariantB === 2 && dr <= 1 && dc <= 1) return true;
+    }
+
+    return false;
+  })();
+
+  // Decide background color - P1 Zone (left) is blue, P2 Zone (right) is red
+  let bgColor = 'bg-slate-900 border border-slate-800/20';
+
+  if (cell.c < 12) {
+    // P1 Zone - RTX Blue
+    bgColor = 'rtx-cell-p1';
+  } else {
+    // P2 Zone - RTX Red
+    bgColor = 'rtx-cell-p2';
+  }
+
+  if (cell.isObstacle) bgColor = 'bg-slate-800/90 border-2 border-slate-400/50 shadow-[0_0_15px_rgba(255,255,255,0.2),inset_0_0_10px_rgba(255,255,255,0.1)] pattern-diagonal-lines brightness-75';
+  if (isInActionRange && targetMode === 'scan') bgColor += ` cell-highlight-action-range ${actionRangeColor}`;
+  else if (isSelected && targetMode !== 'scan') bgColor += ' cell-highlight-selected';
+  else if (isValidMove) bgColor += ' cell-highlight-valid-move';
+  else if (isAttackTarget) bgColor += ' cell-highlight-attack';
+  else if (isInActionRange) bgColor += ` cell-highlight-action-range ${actionRangeColor}`;
+
   // Checker for Damage Zone (General Path B 3-2)
-  const isInsideP1DamageZone = p1GeneralLevelB >= 3 && p1GeneralVariantB === 2 &&
-    Math.abs(cell.r - p1FlagLoc.r) <= 1 && Math.abs(cell.c - p1FlagLoc.c) <= 1;
-  const isInsideP2DamageZone = p2GeneralLevelB >= 3 && p2GeneralVariantB === 2 &&
-    Math.abs(cell.r - p2FlagLoc.r) <= 1 && Math.abs(cell.c - p2FlagLoc.c) <= 1;
-
-  // Checker for Shield Zone (General Path B 2+) - 5x5 Range
-  const isInsideP1ShieldZone = p1GeneralLevelB >= 2 &&
-    Math.abs(cell.r - p1FlagLoc.r) <= 2 && Math.abs(cell.c - p1FlagLoc.c) <= 2;
-  const isInsideP2ShieldZone = p2GeneralLevelB >= 2 &&
-    Math.abs(cell.r - p2FlagLoc.r) <= 2 && Math.abs(cell.c - p2FlagLoc.c) <= 2;
-
-  // Checker for Factory Range (Maker Path B)
-  const factoryRangeBuilding = buildings.find(b =>
-    b.type === 'factory' &&
-    (
-      b.level >= 2
-        ? (Math.abs(cell.r - b.r) + Math.abs(cell.c - b.c) <= 2)
-        : (Math.abs(cell.r - b.r) <= 1 && Math.abs(cell.c - b.c) <= 1)
-    )
-  );
-  const isInsideFactoryRange = !!factoryRangeBuilding;
-
-  // Checker for Hub Area (Ranger Path A Tier 1) - Manhattan Distance 2
-  const hubMoveZoneBuilding = buildings.find(b =>
-    b.type === 'hub' &&
-    (Math.abs(cell.r - b.r) + Math.abs(cell.c - b.c) <= 2)
-  );
-  const isInsideHubRange = !!hubMoveZoneBuilding;
-
-  // Ranger Path A3-1 smoke uses Manhattan Distance 2 around the hub
+  // Building range calculations are now handled by high-level indicators.
   const hubSmokeBuilding = buildings.find(b =>
     b.type === 'hub' &&
     b.level === 3 &&
@@ -325,18 +348,14 @@ const GridCell: React.FC<GridCellProps> = ({
     (Math.abs(cell.r - b.r) + Math.abs(cell.c - b.c) <= 2)
   );
   const isHub31Smoke = !!hubSmokeBuilding;
+  // Functional colors based on building type, matching buttons
+  const towerColor = '#fb923c'; // Amber/Orange for Detection Tower
+  const hubColor = '#c084fc';   // Purple for Hub
+  const factoryColor = '#22d3ee'; // Cyan for Autonomous Factory/Workshop
+  const shieldColor = '#4ade80';  // Bright Emerald/Mint for Spirit Domain (high contrast vs board blue)
+  const kirinColor = '#ffd700';   // Gold for Kirin Domain
 
-  if (isInsideHubRange && !cell.isObstacle) {
-    bgColor = `${bgColor} border-2 border-dashed ${hubMoveZoneBuilding!.owner === PlayerID.P1 ? 'border-cyan-500/50' : 'border-red-500/50'}`;
-  }
 
-  // Checker for Tower Range - 3x3 Range
-  const towerBuilding = buildings.find(b =>
-    b.type === 'tower' &&
-    Math.abs(cell.r - b.r) <= 1 &&
-    Math.abs(cell.c - b.c) <= 1
-  );
-  const isInsideTowerRange = !!towerBuilding;
   const friendlyTowerInRange = buildings.some(b =>
     b.type === 'tower' &&
     b.owner === currentPlayer &&
@@ -344,13 +363,28 @@ const GridCell: React.FC<GridCellProps> = ({
     Math.abs(cell.c - b.c) <= 1
   );
 
-  if (isInsideTowerRange && !cell.isObstacle) {
-    bgColor = `${bgColor} border-2 border-dotted ${towerBuilding!.owner === PlayerID.P1
-      ? '!border-cyan-300/90 shadow-[inset_0_0_8px_rgba(34,211,238,0.45)]'
-      : '!border-rose-300/90 shadow-[inset_0_0_8px_rgba(244,63,94,0.4)]'
-      }`;
-  }
+  // Building range borders are now handled by high-level indicators in each building's root cell,
+  // so we no longer apply per-cell borders here for better visual clarity.
 
+  const isAreaFocused = (targetR: number, targetC: number, rangeType: '3x3' | '5x5' | 'manhattan2'): boolean => {
+    // If the building/unit is selected, focus its range
+    if (isSelected && cell.r === targetR && cell.c === targetC) return true;
+
+    if (!hoveredPos) return false;
+
+    // Check if the current mouse position (hoveredPos) is within the domain of the target
+    const dr = Math.abs(hoveredPos.r - targetR);
+    const dc = Math.abs(hoveredPos.c - targetC);
+
+    if (rangeType === '3x3') {
+      return dr <= 1.1 && dc <= 1.1; // Added 0.1 buffer for border stability
+    } else if (rangeType === '5x5') {
+      return dr <= 2.1 && dc <= 2.1;
+    } else if (rangeType === 'manhattan2') {
+      return dr + dc <= 2.1; // Added 0.1 buffer for diamond corner stability
+    }
+    return false;
+  };
 
   // Mine Visibility Logic - strict check including smoke
   // When in Sandbox "Normal" mode, we filter strictly based on who the user currently "is" (currentPlayer)
@@ -359,8 +393,7 @@ const GridCell: React.FC<GridCellProps> = ({
     !((isSmoked && smokeOwner !== currentPlayer) || (isHub31Smoke && hubSmokeBuilding?.owner !== currentPlayer))
   );
   const enemyPlayer = currentPlayer === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
-  const mineIsRevealedToViewer = !!mine && (forceShowMines || mine.revealedTo.includes(currentPlayer));
-  const mineIsKnownByEnemy = !!mine && mine.revealedTo.includes(enemyPlayer);
+  const mineIsKnownByEnemy = !!mine && (forceShowMines || mine.revealedTo.includes(enemyPlayer));
   // Eye icon: show only on my mines that are known by the enemy (to warn they are revealed)
   const shouldShowEye =
     mine && isMineVisible && !unit &&
@@ -395,14 +428,15 @@ const GridCell: React.FC<GridCellProps> = ({
   const renderBuilding = () => {
     if (!building) return null;
     const colorClass = building.owner === PlayerID.P1 ? 'text-cyan-400' : 'text-red-400';
-    const accentColor = building.owner === PlayerID.P1 ? '#22d3ee' : '#ef4444';
     const isLvl2 = building.level >= 1;
     const isLvl3 = building.level >= 2;
 
+
     if (building.type === 'tower') {
       return (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-visible">
-          {/* Effect Range Indicator - Removed global indicator in favor of per-cell border */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-visible">
+          {/* Effect Range Indicator */}
+          <div className={`building-range-indicator tower-range-indicator ${isAreaFocused(cell.r, cell.c, '3x3') ? 'range-focused' : ''}`} style={{ borderColor: `${towerColor}cc`, color: towerColor }} />
 
           <div className={`relative w-8 h-8 flex items-center justify-center`}>
             {/* Core & Base */}
@@ -413,25 +447,27 @@ const GridCell: React.FC<GridCellProps> = ({
 
               {/* Level 2: Floating Ring */}
               {isLvl2 && (
-                <ellipse cx="20" cy="20" rx="15" ry="6" fill="none" stroke={accentColor} strokeWidth="1" strokeDasharray="4 2" className="animate-[towerRotate_4s_linear_infinite]" />
+                <ellipse cx="20" cy="20" rx="15" ry="6" fill="none" stroke={towerColor} strokeWidth="1" strokeDasharray="4 2" className="animate-[towerRotate_4s_linear_infinite]" />
               )}
 
               {/* Level 3: Extra Parts */}
               {isLvl3 && (
                 <>
-                  <circle cx="20" cy="12" r="6" fill="none" stroke={accentColor} strokeWidth="0.5" className="animate-pulse" />
-                  <path d="M12 10 L8 6" stroke={accentColor} strokeWidth="1.5" strokeLinecap="round" className="animate-pulse" />
-                  <path d="M28 10 L32 6" stroke={accentColor} strokeWidth="1.5" strokeLinecap="round" className="animate-pulse" />
+                  <circle cx="20" cy="12" r="6" fill="none" stroke={towerColor} strokeWidth="0.5" className="animate-pulse" />
+                  <path d="M12 10 L8 6" stroke={towerColor} strokeWidth="1.5" strokeLinecap="round" className="animate-pulse" />
+                  <path d="M28 10 L32 6" stroke={towerColor} strokeWidth="1.5" strokeLinecap="round" className="animate-pulse" />
                 </>
               )}
 
+
               {/* Antenna and Core */}
-              <circle cx="20" cy="12" r="3" fill={accentColor} className="tower-core-glow" />
-              <rect x="19.5" y="4" width="1" height="8" fill={accentColor} className="animate-pulse" />
+              <circle cx="20" cy="12" r="3" fill={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} className="tower-core-glow" />
+              <rect x="19.5" y="4" width="1" height="8" fill={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} className="animate-pulse" />
 
               {/* Radar Pings */}
-              <circle cx="20" cy="12" r="8" fill="none" stroke={accentColor} className="tower-antenna-signal" style={{ animationDelay: '0s' }} />
-              <circle cx="20" cy="12" r="14" fill="none" stroke={accentColor} className="tower-antenna-signal" style={{ animationDelay: '0.5s' }} />
+              <circle cx="20" cy="12" r="8" fill="none" stroke={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} className="tower-antenna-signal" style={{ animationDelay: '0s' }} />
+              <circle cx="20" cy="12" r="14" fill="none" stroke={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} className="tower-antenna-signal" style={{ animationDelay: '0.5s' }} />
+
             </svg>
 
             {/* Duration Display */}
@@ -445,19 +481,46 @@ const GridCell: React.FC<GridCellProps> = ({
       );
     } else if (building.type === 'hub') {
       return (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-visible">
-          {/* Hub Boundary: Dashed Line (Manhattan Distance 2) */}
-          <div className="building-range-indicator hub-range-indicator" style={{ borderColor: `${accentColor}40`, borderStyle: 'dashed' }} />
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-visible">
+          {/* Hub Boundary: Stepped Manhattan Distance 2 Diamond */}
+          <svg
+            className="absolute pointer-events-none overflow-visible"
+            viewBox="0 0 100 100"
+            style={{
+              left: '-200%',
+              right: '-200%',
+              top: '-200%',
+              bottom: '-200%',
+              color: hubColor,
+              filter: `drop-shadow(0 0 ${isAreaFocused(cell.r, cell.c, 'manhattan2') ? '12px' : '5px'} currentColor) brightness(${isAreaFocused(cell.r, cell.c, 'manhattan2') ? '1.2' : '1'})`,
+              opacity: isAreaFocused(cell.r, cell.c, 'manhattan2') ? 0.8 : 0.25,
+              transform: `scale(${isAreaFocused(cell.r, cell.c, 'manhattan2') ? '1.01' : '1'})`,
+              transition: 'all 0.15s ease-out'
+            }}
+
+          >
+            <path
+              d="M 40 4 A 4 4 0 0 1 44 0 L 56 0 A 4 4 0 0 1 60 4 L 60 16 A 4 4 0 0 0 64 20 L 76 20 A 4 4 0 0 1 80 24 L 80 36 A 4 4 0 0 0 84 40 L 96 40 A 4 4 0 0 1 100 44 L 100 56 A 4 4 0 0 1 96 60 L 84 60 A 4 4 0 0 0 80 64 L 80 76 A 4 4 0 0 1 76 80 L 64 80 A 4 4 0 0 0 60 84 L 60 96 A 4 4 0 0 1 56 100 L 44 100 A 4 4 0 0 1 40 96 L 40 84 A 4 4 0 0 0 36 80 L 24 80 A 4 4 0 0 1 20 76 L 20 64 A 4 4 0 0 0 16 60 L 4 60 A 4 4 0 0 1 0 56 L 0 44 A 4 4 0 0 1 4 40 L 16 40 A 4 4 0 0 0 20 36 L 20 24 A 4 4 0 0 1 24 20 L 36 20 A 4 4 0 0 0 40 16 Z"
+              fill="currentColor"
+              fillOpacity="0.15"
+              stroke="currentColor"
+              strokeWidth={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "2.5" : "1.5"}
+              strokeDasharray={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "none" : "4 2"}
+              className="animate-[rangeGlowPulse_4s_infinite_ease-in-out]"
+              style={{ opacity: 0.9 }}
+            />
+          </svg>
 
           <div className="relative w-8 h-8 flex items-center justify-center animate-[towerFloat_3s_ease-in-out_infinite]">
             <svg viewBox="0 0 40 40" className="w-full h-full drop-shadow-xl">
-              <rect x="8" y="8" width="24" height="24" rx="4" fill="#1e293b" stroke={accentColor} strokeWidth="2" />
-              <path d="M12 20 L28 20 M20 12 L20 28" stroke={accentColor} strokeWidth="1" opacity="0.3" />
-              <circle cx="20" cy="20" r="6" fill="none" stroke={accentColor} strokeWidth="1" strokeDasharray="2 2" className="animate-spin" />
+              <rect x="8" y="8" width="24" height="24" rx="4" fill="#1e293b" stroke={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} strokeWidth="2" />
+              <path d="M12 20 L28 20 M20 12 L20 28" stroke={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} strokeWidth="1" opacity="0.3" />
+              <circle cx="20" cy="20" r="6" fill="none" stroke={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} strokeWidth="1" strokeDasharray="2 2" className="animate-spin" />
 
               {/* Hub Levels */}
-              {isLvl2 && <rect x="14" y="14" width="12" height="12" rx="1" fill="none" stroke={accentColor} className="animate-pulse" />}
-              {isLvl3 && <circle cx="20" cy="20" r="2" fill={accentColor} className="animate-ping" />}
+              {isLvl2 && <rect x="14" y="14" width="12" height="12" rx="1" fill="none" stroke={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} className="animate-pulse" />}
+              {isLvl3 && <circle cx="20" cy="20" r="2" fill={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} className="animate-ping" />}
+
 
               <Cpu size={16} className={`${colorClass} absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2`} />
             </svg>
@@ -473,9 +536,43 @@ const GridCell: React.FC<GridCellProps> = ({
       );
     } else if (building.type === 'factory') {
       const ownerColor = building.owner === PlayerID.P1 ? '#3b82f6' : '#ef4444'; // Blue vs Red
-      const ownerAccent = building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171';
+      const isLvl2 = building.level >= 1;
+      const isLvl3 = building.level >= 2;
+
+
       return (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 overflow-visible">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-visible">
+          {/* Effect Range Indicator */}
+          {isLvl3 ? (
+            <svg
+              className="absolute pointer-events-none overflow-visible"
+              viewBox="0 0 100 100"
+              style={{
+                left: '-200%',
+                right: '-200%',
+                top: '-200%',
+                bottom: '-200%',
+                color: factoryColor,
+                filter: `drop-shadow(0 0 ${isAreaFocused(cell.r, cell.c, 'manhattan2') ? '12px' : '5px'} currentColor) brightness(${isAreaFocused(cell.r, cell.c, 'manhattan2') ? '1.2' : '1'})`,
+                opacity: isAreaFocused(cell.r, cell.c, 'manhattan2') ? 0.8 : 0.25,
+                transform: `scale(${isAreaFocused(cell.r, cell.c, 'manhattan2') ? '1.01' : '1'})`,
+                transition: 'all 0.1s ease-out' // Snappier
+              }}
+            >
+              <path
+                d="M 40 4 A 4 4 0 0 1 44 0 L 56 0 A 4 4 0 0 1 60 4 L 60 16 A 4 4 0 0 0 64 20 L 76 20 A 4 4 0 0 1 80 24 L 80 36 A 4 4 0 0 0 84 40 L 96 40 A 4 4 0 0 1 100 44 L 100 56 A 4 4 0 0 1 96 60 L 84 60 A 4 4 0 0 0 80 64 L 80 76 A 4 4 0 0 1 76 80 L 64 80 A 4 4 0 0 0 60 84 L 60 96 A 4 4 0 0 1 56 100 L 44 100 A 4 4 0 0 1 40 96 L 40 84 A 4 4 0 0 0 36 80 L 24 80 A 4 4 0 0 1 20 76 L 20 64 A 4 4 0 0 0 16 60 L 4 60 A 4 4 0 0 1 0 56 L 0 44 A 4 4 0 0 1 4 40 L 16 40 A 4 4 0 0 0 20 36 L 20 24 A 4 4 0 0 1 24 20 L 36 20 A 4 4 0 0 0 40 16 Z"
+                fill="currentColor"
+                fillOpacity="0.15"
+                stroke="currentColor"
+                strokeWidth={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "2.5" : "1.5"}
+                strokeDasharray={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "none" : "4 2"}
+                className="animate-[rangeGlowPulse_4s_infinite_ease-in-out]"
+              />
+            </svg>
+          ) : (
+            <div className={`building-range-indicator tower-range-indicator ${isAreaFocused(cell.r, cell.c, '3x3') ? 'range-focused' : ''}`} style={{ borderColor: `${factoryColor}cc`, color: factoryColor }} />
+          )}
+
           <div className="relative w-8 h-8 flex items-center justify-center">
             <svg viewBox="0 0 40 40" className="w-full h-full drop-shadow-[0_0_8px_rgba(30,41,59,0.5)]">
               {/* Base structure - now colors based on owner */}
@@ -488,16 +585,17 @@ const GridCell: React.FC<GridCellProps> = ({
               />
               {/* Chimneys */}
               <rect x="12" y="5" width="4" height="10" fill="#475569" stroke="#1e293b" />
-              {building.level >= 2 && <rect x="22" y="5" width="4" height="10" fill="#475569" stroke="#1e293b" />}
+              {isLvl2 && <rect x="22" y="5" width="4" height="10" fill="#475569" stroke="#1e293b" />}
 
               {/* Enhanced Smoke for LV3/Active */}
               <g className="smoke-container">
                 <circle cx="14" cy="2" r="2.5" fill="#94a3b8" className="animate-[smoke_2s_infinite_ease-out]" />
-                {building.level >= 2 && <circle cx="24" cy="2" r="2.5" fill="#94a3b8" className="animate-[smoke_2s_infinite_0.7s_ease-out]" />}
+                {isLvl3 && <circle cx="24" cy="2" r="2.5" fill="#94a3b8" className="animate-[smoke_2s_infinite_0.7s_ease-out]" />}
               </g>
 
               {/* Core Glow */}
-              <circle cx="20" cy="27" r="6" fill={ownerAccent} opacity="0.3" className="animate-ping" />
+              <circle cx="20" cy="27" r="6" fill={building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171'} opacity="0.3" className="animate-ping" />
+
               <FlaskConical size={14} className="text-white absolute top-[22px] left-1/2 -translate-x-1/2 -translate-y-1/2 drop-shadow-md" />
             </svg>
 
@@ -516,11 +614,26 @@ const GridCell: React.FC<GridCellProps> = ({
   return (
     <div
       onClick={onClick}
+      onMouseEnter={() => onHover?.(cell.r, cell.c)}
       className={`
-        relative w-full aspect-square flex items-center justify-center text-xs font-bold transition-all duration-300
+        relative w-full aspect-square flex items-center justify-center text-xs font-bold transition-all duration-300 rtx-cell-base
         ${bgColor}
-        ${!cell.isObstacle ? 'hover:bg-opacity-90 hover:scale-[1.02] hover:z-30' : ''}
-        ${unit ? ((evolutionLevelA >= 1 || evolutionLevelB >= 1 || isSelected) ? 'z-50' : 'z-20') : (mine ? 'z-10' : '')}
+        ${!cell.isObstacle ? 'hover:bg-opacity-90 hover:scale-[1.02]' : ''}
+        ${(() => {
+          // Priority Hierarchy (Highest to Lowest):
+          // 1. Units with Evolution (Accessories must be at the very top)
+          if (unit && (evolutionLevelA >= 1 || evolutionLevelB >= 1)) return 'z-[150]';
+          // 2. Regular Units or Flag Presence
+          if (unit || isP1FlagHere || isP2FlagHere) return 'z-[140]';
+          // 3. Move/Action Highlights (should cover range indicators of other buildings)
+          if (isValidMove || isAttackTarget || isInActionRange) return 'z-[130]';
+          // 4. Focused Building Centers (Emitters of pulses)
+          if (isThisCellFocusedCenter) return 'z-[100]';
+          // 5. Mines (below action highlights and pulses)
+          if (mine) return 'z-[50]';
+          // 6. Default
+          return 'z-[1]';
+        })()}
         group overflow-visible rounded-sm
       `}
       id={`cell-${cell.r}-${cell.c}`}
@@ -620,35 +733,18 @@ const GridCell: React.FC<GridCellProps> = ({
           <Flag size={20} className="text-cyan-400 absolute z-10 drop-shadow-lg animate-pulse" fill="currentColor" />
         )}
 
-        {/* Pulse Waves - Visible even if General carries flag */}
+
+
+        {/* P1 Shield Zone Perimeter (5x5) */}
+        {isP1FlagHere && p1GeneralLevelB >= 2 && (
+          <div className={`building-range-indicator factory-range-indicator shield-domain ${isAreaFocused(p1FlagLoc.r, p1FlagLoc.c, '5x5') ? 'range-focused' : ''}`} style={{ borderColor: `${shieldColor}cc`, color: shieldColor }} />
+        )}
+        {/* P1 Kirin Domain Perimeter (3x3) */}
         {isP1FlagHere && p1GeneralLevelB >= 3 && p1GeneralVariantB === 2 && (
-          <>
-            <div className="flag-pulse-wave flag-pulse-wave-p1 flag-pulse-wave-1" />
-            <div className="flag-pulse-wave flag-pulse-wave-p1 flag-pulse-wave-2" />
-            <div className="flag-pulse-wave flag-pulse-wave-p1 flag-pulse-wave-3" />
-          </>
+          <div className={`building-range-indicator tower-range-indicator kirin-domain ${isAreaFocused(p1FlagLoc.r, p1FlagLoc.c, '3x3') ? 'range-focused' : ''}`} style={{ borderColor: `${kirinColor}cc`, color: kirinColor }} />
         )}
       </div>
 
-      {/* P1 Shield Zone 5x5 Indicator */}
-      {
-        isInsideP1ShieldZone && (
-          <div
-            className="absolute inset-0 shield-domain-p1 pointer-events-none"
-            style={{ zIndex: 0 }}
-          />
-        )
-      }
-
-      {/* P1 Damage Zone 3x3 Indicator */}
-      {
-        isInsideP1DamageZone && (
-          <div
-            className="absolute inset-0 damage-domain-p1 pointer-events-none"
-            style={{ zIndex: 0 }}
-          />
-        )
-      }
 
       {/* P2 Flag and Spirit Domain Pulse */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-visible">
@@ -657,45 +753,18 @@ const GridCell: React.FC<GridCellProps> = ({
           <Flag size={20} className="text-red-400 absolute z-10 drop-shadow-lg animate-pulse" fill="currentColor" />
         )}
 
-        {/* Pulse Waves - Visible even if General carries flag */}
+
+
+        {/* P2 Shield Zone Perimeter (5x5) */}
+        {isP2FlagHere && p2GeneralLevelB >= 2 && (
+          <div className={`building-range-indicator factory-range-indicator shield-domain ${isAreaFocused(p2FlagLoc.r, p2FlagLoc.c, '5x5') ? 'range-focused' : ''}`} style={{ borderColor: `${shieldColor}cc`, color: shieldColor }} />
+        )}
+        {/* P2 Kirin Domain Perimeter (3x3) */}
         {isP2FlagHere && p2GeneralLevelB >= 3 && p2GeneralVariantB === 2 && (
-          <>
-            <div className="flag-pulse-wave flag-pulse-wave-p2 flag-pulse-wave-1" />
-            <div className="flag-pulse-wave flag-pulse-wave-p2 flag-pulse-wave-2" />
-            <div className="flag-pulse-wave flag-pulse-wave-p2 flag-pulse-wave-3" />
-          </>
+          <div className={`building-range-indicator tower-range-indicator kirin-domain ${isAreaFocused(p2FlagLoc.r, p2FlagLoc.c, '3x3') ? 'range-focused' : ''}`} style={{ borderColor: `${kirinColor}cc`, color: kirinColor }} />
         )}
       </div>
 
-      {/* P2 Shield Zone 5x5 Indicator */}
-      {
-        isInsideP2ShieldZone && (
-          <div
-            className="absolute inset-0 shield-domain-p2 pointer-events-none"
-            style={{ zIndex: 0 }}
-          />
-        )
-      }
-
-      {/* P2 Damage Zone 3x3 Indicator */}
-      {
-        isInsideP2DamageZone && (
-          <div
-            className="absolute inset-0 damage-domain-p2 pointer-events-none"
-            style={{ zIndex: 0 }}
-          />
-        )
-      }
-
-      {/* Factory Range Indicator (Maker Path B) */}
-      {
-        isInsideFactoryRange && (
-          <div
-            className="absolute inset-0 factory-domain pointer-events-none"
-            style={{ zIndex: 0 }}
-          />
-        )
-      }
 
 
       {/* Unit */}
@@ -703,11 +772,10 @@ const GridCell: React.FC<GridCellProps> = ({
         unit && !unit.isDead && (
           <div
             className={`
-            relative z-20 w-10 h-10 rounded-full flex flex-col items-center justify-center overflow-visible
+            relative z-50 w-10 h-10 rounded-full flex flex-col items-center justify-center overflow-visible
             ${unit?.owner === PlayerID.P1 ? 'bg-gradient-to-br from-cyan-600 to-blue-700 text-cyan-100 border-2 border-cyan-400' : 'bg-gradient-to-br from-red-600 to-pink-700 text-red-100 border-2 border-red-400'}
             transition-all
-            ${unit.hasActedThisRound ? 'opacity-90' : ''} 
-            ${unit.hasActedThisRound ? '[&>.unit-body]:grayscale [&>.unit-icon]:grayscale' : ''} 
+            ${unit.hasActedThisRound ? 'opacity-80' : ''} 
             ${cell.hasEnergyOre ? 'ring-2 ring-purple-500' : ''}
             ${unit?.owner === PlayerID.P1 ? 'before:absolute before:inset-0 before:bg-cyan-400/20 before:rounded-full before:-z-10 before:blur-md' : 'before:absolute before:inset-0 before:bg-red-400/20 before:rounded-full before:-z-10 before:blur-md'}
             ${evolutionLevelA > 0 && evolutionLevelB === 0 ? (evolutionLevelA === 1 ? 'evolution-aura-a-lv1' : evolutionLevelA === 2 ? 'evolution-aura-a-lv2' : 'evolution-aura-a-lv3') : ''}
@@ -726,7 +794,10 @@ const GridCell: React.FC<GridCellProps> = ({
             }}
           >
 
-            <div className={`unit-body absolute inset-0 rounded-full -z-10 ${unit?.owner === PlayerID.P1 ? 'bg-gradient-to-br from-cyan-600 to-blue-700' : 'bg-gradient-to-br from-red-600 to-pink-700'}`} />
+            <div className={`unit-body absolute inset-0 rounded-full -z-10 ${unit.hasActedThisRound
+              ? (unit.owner === PlayerID.P1 ? 'bg-blue-50/20' : 'bg-red-50/20')
+              : (unit?.owner === PlayerID.P1 ? 'bg-gradient-to-br from-cyan-600 to-blue-700' : 'bg-gradient-to-br from-red-600 to-pink-700')
+              }`} />
 
             <div className="unit-icon relative z-20">
               {/* Unit Icon with Stealth Effect */}
@@ -737,11 +808,11 @@ const GridCell: React.FC<GridCellProps> = ({
 
             {/* Evolution Accessories - Path A (Blue) */}
             {evolutionLevelA > 0 && (
-              <>
+              <div className="evolution-accessories-container absolute inset-0 z-50 pointer-events-none overflow-visible">
                 {/* LV1: 1 accessory at top */}
                 {evolutionLevelA === 1 && (
                   <>
-                    <div style={{
+                    <div className="evolution-accessory" style={{
                       position: 'absolute',
                       top: '-12px',
                       left: '50%',
@@ -750,7 +821,8 @@ const GridCell: React.FC<GridCellProps> = ({
                       height: '8px',
                       backgroundColor: 'rgb(96, 165, 250)',
                       borderRadius: '2px',
-                      boxShadow: '0 0 4px rgba(96, 165, 250, 0.8)'
+                      boxShadow: '0 0 4px rgba(96, 165, 250, 0.8)',
+                      zIndex: 10
                     }} />
                     {/* Circle outline for LV1 */}
                     <div style={{
@@ -771,7 +843,7 @@ const GridCell: React.FC<GridCellProps> = ({
                 {evolutionLevelA === 2 && (
                   <>
                     {/* Top point */}
-                    <div style={{
+                    <div className="evolution-accessory" style={{
                       position: 'absolute',
                       top: '-15px',
                       left: 'calc(50% - 4px)',
@@ -781,10 +853,11 @@ const GridCell: React.FC<GridCellProps> = ({
                       backgroundColor: 'rgb(96, 165, 250)',
                       borderRadius: '2px',
                       boxShadow: '0 0 4px rgba(96, 165, 250, 0.8)',
-                      animation: 'accessoryBreatheTop 2s ease-in-out infinite'
+                      animation: 'accessoryBreatheTop 2s ease-in-out infinite',
+                      zIndex: 10
                     }} />
                     {/* Bottom-left point */}
-                    <div style={{
+                    <div className="evolution-accessory" style={{
                       position: 'absolute',
                       bottom: '-8px',
                       left: '-8px',
@@ -797,7 +870,7 @@ const GridCell: React.FC<GridCellProps> = ({
                       animation: 'accessoryBreatheBottomLeft 2s ease-in-out infinite'
                     }} />
                     {/* Bottom-right point */}
-                    <div style={{
+                    <div className="evolution-accessory" style={{
                       position: 'absolute',
                       bottom: '-8px',
                       right: '-8px',
@@ -901,16 +974,16 @@ const GridCell: React.FC<GridCellProps> = ({
                     } as React.CSSProperties} />
                   </>
                 )}
-              </>
+              </div>
             )}
 
             {/* Evolution Accessories - Path B (Orange) */}
             {evolutionLevelB > 0 && (
-              <>
+              <div className="evolution-accessories-container absolute inset-0 z-50 pointer-events-none overflow-visible">
                 {/* LV1: 1 accessory at bottom */}
                 {evolutionLevelB === 1 && (
                   <>
-                    <div style={{
+                    <div className="evolution-accessory" style={{
                       position: 'absolute',
                       bottom: '-12px',
                       left: 'calc(50% - 4px)',
@@ -922,7 +995,8 @@ const GridCell: React.FC<GridCellProps> = ({
                       boxShadow: '0 0 4px rgba(251, 146, 60, 0.8)',
                       animation: 'accessoryBreathe 2s ease-in-out infinite',
                       '--breathe-x': '0px',
-                      '--breathe-y': '5px'
+                      '--breathe-y': '5px',
+                      zIndex: 10
                     } as React.CSSProperties} />
                     {/* Circle outline for LV1 */}
                     <div style={{
@@ -943,7 +1017,7 @@ const GridCell: React.FC<GridCellProps> = ({
                 {evolutionLevelB === 2 && (
                   <>
                     {/* Bottom point */}
-                    <div style={{
+                    <div className="evolution-accessory" style={{
                       position: 'absolute',
                       bottom: '-15px',
                       left: 'calc(50% - 4px)',
@@ -956,7 +1030,7 @@ const GridCell: React.FC<GridCellProps> = ({
                       animation: 'accessoryBreatheTop 2s ease-in-out infinite'
                     }} />
                     {/* Top-left point */}
-                    <div style={{
+                    <div className="evolution-accessory" style={{
                       position: 'absolute',
                       top: '-8px',
                       left: '-8px',
@@ -969,7 +1043,7 @@ const GridCell: React.FC<GridCellProps> = ({
                       animation: 'accessoryBreatheBottomLeft 2s ease-in-out infinite'
                     }} />
                     {/* Top-right point */}
-                    <div style={{
+                    <div className="evolution-accessory" style={{
                       position: 'absolute',
                       top: '-8px',
                       right: '-8px',
@@ -1086,7 +1160,7 @@ const GridCell: React.FC<GridCellProps> = ({
                     }} />
                   </>
                 )}
-              </>
+              </div>
             )}
 
             {/* Particles */}
@@ -1123,7 +1197,7 @@ const GridCell: React.FC<GridCellProps> = ({
             )}
 
             {/* Carrying Mine Indicator (Ranger) */}
-            {showCarriedMineIndicator && (
+            {showCarriedMineIndicator && unit?.carriedMine && (
               <div className="absolute -bottom-2 -left-2 bg-slate-900/90 rounded-full p-0.5 border border-amber-300 shadow-lg shadow-amber-500/30 z-30">
                 {unit.carriedMine.type === MineType.NORMAL && <Bomb size={10} className="text-white" />}
                 {unit.carriedMine.type === MineType.SMOKE && <Cloud size={10} className="text-slate-200" />}
@@ -1133,11 +1207,16 @@ const GridCell: React.FC<GridCellProps> = ({
               </div>
             )}
 
-            {/* Red Slash for Acted Units */}
+            {/* Team-colored Slash for Acted Units */}
             {unit.hasActedThisRound && (
               <div className="absolute inset-0 z-30 pointer-events-none">
-                <svg viewBox="0 0 100 100" className="w-full h-full opacity-80">
-                  <line x1="20" y1="20" x2="80" y2="80" stroke="#ef4444" strokeWidth="15" strokeLinecap="round" />
+                <svg viewBox="0 0 100 100" className="w-full h-full opacity-70">
+                  <line
+                    x1="20" y1="20" x2="80" y2="80"
+                    stroke={unit.owner === PlayerID.P1 ? '#1d4ed8' : '#b91c1c'}
+                    strokeWidth="15"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </div>
             )}
@@ -1169,8 +1248,18 @@ const GridCell: React.FC<GridCellProps> = ({
 };
 
 export default React.memo(GridCell, (prevProps, nextProps) => {
-  // Return true if props are equal (no re-render), false if different (re-render)
-  // Custom comparison to ensure evolutionLevelA changes trigger re-render
+  // --- Performance Strategy ---
+  // A cell only needs to re-render when hoveredPos changes IF it has a building or is a flag position.
+  // This prevents 576 cells from re-rendering on every mouse move.
+  const hasRangePrev = prevProps.building || (prevProps.p1FlagLoc.r === prevProps.cell.r && prevProps.p1FlagLoc.c === prevProps.cell.c) || (prevProps.p2FlagLoc.r === prevProps.cell.r && prevProps.p2FlagLoc.c === prevProps.cell.c);
+  const hasRangeNext = nextProps.building || (nextProps.p1FlagLoc.r === nextProps.cell.r && nextProps.p1FlagLoc.c === nextProps.cell.c) || (nextProps.p2FlagLoc.r === nextProps.cell.r && nextProps.p2FlagLoc.c === nextProps.cell.c);
+
+  if (prevProps.hoveredPos !== nextProps.hoveredPos) {
+    // If either or both cells have ranges, they must re-render to potentially update their highlights
+    if (hasRangePrev || hasRangeNext) return false;
+  }
+
+  // Check all other functional props
   if (prevProps.selectedGeneralLevelA !== nextProps.selectedGeneralLevelA) return false;
   if (prevProps.evolutionLevelA !== nextProps.evolutionLevelA) return false;
   if (prevProps.evolutionLevelB !== nextProps.evolutionLevelB) return false;
@@ -1179,7 +1268,6 @@ export default React.memo(GridCell, (prevProps, nextProps) => {
   if (prevProps.isSelected !== nextProps.isSelected) return false;
   if (prevProps.isValidMove !== nextProps.isValidMove) return false;
   if (prevProps.isAttackTarget !== nextProps.isAttackTarget) return false;
-  if (prevProps.isSkillTarget !== nextProps.isSkillTarget) return false;
   if (prevProps.cell !== nextProps.cell) return false;
   if (prevProps.unit !== nextProps.unit) return false;
   if (prevProps.mine !== nextProps.mine) return false;
@@ -1187,6 +1275,10 @@ export default React.memo(GridCell, (prevProps, nextProps) => {
   if (prevProps.buildings !== nextProps.buildings) return false;
   if (prevProps.p1FlagLoc !== nextProps.p1FlagLoc) return false;
   if (prevProps.p2FlagLoc !== nextProps.p2FlagLoc) return false;
+  if (prevProps.scanMarkSuccess !== nextProps.scanMarkSuccess) return false;
+  if (prevProps.selectedUnitLevelB !== nextProps.selectedUnitLevelB) return false;
+  if (prevProps.p1GeneralVariantB !== nextProps.p1GeneralVariantB) return false;
+  if (prevProps.p2GeneralVariantB !== nextProps.p2GeneralVariantB) return false;
   if (prevProps.evolutionVariantA !== nextProps.evolutionVariantA) return false;
   if (prevProps.evolutionVariantB !== nextProps.evolutionVariantB) return false;
   if (prevProps.p1GeneralLevelB !== nextProps.p1GeneralLevelB) return false;

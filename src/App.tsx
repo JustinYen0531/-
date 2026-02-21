@@ -293,6 +293,7 @@ export default function App() {
     const [selectedMineType, setSelectedMineType] = useState<MineType>(MineType.NORMAL);
     const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('normal');
     const [aiTuningProfile, setAiTuningProfile] = useState<AITuningProfile>('balanced');
+    const [hoveredPos, setHoveredPos] = useState<{ r: number, c: number } | null>(null);
     const [aiDebug] = useState(false);
     const [aiDecision, setAiDecision] = useState<AIDecisionInfo | null>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
@@ -375,13 +376,13 @@ export default function App() {
     }, [isDevToolsAllowedInCurrentMatch, showDevTools]);
 
     // Safety: entering Planning (thinking) should not carry previous selections/active units
+    const prevPhaseRef = useRef(gameState.phase);
     useEffect(() => {
-        if (gameState.phase === 'thinking' && (gameState.selectedUnitId || gameState.activeUnitId || targetMode)) {
-            setGameState(prev => prev.phase === 'thinking'
-                ? { ...prev, selectedUnitId: null, activeUnitId: null, targetMode: null }
-                : prev);
+        if (gameState.phase === 'thinking' && prevPhaseRef.current !== 'thinking') {
+            setGameState(prev => ({ ...prev, selectedUnitId: null, activeUnitId: null, targetMode: null }));
         }
-    }, [gameState.phase, gameState.selectedUnitId, gameState.activeUnitId, targetMode]);
+        prevPhaseRef.current = gameState.phase;
+    }, [gameState.phase]);
 
 
 
@@ -591,6 +592,10 @@ export default function App() {
             }
         }));
     };
+
+    const handleHoverCell = useCallback((r: number, c: number | null) => {
+        setHoveredPos(c === null ? null : { r, c });
+    }, []);
 
     const resolveLocalPlayer = (state: GameState): PlayerID => {
         if (state.gameMode === 'pvp') {
@@ -2098,7 +2103,8 @@ export default function App() {
 
         // Global Pickup/Drop Action (for Flag)
         const genLevelB = player.evolutionLevels[UnitType.GENERAL].b;
-        const canCarryFlag = unit.type === UnitType.GENERAL || genLevelB >= 3;
+        const genVariantB = player.evolutionLevels[UnitType.GENERAL].bVariant;
+        const canCarryFlag = unit.type === UnitType.GENERAL || (genLevelB >= 3 && genVariantB === 1);
         const isAtFlag = unit.r === player.flagPosition.r && unit.c === player.flagPosition.c;
         if (canCarryFlag) {
             if (!unit.hasFlag && isAtFlag) {
@@ -2115,7 +2121,8 @@ export default function App() {
         if (unit.type !== UnitType.GENERAL) {
             const player = gameState.players[unit.owner];
             const genLevelB = player.evolutionLevels[UnitType.GENERAL].b;
-            const canCarry = genLevelB >= 3;
+            const genVariantB = player.evolutionLevels[UnitType.GENERAL].bVariant;
+            const canCarry = genLevelB >= 3 && genVariantB === 1;
             const isAtFlag = unit.r === player.flagPosition.r && unit.c === player.flagPosition.c;
 
             if (canCarry) {
@@ -3118,17 +3125,18 @@ export default function App() {
                     // --- General Evolution Logic: Path B (Reduce Flag Move Cost) ---
                     const player = state.players[unit.owner];
                     const genLevelB = player.evolutionLevels[UnitType.GENERAL].b;
+                    const genVariantB = player.evolutionLevels[UnitType.GENERAL].bVariant;
 
                     let baseCost = UNIT_STATS[unit.type].moveCost;
                     if (unit.hasFlag) {
                         if (unit.type === UnitType.GENERAL) {
-                            // Gen Path B Level 3: Cost reduced to 4 (normally 5)
-                            baseCost = (genLevelB >= 3) ? 4 : UNIT_STATS[UnitType.GENERAL].flagMoveCost;
-                        } else if (genLevelB >= 3) {
-                            // Gen Path B Level 3: Any unit can carry flag, cost is 4
+                            // Gen Path B Level 3-1: Cost reduced to 4 (normally 5)
+                            baseCost = (genLevelB >= 3 && genVariantB === 1) ? 4 : UNIT_STATS[UnitType.GENERAL].flagMoveCost;
+                        } else if (genLevelB >= 3 && genVariantB === 1) {
+                            // Gen Path B Level 3-1: Any unit can carry flag, cost is 4
                             baseCost = 4;
                         } else {
-                            // Should technically not happen if only General can carry, but fail safe
+                            // Fallback for non-General units
                             baseCost = 5;
                         }
                     } else if (unit.type === UnitType.RANGER && unit.carriedMine) {
@@ -3319,10 +3327,10 @@ export default function App() {
               `}</style>
                             <div className="text-center">
                                 <div className="text-6xl font-black text-white mb-4 animate-pulse">
-                                    開始
+                                    {t(gameState.gameMode + '_mode')}
                                 </div>
                                 <div className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-                                    BATTLE START
+                                    {t('battle_start')}
                                 </div>
                             </div>
                         </div>
@@ -3479,8 +3487,10 @@ export default function App() {
                                     handleUnitClick={handleUnitClick}
                                     onDismissMiss={clearMissMarksImmediatelyAt}
                                     onDismissCount={clearCountMarkersImmediatelyAt}
-                                    isFlipped={shouldFlipBoard}
-                                    viewerPlayerId={viewerPlayerId}
+                                    isFlipped={pvpPerspectivePlayer === PlayerID.P2}
+                                    viewerPlayerId={pvpPerspectivePlayer || undefined}
+                                    hoveredPos={hoveredPos}
+                                    onHoverCell={handleHoverCell}
                                 />
 
                                 {/* Timer Bar Below Board */}

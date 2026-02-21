@@ -167,7 +167,7 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                         })()}
                                                     </div>
 
-                                                    <div className="flex items-center h-24">
+                                                    <div className="flex items-center h-28">
                                                         {/* LV1 Card */}
                                                         <div className="flex-1 relative h-full">
                                                             {(() => {
@@ -185,7 +185,7 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                         ) : (
                                                                             <div className="flex h-full flex-col justify-center min-w-0">
                                                                                 <div className="flex items-center justify-between gap-1">
-                                                                                    <div className="font-bold mb-0.5 opacity-70">LV1</div>
+                                                                                    <div className="font-bold mb-0.5 opacity-70 whitespace-nowrap shrink-0">LV1</div>
                                                                                     <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 text-right">
                                                                                         {isUnlocked && <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>}
                                                                                         <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r1_req`, [`${evolutionKeyBase}_req`])}</span>
@@ -219,7 +219,7 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                         ) : (
                                                                             <div className="flex h-full flex-col justify-center min-w-0">
                                                                                 <div className="flex items-center justify-between gap-1">
-                                                                                    <div className="font-bold mb-0.5 opacity-70">LV2</div>
+                                                                                    <div className="font-bold mb-0.5 opacity-70 whitespace-nowrap shrink-0">LV2</div>
                                                                                     <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 text-right">
                                                                                         {isUnlocked && <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>}
                                                                                         <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r2_req`, [`${evolutionKeyBase}_req`])}</span>
@@ -255,7 +255,7 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                                     ) : (
                                                                                         <div className="flex h-full flex-col justify-center min-w-0">
                                                                                             <div className="flex items-center justify-between gap-1">
-                                                                                                <div className="font-bold mb-0.5 opacity-70">LV3-{subLevel}</div>
+                                                                                                <div className="font-bold mb-0.5 opacity-70 whitespace-nowrap shrink-0">LV3-{subLevel}</div>
                                                                                                 <div className="text-[9px] text-gray-300 font-bold flex items-center gap-1 shrink-0 text-right">
                                                                                                     <div className="w-2.5 h-2.5 bg-green-500 rounded-full flex items-center justify-center text-[6px] text-white shrink-0"></div>
                                                                                                     <span className="opacity-80">{translateWithFallback(`${evolutionKeyBase}_r3_req`, [`${evolutionKeyBase}_req`])}</span>
@@ -286,11 +286,11 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                             const isUnlocked = currentLevel === 3 && selectedVariant !== null && selectedVariant === subLevel;
                                                                             const isFlipped = flippedCardId === cardId;
                                                                             return (
-                                                                                <div key={idx} className="relative h-[46px]">
+                                                                                <div key={idx} className="relative h-[52px]">
                                                                                     <div onClick={() => {
                                                                                         if (isOtherVariantSelected) return;
                                                                                         setFlippedCardId(isFlipped ? null : cardId);
-                                                                                    }} className={`absolute inset-0 z-10 p-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? `${flippedCardShellClass} bg-[#1a1a1a] border-indigo-400 shadow-2xl` : `h-full ${isUnlocked ? 'bg-orange-950/40 border-orange-500 text-orange-100 shadow-[0_0_12px_rgba(249,115,22,0.2)]' : isOtherVariantSelected ? 'bg-transparent border-gray-800 text-gray-700 opacity-20 grayscale pointer-events-none' : 'bg-gray-800/40 border-gray-600/50 text-gray-500 hover:border-gray-500'}`}`}>
+                                                                                    }} className={`absolute inset-0 z-10 py-1.5 px-2 rounded border flex flex-col justify-center cursor-pointer transition-all duration-300 ${isFlipped ? `${flippedCardShellClass} bg-[#1a1a1a] border-indigo-400 shadow-2xl` : `h-full ${isUnlocked ? 'bg-orange-950/40 border-orange-500 text-orange-100 shadow-[0_0_12px_rgba(249,115,22,0.2)]' : isOtherVariantSelected ? 'bg-transparent border-gray-800 text-gray-700 opacity-20 grayscale pointer-events-none' : 'bg-gray-800/40 border-gray-600/50 text-gray-500 hover:border-gray-500'}`}`}>
                                                                                         {isFlipped ? (
                                                                                             <FlippedCardDetail
                                                                                                 text={translateWithFallback(`${evolutionKeyBase}_r3_${subLevel}_detail`, [config[branch].rewardText[idx], `${evolutionKeyBase}_detail`])}
@@ -300,7 +300,7 @@ const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) 
                                                                                             <div className="flex items-center h-full gap-1 overflow-hidden">
                                                                                                 <div className="flex flex-col justify-center min-w-0 flex-1">
                                                                                                     <div className="flex items-center gap-1.5 mb-0.5 shrink-0">
-                                                                                                        <span className={`text-[9px] ${isUnlocked ? 'text-orange-400' : 'text-gray-500'} font-bold`}>LV3-{subLevel}</span>
+                                                                                                        <span className={`text-[9px] ${isUnlocked ? 'text-orange-400' : 'text-gray-500'} font-bold whitespace-nowrap shrink-0`}>LV3-{subLevel}</span>
                                                                                                         {isUnlocked && <span className="text-[6px] px-1 bg-orange-600 text-white rounded-[2px] font-black animate-pulse">ACT</span>}
                                                                                                     </div>
                                                                                                     <div className={`text-[8.5px] sm:text-[9px] leading-[1.1] font-bold ${rewardTextClampClass}`}>{t(config[branch].rewardText[idx])}</div>
