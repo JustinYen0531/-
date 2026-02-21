@@ -11,6 +11,7 @@ import developerLogOverviewRaw from '../../遊戲文章總覽.MD?raw';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { VisualDetailMode } from '../visualDetail';
 
 
 
@@ -29,6 +30,7 @@ interface GameModalsProps {
     roomId: string | null;
     setRoomId: (id: string | null) => void;
     onOpenSettings: () => void;
+    detailMode: VisualDetailMode;
     t: (key: string, params?: Record<string, any>) => string;
 }
 
@@ -160,6 +162,7 @@ const GameModals: React.FC<GameModalsProps> = ({
     roomId,
     setRoomId,
     onOpenSettings,
+    detailMode,
     t
 }) => {
     // Dynamically derive DEVELOPER_LOGS to support localization from i18n.ts
@@ -271,6 +274,8 @@ const GameModals: React.FC<GameModalsProps> = ({
 
     const pveDifficultyTitle = isZh ? '選擇AI難度' : 'Choose AI Difficulty';
     const latestDeveloperLog = derivedLogs[0] ?? null;
+    const isLowDetail = detailMode === 'low';
+    const isUltraLowDetail = detailMode === 'ultra_low';
 
     useEffect(() => {
         if (joinMode !== 'create') {
@@ -458,14 +463,25 @@ const GameModals: React.FC<GameModalsProps> = ({
                     `
                 }}
             >
-                <CircularMeteorShower className="z-0 opacity-100" />
+                <CircularMeteorShower className="z-0 opacity-100" detailMode={detailMode} />
                 <div className="absolute inset-0 overflow-hidden pointer-events-none z-[1]">
+                    <div
+                        className="absolute inset-0 mix-blend-screen"
+                        style={{
+                            opacity: isUltraLowDetail ? 0.35 : isLowDetail ? 0.5 : 0.7,
+                            background: `
+                                radial-gradient(70% 120% at 0% 52%, rgba(56, 189, 248, 0.28) 0%, rgba(56, 189, 248, 0.08) 38%, rgba(56, 189, 248, 0) 72%),
+                                radial-gradient(70% 120% at 100% 52%, rgba(244, 63, 94, 0.28) 0%, rgba(244, 63, 94, 0.08) 38%, rgba(244, 63, 94, 0) 72%),
+                                radial-gradient(32% 40% at 50% 54%, rgba(168, 85, 247, 0.12) 0%, rgba(168, 85, 247, 0) 100%)
+                            `
+                        }}
+                    />
                     <div className="absolute top-4 left-2 md:top-8 md:left-6 z-[1]">
                         <div
                             className="absolute inset-0 rounded-full bg-cyan-400/25 blur-[56px] scale-[1.85]"
-                            style={{ animation: 'cloud-flow 6s ease-in-out infinite' }}
+                            style={{ animation: isUltraLowDetail ? 'none' : `cloud-flow ${isLowDetail ? 9 : 6}s ease-in-out infinite` }}
                         />
-                        <div style={{ animation: 'fadeInOut 4s ease-in-out infinite' }}>
+                        <div style={{ animation: isUltraLowDetail ? 'none' : `fadeInOut ${isLowDetail ? 6.2 : 4}s ease-in-out infinite` }}>
                             <Bomb size={220} className="text-cyan-300 drop-shadow-[0_0_28px_rgba(34,211,238,0.8)] relative z-10" />
                         </div>
                     </div>
@@ -473,21 +489,22 @@ const GameModals: React.FC<GameModalsProps> = ({
                     <div className="absolute bottom-4 right-2 md:bottom-8 md:right-6 z-[1]">
                         <div
                             className="absolute inset-0 rounded-full bg-red-500/25 blur-[56px] scale-[1.85]"
-                            style={{ animation: 'cloud-flow 6s ease-in-out infinite reverse' }}
+                            style={{ animation: isUltraLowDetail ? 'none' : `cloud-flow ${isLowDetail ? 9 : 6}s ease-in-out infinite reverse` }}
                         />
-                        <div style={{ animation: 'fadeInOut 4s ease-in-out infinite' }}>
+                        <div style={{ animation: isUltraLowDetail ? 'none' : `fadeInOut ${isLowDetail ? 6.2 : 4}s ease-in-out infinite` }}>
                             <Crown size={240} className="text-red-400 drop-shadow-[0_0_30px_rgba(248,113,113,0.85)] relative z-10" />
                         </div>
                     </div>
 
                     <div
-                        className="absolute inset-0 opacity-10"
+                        className="absolute inset-0"
                         style={{
+                            opacity: isUltraLowDetail ? 0.03 : isLowDetail ? 0.06 : 0.1,
                             backgroundImage: `
                                 linear-gradient(0deg, transparent 24%, rgba(0, 255, 255, 0.08) 25%, rgba(0, 255, 255, 0.08) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.08) 75%, rgba(0, 255, 255, 0.08) 76%, transparent 77%, transparent),
                                 linear-gradient(90deg, transparent 24%, rgba(0, 255, 255, 0.08) 25%, rgba(0, 255, 255, 0.08) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.08) 75%, rgba(0, 255, 255, 0.08) 76%, transparent 77%, transparent)
                             `,
-                            backgroundSize: '60px 60px'
+                            backgroundSize: isUltraLowDetail ? '100px 100px' : isLowDetail ? '80px 80px' : '60px 60px'
                         }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-red-500/10" />

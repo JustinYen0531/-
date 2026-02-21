@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { VisualDetailMode } from '../visualDetail';
 
 type ShaderPlanetTheme = 'blue' | 'red';
 
@@ -8,6 +9,7 @@ interface ShaderPlanetProps {
     spinDirection?: 1 | -1;
     isTurnActive?: boolean;
     motionSpeed?: number;
+    detailMode?: VisualDetailMode;
     className?: string;
 }
 
@@ -64,6 +66,7 @@ uniform vec3 uMidColor;
 uniform vec3 uHighColor;
 uniform vec3 uSparkleColor;
 uniform vec3 uLightDir;
+uniform float uDetailLevel;
 varying vec2 vUvSphere;
 varying vec3 vNormalWorld;
 
@@ -129,11 +132,22 @@ void main() {
 
   vec2 sparkleA = starField(vUvSphere, vec2(74.0, 46.0), 0.0032, 0.0066, 1.2);
   vec2 sparkleB = starField(vUvSphere + vec2(0.137, 0.241), vec2(98.0, 58.0), 0.0025, 0.0054, 1.45) * 0.88;
-  vec2 sparkleC = starField(vUvSphere + vec2(0.281, 0.073), vec2(30.0, 18.0), 0.007, 0.0135, 0.82) * 1.0;
-  vec2 sparkleD = starField(vUvSphere + vec2(0.413, 0.327), vec2(17.0, 10.0), 0.0105, 0.018, 0.68) * 1.08;
-  vec2 sparkleE = starField(vUvSphere + vec2(0.519, 0.119), vec2(12.0, 7.0), 0.014, 0.024, 0.56) * 1.12;
+  vec2 sparkleC = vec2(0.0, 0.0);
+  vec2 sparkleD = vec2(0.0, 0.0);
+  vec2 sparkleE = vec2(0.0, 0.0);
+
+  if (uDetailLevel > 0.5) {
+    sparkleC = starField(vUvSphere + vec2(0.281, 0.073), vec2(30.0, 18.0), 0.007, 0.0135, 0.82) * 0.84;
+  }
+  if (uDetailLevel > 1.5) {
+    sparkleD = starField(vUvSphere + vec2(0.413, 0.327), vec2(17.0, 10.0), 0.0105, 0.018, 0.68) * 1.08;
+    sparkleE = starField(vUvSphere + vec2(0.519, 0.119), vec2(12.0, 7.0), 0.014, 0.024, 0.56) * 1.12;
+  }
+
   float sparkle = clamp(sparkleA.x + sparkleB.x + sparkleC.x + sparkleD.x + sparkleE.x, 0.0, 3.7);
   float sparkleFlash = clamp(sparkleA.y + sparkleB.y + sparkleC.y + sparkleD.y + sparkleE.y, 0.0, 1.8);
+  sparkle *= mix(0.56, 1.0, min(1.0, uDetailLevel * 0.5));
+  sparkleFlash *= mix(0.45, 1.0, min(1.0, uDetailLevel * 0.5));
   vec3 sparkleColor = mix(uSparkleColor, uMidColor, 0.25);
   color += sparkleColor * sparkle * 0.98;
   color += vec3(1.0, 1.0, 1.0) * sparkleFlash * 0.72;
@@ -163,10 +177,18 @@ void main() {
 }
 `;
 
-const ShaderPlanet: React.FC<ShaderPlanetProps> = ({ theme, spinDirection = 1, isTurnActive = false, motionSpeed = 1, className = '' }) => {
+const ShaderPlanet: React.FC<ShaderPlanetProps> = ({
+    theme,
+    spinDirection = 1,
+    isTurnActive = false,
+    motionSpeed = 1,
+    detailMode = 'normal',
+    className = ''
+}) => {
     const rootRef = useRef<HTMLDivElement | null>(null);
     const clampedMotionSpeed = Math.min(3, Math.max(0.4, motionSpeed));
     const motionSpeedRef = useRef(clampedMotionSpeed);
+    const detailLevel = detailMode === 'ultra_low' ? 0 : detailMode === 'low' ? 1 : 2;
 
     useEffect(() => {
         motionSpeedRef.current = clampedMotionSpeed;
@@ -199,7 +221,8 @@ const ShaderPlanet: React.FC<ShaderPlanetProps> = ({ theme, spinDirection = 1, i
             uMidColor: { value: new THREE.Color(palette.mid) },
             uHighColor: { value: new THREE.Color(palette.high) },
             uSparkleColor: { value: new THREE.Color(palette.sparkle) },
-            uLightDir: { value: LIGHT_DIRECTION.clone() }
+            uLightDir: { value: LIGHT_DIRECTION.clone() },
+            uDetailLevel: { value: detailLevel }
         };
 
         const surfaceMaterial = new THREE.ShaderMaterial({
@@ -209,7 +232,11 @@ const ShaderPlanet: React.FC<ShaderPlanetProps> = ({ theme, spinDirection = 1, i
             transparent: true
         });
 
-        const surfaceGeometry = new THREE.SphereGeometry(1, 192, 128);
+        const surfaceGeometry = new THREE.SphereGeometry(
+            1,
+            detailMode === 'ultra_low' ? 48 : detailMode === 'low' ? 96 : 192,
+            detailMode === 'ultra_low' ? 32 : detailMode === 'low' ? 64 : 128
+        );
         const surfaceMesh = new THREE.Mesh(surfaceGeometry, surfaceMaterial);
         scene.add(surfaceMesh);
 
@@ -225,14 +252,21 @@ const ShaderPlanet: React.FC<ShaderPlanetProps> = ({ theme, spinDirection = 1, i
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
-        const rimGeometry = new THREE.SphereGeometry(1.04, 128, 96);
+        const rimGeometry = new THREE.SphereGeometry(
+            1.04,
+            detailMode === 'ultra_low' ? 32 : detailMode === 'low' ? 64 : 128,
+            detailMode === 'ultra_low' ? 24 : detailMode === 'low' ? 48 : 96
+        );
         const rimMesh = new THREE.Mesh(rimGeometry, rimMaterial);
         scene.add(rimMesh);
 
         const resize = () => {
             const rect = root.getBoundingClientRect();
             const size = Math.max(1, Math.floor(Math.min(rect.width, rect.height)));
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+            renderer.setPixelRatio(Math.min(
+                window.devicePixelRatio || 1,
+                detailMode === 'ultra_low' ? 1 : detailMode === 'low' ? 1.25 : 1.5
+            ));
             renderer.setSize(size, size, false);
             camera.aspect = 1;
             camera.updateProjectionMatrix();
@@ -250,7 +284,8 @@ const ShaderPlanet: React.FC<ShaderPlanetProps> = ({ theme, spinDirection = 1, i
             const delta = clock.getDelta();
             const elapsed = clock.elapsedTime;
             surfaceUniforms.uTime.value = elapsed;
-            rotationY += delta * 0.24 * spinDirection * motionSpeedRef.current;
+            const detailSpinScale = detailMode === 'ultra_low' ? 0.52 : detailMode === 'low' ? 0.74 : 1;
+            rotationY += delta * 0.24 * spinDirection * motionSpeedRef.current * detailSpinScale;
             surfaceMesh.rotation.y = rotationY;
             surfaceMesh.rotation.x = 0.12;
             rimMesh.rotation.y = surfaceMesh.rotation.y;
@@ -275,12 +310,37 @@ const ShaderPlanet: React.FC<ShaderPlanetProps> = ({ theme, spinDirection = 1, i
                 root.removeChild(renderer.domElement);
             }
         };
-    }, [theme, spinDirection]);
+    }, [detailLevel, detailMode, theme, spinDirection]);
+
+    const detailStyle = detailMode === 'ultra_low'
+        ? {
+            ['--shader-planet-breathe-scale' as string]: '1.015',
+            ['--shader-planet-breathe-duration' as string]: '10.2s',
+            ['--shader-planet-halo-duration' as string]: '9.1s',
+            ['--shader-planet-halo-min' as string]: '0.28',
+            ['--shader-planet-halo-max' as string]: '0.44',
+            ['--shader-planet-halo-scale-min' as string]: '0.98',
+            ['--shader-planet-halo-scale-max' as string]: '1.03',
+            ['--shader-planet-halo-blur-min' as string]: '6px',
+            ['--shader-planet-halo-blur-max' as string]: '10px'
+        }
+        : detailMode === 'low'
+            ? {
+                ['--shader-planet-breathe-scale' as string]: '1.03',
+                ['--shader-planet-breathe-duration' as string]: '8.8s',
+                ['--shader-planet-halo-duration' as string]: '7.4s',
+                ['--shader-planet-halo-min' as string]: '0.38',
+                ['--shader-planet-halo-max' as string]: '0.58',
+                ['--shader-planet-halo-scale-min' as string]: '0.98',
+                ['--shader-planet-halo-scale-max' as string]: '1.06'
+            }
+            : undefined;
 
     return (
         <div
             ref={rootRef}
             className={`shader-planet shader-planet-${theme} ${isTurnActive ? 'shader-planet-turn-active' : ''} ${className}`.trim()}
+            style={detailStyle}
             aria-hidden="true"
         />
     );

@@ -34,6 +34,7 @@ import ControlPanel from './components/ControlPanel';
 import GameModals from './components/GameModals';
 import ShaderPlanet from './components/ShaderPlanet';
 import CommonSettingsModal from './components/CommonSettingsModal';
+import { VisualDetailMode } from './visualDetail';
 import { useConnection } from './network/ConnectionProvider';
 import {
     AttackPayload,
@@ -313,8 +314,10 @@ export default function App() {
     const [showEvolutionTree, setShowEvolutionTree] = useState(false);
     const [language, setLanguage] = useState<Language>('en');
     const [musicVolume, setMusicVolume] = useState(0.3);
+    const [sfxVolume, setSfxVolume] = useState(0.7);
     const [showCommonSettings, setShowCommonSettings] = useState(false);
     const [disableBoardShake, setDisableBoardShake] = useState(false);
+    const [detailMode, setDetailMode] = useState<VisualDetailMode>('normal');
     const [showGameStartAnimation, setShowGameStartAnimation] = useState(false);
     const [showLog, setShowLog] = useState(true);
     const [pvpPerspectivePlayer, setPvpPerspectivePlayer] = useState<PlayerID | null>(null);
@@ -492,7 +495,7 @@ export default function App() {
     // See useGameLoop hook at the bottom of the component
 
     const playSfx = useCallback((sound: SfxName, cooldownMs: number = 100, volumeMultiplier: number = 1) => {
-        if (view !== 'game' || musicVolume <= 0) return;
+        if (view !== 'game' || sfxVolume <= 0) return;
         const now = Date.now();
         const lastPlayed = sfxLastPlayedRef.current.get(sound) ?? 0;
         if (cooldownMs > 0 && now - lastPlayed < cooldownMs) return;
@@ -507,11 +510,11 @@ export default function App() {
 
         sfxLastPlayedRef.current.set(sound, now);
         audio.currentTime = 0;
-        audio.volume = Math.min(1, Math.max(0, musicVolume * volumeMultiplier));
+        audio.volume = Math.min(1, Math.max(0, sfxVolume * volumeMultiplier));
         audio.play().catch(() => {
             // Browser autoplay policy may block playback before first user interaction.
         });
-    }, [view, musicVolume]);
+    }, [view, sfxVolume]);
 
 
     const addLog = (messageKey: string, type: GameLog['type'] = 'info', params?: Record<string, any>, owner?: PlayerID) => {
@@ -3469,6 +3472,9 @@ export default function App() {
             handleActionComplete: executeEndTurnAction
         }
     });
+    const isLowDetail = detailMode === 'low';
+    const isUltraLowDetail = detailMode === 'ultra_low';
+    const detailScale = isUltraLowDetail ? 0.45 : isLowDetail ? 0.72 : 1;
     const leftSideAura = shouldFlipBoard ? 'rgba(255, 50, 100, 0.58)' : 'rgba(0, 150, 255, 0.58)';
     const rightSideAura = shouldFlipBoard ? 'rgba(0, 150, 255, 0.58)' : 'rgba(255, 50, 100, 0.58)';
     const leftPlanetTheme: 'blue' | 'red' = shouldFlipBoard ? 'red' : 'blue';
@@ -3481,18 +3487,19 @@ export default function App() {
         ? Math.min(1, Math.max(0, 1 - gameState.timeLeft / TURN_TIMER))
         : 0;
     // Only the current side's planet accelerates; the other side stays at normal spin speed.
-    const bluePlanetSpinSpeed = (gameState.phase === 'action' && gameState.currentPlayer === PlayerID.P1)
+    const bluePlanetSpinSpeed = ((gameState.phase === 'action' && gameState.currentPlayer === PlayerID.P1)
         ? 1 + Math.pow(actionUrgencyProgress, 1.2) * 1.9
-        : 1;
-    const redPlanetSpinSpeed = (gameState.phase === 'action' && gameState.currentPlayer === PlayerID.P2)
+        : 1) * detailScale;
+    const redPlanetSpinSpeed = ((gameState.phase === 'action' && gameState.currentPlayer === PlayerID.P2)
         ? 1 + Math.pow(actionUrgencyProgress, 1.32) * 2.1
-        : 1;
+        : 1) * detailScale;
     const isLeftPlanetTurnActive = leftPlanetTheme === activeTurnPlanetTheme;
     const isRightPlanetTurnActive = rightPlanetTheme === activeTurnPlanetTheme;
     const isLeftPlanetTurnInactive = activeTurnPlanetTheme !== null && !isLeftPlanetTurnActive;
     const isRightPlanetTurnInactive = activeTurnPlanetTheme !== null && !isRightPlanetTurnActive;
     const rightAuraCenter = showLog ? '52% 42%' : '70% 42%';
     const neutralAuraCenter = showLog ? '41% 20%' : '50% 20%';
+    const meteorCount = isUltraLowDetail ? 6 : isLowDetail ? 12 : 25;
     const isLocalPlayerTurn = gameState.gameMode === 'pvp'
         ? (
             gameState.phase === 'placement' ||
@@ -3538,6 +3545,7 @@ export default function App() {
                 roomId={roomId}
                 setRoomId={setRoomId}
                 onOpenSettings={() => setShowCommonSettings(true)}
+                detailMode={detailMode}
                 t={t}
             />
 
@@ -3548,10 +3556,14 @@ export default function App() {
                 setLanguage={setLanguage}
                 musicVolume={musicVolume}
                 setMusicVolume={setMusicVolume}
+                sfxVolume={sfxVolume}
+                setSfxVolume={setSfxVolume}
                 allowDevToolsInAiChallenge={allowDevToolsInAiChallenge}
                 setAllowDevToolsInAiChallenge={setAllowDevToolsInAiChallenge}
                 disableBoardShake={disableBoardShake}
                 setDisableBoardShake={setDisableBoardShake}
+                detailMode={detailMode}
+                setDetailMode={setDetailMode}
             />
 
             {view === 'game' && (
@@ -3594,16 +3606,17 @@ export default function App() {
                         style={{
                             background: 'linear-gradient(135deg, #0a0e27 0%, #1a0033 25%, #0a0e27 50%, #1a0033 75%, #0a0e27 100%)',
                             backgroundSize: '400% 400%',
-                            animation: 'gradientShift 15s ease infinite'
+                            animation: isUltraLowDetail ? 'none' : `gradientShift ${isLowDetail ? 22 : 15}s ease infinite`
                         }}>
                         {/* Neon Grid Background */}
-                        <div className="absolute inset-0 opacity-10"
+                        <div className="absolute inset-0"
                             style={{
+                                opacity: isUltraLowDetail ? 0.04 : isLowDetail ? 0.07 : 0.1,
                                 backgroundImage: `
                        linear-gradient(0deg, transparent 24%, rgba(0, 255, 255, 0.08) 25%, rgba(0, 255, 255, 0.08) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.08) 75%, rgba(0, 255, 255, 0.08) 76%, transparent 77%, transparent),
                        linear-gradient(90deg, transparent 24%, rgba(0, 255, 255, 0.08) 25%, rgba(0, 255, 255, 0.08) 26%, transparent 27%, transparent 74%, rgba(0, 255, 255, 0.08) 75%, rgba(0, 255, 255, 0.08) 76%, transparent 77%, transparent)
                      `,
-                                backgroundSize: '60px 60px',
+                                backgroundSize: isUltraLowDetail ? '96px 96px' : isLowDetail ? '76px 76px' : '60px 60px',
                                 pointerEvents: 'none',
                                 zIndex: 1
                             }}>
@@ -3629,23 +3642,23 @@ export default function App() {
                                     }
                                 }
                             `}</style>
-                            {Array.from({ length: 25 }).map((_, i) => (
+                            {Array.from({ length: meteorCount }).map((_, i) => (
                                 <div
                                     key={`meteor-${i}`}
                                     className="absolute"
                                     style={{
                                         left: `${(i * 13 + 7) % 100}%`,
                                         top: '-200px',
-                                        animation: `meteorFall ${3 + (i % 5)}s linear infinite`,
+                                        animation: `meteorFall ${isUltraLowDetail ? 6.8 : isLowDetail ? 5.1 : 3 + (i % 5)}s linear infinite`,
                                         animationDelay: `${i * 0.5}s`,
                                         opacity: 0
                                     }}
                                 >
                                     <div style={{
                                         width: '2px',
-                                        height: `${80 + (i % 6) * 20}px`,
+                                        height: `${(isUltraLowDetail ? 54 : isLowDetail ? 66 : 80) + (i % 6) * (isUltraLowDetail ? 10 : isLowDetail ? 14 : 20)}px`,
                                         background: 'linear-gradient(to bottom, rgba(0, 255, 255, 0), rgba(200, 255, 255, 0.8))',
-                                        boxShadow: '0 0 15px rgba(0, 255, 255, 0.6)',
+                                        boxShadow: `0 0 ${isUltraLowDetail ? 8 : isLowDetail ? 11 : 15}px rgba(0, 255, 255, 0.6)`,
                                         transform: 'rotate(-25deg)',
                                         transformOrigin: 'bottom center'
                                     }} />
@@ -3656,21 +3669,25 @@ export default function App() {
                         {/* Background Decorative Elements */}
                         <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 5 }}>
                             {/* Aurora Effect */}
-                            <div className="absolute inset-0 opacity-40 mix-blend-screen" style={{ zIndex: 0 }}>
-                                <div className="absolute inset-[-50%]" style={{
-                                    background: 'linear-gradient(45deg, transparent 40%, rgba(0, 255, 128, 0.3) 50%, transparent 60%)',
-                                    filter: 'blur(60px)',
-                                    animation: 'aurora-flow 8s ease-in-out infinite alternate',
-                                    transformOrigin: 'center'
-                                }}></div>
-                                <div className="absolute inset-[-50%]" style={{
-                                    background: 'linear-gradient(-45deg, transparent 40%, rgba(50, 255, 100, 0.2) 50%, transparent 60%)',
-                                    filter: 'blur(40px)',
-                                    animation: 'aurora-flow 12s ease-in-out infinite alternate-reverse',
-                                    transformOrigin: 'center',
-                                    animationDelay: '-4s'
-                                }}></div>
-                            </div>
+                            {!isUltraLowDetail && (
+                                <div className="absolute inset-0 opacity-40 mix-blend-screen" style={{ zIndex: 0 }}>
+                                    <div className="absolute inset-[-50%]" style={{
+                                        background: 'linear-gradient(45deg, transparent 40%, rgba(0, 255, 128, 0.3) 50%, transparent 60%)',
+                                        filter: `blur(${isLowDetail ? 46 : 60}px)`,
+                                        animation: `aurora-flow ${isLowDetail ? 11 : 8}s ease-in-out infinite alternate`,
+                                        transformOrigin: 'center'
+                                    }}></div>
+                                    {!isLowDetail && (
+                                        <div className="absolute inset-[-50%]" style={{
+                                            background: 'linear-gradient(-45deg, transparent 40%, rgba(50, 255, 100, 0.2) 50%, transparent 60%)',
+                                            filter: 'blur(40px)',
+                                            animation: 'aurora-flow 12s ease-in-out infinite alternate-reverse',
+                                            transformOrigin: 'center',
+                                            animationDelay: '-4s'
+                                        }}></div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Neon Planets */}
                             <div className="neon-planets-layer">
@@ -3679,6 +3696,7 @@ export default function App() {
                                     spinDirection={leftPlanetTheme === 'red' ? -1 : 1}
                                     isTurnActive={isLeftPlanetTurnActive}
                                     motionSpeed={leftPlanetTheme === 'blue' ? bluePlanetSpinSpeed : redPlanetSpinSpeed}
+                                    detailMode={detailMode}
                                     className={`planet-left ${isLeftPlanetTurnInactive ? 'shader-planet-turn-inactive' : ''}`.trim()}
                                 />
                                 <ShaderPlanet
@@ -3686,6 +3704,7 @@ export default function App() {
                                     spinDirection={rightPlanetTheme === 'red' ? -1 : 1}
                                     isTurnActive={isRightPlanetTurnActive}
                                     motionSpeed={rightPlanetTheme === 'blue' ? bluePlanetSpinSpeed : redPlanetSpinSpeed}
+                                    detailMode={detailMode}
                                     className={`planet-right ${isRightPlanetTurnInactive ? 'shader-planet-turn-inactive' : ''}`.trim()}
                                 />
                             </div>
@@ -3693,25 +3712,29 @@ export default function App() {
                             {/* Animated Energy Waves - Blue - Slower */}
                             <div className="absolute inset-0" style={{
                                 background: `radial-gradient(circle at 30% 42%, ${leftSideAura} 0%, transparent 50%)`,
-                                animation: 'pulse 4.6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                animation: isUltraLowDetail ? 'none' : `pulse ${isLowDetail ? 6.2 : 4.6}s cubic-bezier(0.4, 0, 0.6, 1) infinite`,
+                                opacity: isUltraLowDetail ? 0.35 : isLowDetail ? 0.62 : 1,
                                 zIndex: 1
                             }}></div>
 
                             {/* Animated Energy Waves - Red - Slower */}
                             <div className="absolute inset-0" style={{
                                 background: `radial-gradient(circle at ${rightAuraCenter}, ${rightSideAura} 0%, transparent 50%)`,
-                                animation: 'pulse 4.6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                animation: isUltraLowDetail ? 'none' : `pulse ${isLowDetail ? 6.2 : 4.6}s cubic-bezier(0.4, 0, 0.6, 1) infinite`,
                                 animationDelay: '0.25s',
+                                opacity: isUltraLowDetail ? 0.35 : isLowDetail ? 0.62 : 1,
                                 zIndex: 1
                             }}></div>
 
                             {/* Animated Energy Waves - Purple - Slower */}
-                            <div className="absolute inset-0" style={{
-                                background: `radial-gradient(circle at ${neutralAuraCenter}, rgba(150, 50, 255, 0.5) 0%, transparent 50%)`,
-                                animation: 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                                animationDelay: '1s',
-                                zIndex: 1
-                            }}></div>
+                            {!isUltraLowDetail && (
+                                <div className="absolute inset-0" style={{
+                                    background: `radial-gradient(circle at ${neutralAuraCenter}, rgba(150, 50, 255, ${isLowDetail ? 0.28 : 0.5}) 0%, transparent 50%)`,
+                                    animation: `pulse ${isLowDetail ? 7.6 : 6}s cubic-bezier(0.4, 0, 0.6, 1) infinite`,
+                                    animationDelay: '1s',
+                                    zIndex: 1
+                                }}></div>
+                            )}
                         </div>
 
                         {/* Content Container */}

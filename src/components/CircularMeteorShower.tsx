@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
+import { VisualDetailMode } from '../visualDetail';
 
 interface CircularMeteorShowerProps {
     className?: string;
+    detailMode?: VisualDetailMode;
 }
 
 interface OrbitStar {
@@ -17,7 +19,7 @@ interface OrbitStar {
 
 const TAU = Math.PI * 2;
 
-const CircularMeteorShower: React.FC<CircularMeteorShowerProps> = ({ className = '' }) => {
+const CircularMeteorShower: React.FC<CircularMeteorShowerProps> = ({ className = '', detailMode = 'normal' }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -33,18 +35,26 @@ const CircularMeteorShower: React.FC<CircularMeteorShowerProps> = ({ className =
         let width = 0;
         let height = 0;
         let dpr = 1;
+        const isLowDetail = detailMode === 'low';
+        const isUltraLowDetail = detailMode === 'ultra_low';
+        const qualityScale = isUltraLowDetail ? 0.4 : isLowDetail ? 0.65 : 1;
 
         const makeStar = (maxRadius: number): OrbitStar => {
             const r = Math.pow(Math.random(), 0.62) * maxRadius;
-            const isBright = Math.random() < 0.1;
+            const brightChance = isUltraLowDetail ? 0.03 : isLowDetail ? 0.06 : 0.1;
+            const isBright = Math.random() < brightChance;
             return {
                 radius: r,
                 angle: Math.random() * TAU,
-                speed: (0.00005 + (1 - r / maxRadius) * 0.00028 + Math.random() * 0.00009) * (isBright ? 1.8 : 1),
-                arcLength: (0.005 + Math.random() * 0.024) * (isBright ? 2.4 : 1),
-                width: (0.35 + Math.random() * 1.2) * (isBright ? 1.35 : 1),
-                alpha: 0.18 + Math.random() * (isBright ? 0.8 : 0.5),
-                hue: 190 + Math.random() * 55,
+                speed: (0.00005 + (1 - r / maxRadius) * 0.00028 + Math.random() * 0.00009)
+                    * (isBright ? 1.8 : 1)
+                    * (isUltraLowDetail ? 0.72 : isLowDetail ? 0.86 : 1),
+                arcLength: (0.02 + Math.random() * 0.065)
+                    * (isBright ? 2.1 : 1.25)
+                    * (isUltraLowDetail ? 0.58 : isLowDetail ? 0.78 : 1),
+                width: (0.35 + Math.random() * 1.2) * (isBright ? 1.35 : 1) * (isUltraLowDetail ? 0.78 : isLowDetail ? 0.9 : 1),
+                alpha: (0.18 + Math.random() * (isBright ? 0.8 : 0.5)) * (isUltraLowDetail ? 0.62 : isLowDetail ? 0.8 : 1),
+                hue: isUltraLowDetail ? 200 + Math.random() * 22 : isLowDetail ? 195 + Math.random() * 36 : 190 + Math.random() * 55,
                 twinkleOffset: Math.random() * TAU,
             };
         };
@@ -52,13 +62,14 @@ const CircularMeteorShower: React.FC<CircularMeteorShowerProps> = ({ className =
         const resize = () => {
             width = canvas.clientWidth;
             height = canvas.clientHeight;
-            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            dpr = Math.min(window.devicePixelRatio || 1, isUltraLowDetail ? 1 : isLowDetail ? 1.5 : 2);
             canvas.width = Math.floor(width * dpr);
             canvas.height = Math.floor(height * dpr);
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
             const maxRadius = Math.sqrt(width * width + height * height) * 0.6;
-            const starCount = width < 768 ? 320 : 560;
+            const starCountBase = width < 768 ? 320 : 560;
+            const starCount = Math.max(70, Math.floor(starCountBase * qualityScale));
             stars = Array.from({ length: starCount }, () => makeStar(maxRadius));
         };
 
@@ -67,12 +78,18 @@ const CircularMeteorShower: React.FC<CircularMeteorShowerProps> = ({ className =
             lastTime = now;
             const centerX = width * 0.52;
             const centerY = height * 0.56;
+            ctx.clearRect(0, 0, width, height);
 
-            const bg = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(width, height) * 0.9);
-            bg.addColorStop(0, 'rgba(10, 20, 45, 0.08)');
-            bg.addColorStop(0.5, 'rgba(5, 10, 28, 0.16)');
-            bg.addColorStop(1, 'rgba(1, 3, 10, 0.38)');
-            ctx.fillStyle = bg;
+            const leftAura = ctx.createRadialGradient(width * 0.1, height * 0.52, 0, width * 0.1, height * 0.52, width * 0.8);
+            leftAura.addColorStop(0, `rgba(40, 170, 255, ${0.16 * qualityScale})`);
+            leftAura.addColorStop(1, 'rgba(40, 170, 255, 0)');
+            ctx.fillStyle = leftAura;
+            ctx.fillRect(0, 0, width, height);
+
+            const rightAura = ctx.createRadialGradient(width * 0.9, height * 0.52, 0, width * 0.9, height * 0.52, width * 0.8);
+            rightAura.addColorStop(0, `rgba(255, 70, 115, ${0.16 * qualityScale})`);
+            rightAura.addColorStop(1, 'rgba(255, 70, 115, 0)');
+            ctx.fillStyle = rightAura;
             ctx.fillRect(0, 0, width, height);
 
             const pulse = now * 0.0013;
@@ -82,20 +99,20 @@ const CircularMeteorShower: React.FC<CircularMeteorShowerProps> = ({ className =
                 if (star.angle > TAU) star.angle -= TAU;
 
                 const twinkle = 0.45 + 0.55 * Math.sin(pulse + star.twinkleOffset);
-                const alpha = Math.max(0.18, star.alpha * twinkle * 1.2);
+                const alpha = Math.max(0.09, star.alpha * twinkle * (isUltraLowDetail ? 0.76 : isLowDetail ? 0.92 : 1.2));
                 const trailStart = star.angle - star.arcLength;
 
                 ctx.strokeStyle = `hsla(${star.hue}, 100%, 86%, ${alpha})`;
                 ctx.lineCap = 'round';
-                ctx.lineWidth = star.width * 1.25;
+                ctx.lineWidth = star.width * (isUltraLowDetail ? 0.95 : isLowDetail ? 1.05 : 1.25);
                 ctx.beginPath();
                 ctx.arc(centerX, centerY, star.radius, trailStart, star.angle, false);
                 ctx.stroke();
             }
 
             const coreGlow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(width, height) * 0.25);
-            coreGlow.addColorStop(0, 'rgba(163, 219, 255, 0.32)');
-            coreGlow.addColorStop(0.3, 'rgba(97, 180, 255, 0.08)');
+            coreGlow.addColorStop(0, `rgba(163, 219, 255, ${0.32 * qualityScale})`);
+            coreGlow.addColorStop(0.3, `rgba(97, 180, 255, ${0.08 * qualityScale})`);
             coreGlow.addColorStop(1, 'rgba(97, 180, 255, 0)');
             ctx.fillStyle = coreGlow;
             ctx.beginPath();
@@ -113,7 +130,7 @@ const CircularMeteorShower: React.FC<CircularMeteorShowerProps> = ({ className =
             window.removeEventListener('resize', resize);
             window.cancelAnimationFrame(rafId);
         };
-    }, []);
+    }, [detailMode]);
 
     return <canvas ref={canvasRef} className={`absolute inset-0 block w-full h-full pointer-events-none ${className}`.trim()} />;
 };
