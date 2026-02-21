@@ -1,11 +1,12 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
-import { GameState, UnitType } from '../types';
+import { GameState, UnitType, PlayerID } from '../types';
 import { EVOLUTION_CONFIG } from '../constants';
 import { getUnitTypeAbbr, getUnitIcon } from '../gameHelpers';
 import { Dna, X, Check } from '../icons';
 
 interface EvolutionTreeProps {
     gameState: GameState;
+    playerId: PlayerID;
     onClose: () => void;
     t: (key: string, params?: any) => string;
 }
@@ -62,10 +63,10 @@ const FlippedCardDetail: React.FC<FlippedCardDetailProps> = ({ text, textClassNa
     );
 };
 
-const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, onClose, t }) => {
+const EvolutionTree: React.FC<EvolutionTreeProps> = ({ gameState, playerId, onClose, t }) => {
     const [flippedCardId, setFlippedCardId] = useState<string | null>(null);
 
-    const p = gameState.players[gameState.currentPlayer];
+    const p = gameState.players[playerId];
     const stats = p.questStats;
     const levels = p.evolutionLevels;
 

@@ -50,7 +50,7 @@ The unique twist? Mines are not just obstacles — they are your weapons.`,
         contentEn: `Each player controls a squad of 5 specialized units:
 
 👑 General — ★CORE UNIT★ Can attack & carry flag. If killed, YOU LOSE!
-👁️ Sweeper — Scans for hidden mines (3×3 area)
+👁️ Sweeper — Scans for hidden mines (1×1 area)
 🏃 Ranger — Fast movement, can pick up & move mines
 💣 Maker — Places various special mines
 🛡️ Defuser — Tank with 50% mine damage reduction, can disarm
@@ -59,7 +59,7 @@ Protect your General at all costs!`,
         contentZh: `每位玩家控制由 5 種特化職業組成的小隊：
 
 👑 將軍 — ★核心單位★ 能攻擊與搬旗。死亡 = 立即敗北！
-👁️ 掃雷者 — 掃描隱藏地雷 (3×3 範圍)
+👁️ 掃雷者 — 掃描隱藏地雷 (1×1 範圍)
 🏃 遊俠 — 高機動、可撿放地雷
 💣 製雷者 — 放置各類特殊地雷
 🛡️ 解雷者 — 坦克型、50%地雷減傷、可拆除
@@ -122,7 +122,7 @@ Place up to 5 mines on the board. Use them to control territory!`,
         titleZh: '地雷偵測',
         contentEn: `Enemy mines are hidden! Use your Sweeper to detect them:
 
-🔍 Basic Scan — Reveals 3×3 area around Sweeper
+🔍 Basic Scan — Reveals 1×1 area
 📡 Sensor Scan (Evolution) — Shows mine COUNT in target 3×3 area
     (Classic Minesweeper style — you see the number, not positions!)
 🏗️ Detection Tower (Evolution) — Permanent 3×3 scanning zone
@@ -130,7 +130,7 @@ Place up to 5 mines on the board. Use them to control territory!`,
 Information is power. Scout before you march!`,
         contentZh: `敵方地雷是隱藏的！使用掃雷者來偵測：
 
-🔍 基礎掃描 — 揭露掃雷者周圍 3×3 區域
+🔍 基礎掃描 — 揭露 1×1 區域
 📡 數值共振 (進化) — 顯示目標 3×3 區域的地雷「數量」
     (經典踩地雷風格 — 你看到數字，而非確切位置！)
 🏗️ 偵測塔 (進化) — 永久 3×3 掃描區域

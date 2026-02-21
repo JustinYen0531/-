@@ -95,6 +95,7 @@ export interface ReadyPayload {
 export interface StateSyncPayload {
     reason: string;
     state: unknown;
+    allowDevTools?: boolean;
 }
 
 export const buildActionPacket = <TPayload>(

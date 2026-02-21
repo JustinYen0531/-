@@ -15,6 +15,7 @@ interface SandboxPanelProps {
     onSandboxDragStart: (e: React.MouseEvent) => void;
     targetMode: string | null;
     setTargetMode: any; // Using any to avoid duplicating the huge union type from App.tsx
+    onStateMutated?: (reason: string) => void;
 }
 
 const SandboxPanel: React.FC<SandboxPanelProps> = ({
@@ -27,8 +28,13 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
     sandboxPos,
     onSandboxDragStart,
     targetMode,
-    setTargetMode
+    setTargetMode,
+    onStateMutated
 }) => {
+    const notifyStateMutated = (reason: string) => {
+        onStateMutated?.(reason);
+    };
+
     // Helper functions
     const getUnit = (id: string, state: GameState = gameState) => {
         const p1Unit = state.players[PlayerID.P1].units.find(u => u.id === id);
@@ -41,19 +47,23 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
             ...prev,
             players: {
                 ...prev.players,
-                [prev.currentPlayer]: {
-                    ...prev.players[prev.currentPlayer],
-                    energy: prev.players[prev.currentPlayer].energy + 100
+                [PlayerID.P1]: {
+                    ...prev.players[PlayerID.P1],
+                    energy: prev.players[PlayerID.P1].energy + 100
+                },
+                [PlayerID.P2]: {
+                    ...prev.players[PlayerID.P2],
+                    energy: prev.players[PlayerID.P2].energy + 100
                 }
             }
         }));
+        notifyStateMutated('add_energy');
     };
 
     const evolveCurrentUnit = (branch: 'a' | 'b', variant?: 1 | 2) => {
         if (!gameState.selectedUnitId) return;
         setGameState(prev => {
-            const currentPlayer = prev.players[prev.currentPlayer];
-            const unit = currentPlayer.units.find(u => u.id === prev.selectedUnitId);
+            const unit = getUnit(prev.selectedUnitId || '', prev);
             if (!unit) return prev;
 
             const p = prev.players[unit.owner];
@@ -77,6 +87,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 logs: [{ turn: prev.turnCount, messageKey: 'log_evolved', params: { unit: getUnitNameKey(unit.type), branch: branch.toUpperCase() + (variant ? `-${variant}` : ''), level: newLevels[unit.type][branch] }, type: 'evolution' as const }, ...prev.logs]
             };
         });
+        notifyStateMutated('evolve_selected');
     };
 
     const toggleGodMode = () => {
@@ -85,10 +96,12 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
             isGodMode: !prev.isGodMode,
             logs: [{ turn: prev.turnCount, messageKey: !prev.isGodMode ? 'God Mode Enabled' : 'God Mode Disabled', params: {}, type: 'info' as const }, ...prev.logs]
         }));
+        notifyStateMutated('toggle_god_mode');
     };
 
     const skipToNextRound = () => {
         startNewRound(gameState);
+        notifyStateMutated('new_round');
     };
 
     const healAll = () => {
@@ -99,16 +112,20 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 [PlayerID.P1]: {
                     ...prev.players[PlayerID.P1],
                     units: prev.players[PlayerID.P1].units.map(u => ({ ...u, hp: u.maxHp, isDead: false, respawnTimer: 0 }))
+                },
+                [PlayerID.P2]: {
+                    ...prev.players[PlayerID.P2],
+                    units: prev.players[PlayerID.P2].units.map(u => ({ ...u, hp: u.maxHp, isDead: false, respawnTimer: 0 }))
                 }
             }
         }));
+        notifyStateMutated('heal_all');
     };
 
     const updateUnitStat = (stat: 'hp' | 'maxHp', change: number) => {
         if (!gameState.selectedUnitId) return;
         setGameState(prev => {
-            const currentPlayer = prev.players[prev.currentPlayer];
-            const unit = currentPlayer.units.find(u => u.id === prev.selectedUnitId);
+            const unit = getUnit(prev.selectedUnitId || '', prev);
             if (!unit) return prev;
 
             const p = prev.players[unit.owner];
@@ -135,6 +152,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }
             };
         });
+        notifyStateMutated(`update_${stat}`);
     };
 
     return (
@@ -207,7 +225,10 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                         {language === 'zh_tw' ? '跳過回合' : 'New Round'}
                     </button>
                     <button
-                        onClick={() => setGameState(prev => ({ ...prev, isSandboxTimerPaused: !prev.isSandboxTimerPaused }))}
+                        onClick={() => {
+                            setGameState(prev => ({ ...prev, isSandboxTimerPaused: !prev.isSandboxTimerPaused }));
+                            notifyStateMutated('toggle_timer_pause');
+                        }}
                         className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-black text-xs transition-all transform active:scale-95 ${gameState.isSandboxTimerPaused ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-orange-600 hover:bg-orange-500 text-white'}`}
                     >
                         {gameState.isSandboxTimerPaused ? <Play size={14} /> : <Pause size={14} />}

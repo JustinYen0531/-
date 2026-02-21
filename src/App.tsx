@@ -2319,15 +2319,21 @@ export default function App() {
             turn: state.turnCount,
             payload: {
                 reason,
-                state: toSerializableGameState(state)
+                state: toSerializableGameState(state),
+                allowDevTools: allowDevToolsInPvp
             }
         });
-    }, [isNetworkConnected, roomId, sendActionPacket]);
+    }, [allowDevToolsInPvp, isNetworkConnected, roomId, sendActionPacket]);
 
     const sendGameStateDeferred = useCallback((reason: string) => {
+        // Defer long enough for React state + gameStateRef to settle before snapshotting.
         setTimeout(() => {
             sendGameState(reason);
-        }, 0);
+        }, 24);
+        // One safety re-sync for racey turn/phase transitions (e.g. skip -> new round).
+        setTimeout(() => {
+            sendGameState(`${reason}_resync`);
+        }, 72);
     }, [sendGameState]);
 
     useEffect(() => {
@@ -2668,9 +2674,9 @@ export default function App() {
         }
 
         if (lastIncomingPacket.type === 'START_GAME') {
+            const payload = lastIncomingPacket.payload as StartGamePayload;
+            setAllowDevToolsInPvp(payload.allowDevTools === true);
             if (!isHost && view === 'lobby') {
-                const payload = lastIncomingPacket.payload as StartGamePayload;
-                setAllowDevToolsInPvp(payload.allowDevTools === true);
                 const syncedInitialState = payload.initialState ? fromSerializableGameState(payload.initialState) : null;
                 handleStartGame('pvp', syncedInitialState || undefined);
             }
@@ -2696,6 +2702,9 @@ export default function App() {
             if (type === 'STATE_SYNC') {
                 if (!isStateSyncPayload(payload)) {
                     return;
+                }
+                if (typeof payload.allowDevTools === 'boolean') {
+                    setAllowDevToolsInPvp(payload.allowDevTools);
                 }
                 const syncedState = fromSerializableGameState(payload.state);
                 if (!syncedState) {
@@ -2811,6 +2820,9 @@ export default function App() {
                     return;
                 }
                 executeMoveAction(payload.unitId, payload.r, payload.c, payload.cost, 'remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_move_applied');
+                }
                 return;
             }
 
@@ -2824,6 +2836,9 @@ export default function App() {
                     return;
                 }
                 executeAttackAction(payload.attackerId, target, 'remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_attack_applied');
+                }
                 return;
             }
 
@@ -2836,6 +2851,9 @@ export default function App() {
                     return;
                 }
                 executeScanAction(unit, payload.r, payload.c, 'remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_scan_applied');
+                }
                 return;
             }
 
@@ -2848,6 +2866,9 @@ export default function App() {
                     return;
                 }
                 executeSensorScanAction(payload.unitId, payload.r, payload.c, 'remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_sensor_scan_applied');
+                }
                 return;
             }
 
@@ -2860,6 +2881,9 @@ export default function App() {
                     return;
                 }
                 executePlaceMineAction(unit, payload.r, payload.c, payload.mineType, 'remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_place_mine_applied');
+                }
                 return;
             }
 
@@ -2868,6 +2892,9 @@ export default function App() {
                     return;
                 }
                 executeEvolveAction(payload.unitType, payload.branch, payload.variant, 'remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_evolve_applied');
+                }
                 return;
             }
 
@@ -2876,11 +2903,17 @@ export default function App() {
                     return;
                 }
                 executeEndTurnAction(payload.actedUnitId, 'remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_end_turn_applied');
+                }
                 return;
             }
 
             if (type === 'SKIP_TURN') {
                 executeSkipTurnAction('remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_skip_turn_applied');
+                }
             }
         } finally {
             applyingRemoteActionRef.current = false;
@@ -3674,6 +3707,7 @@ export default function App() {
                             onSandboxDragStart={onSandboxDragStart}
                             targetMode={targetMode}
                             setTargetMode={setTargetMode}
+                            onStateMutated={(reason) => sendGameStateDeferred(`sandbox_${reason}`)}
                         />
                     )}
 

@@ -148,6 +148,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             {showEvolutionTree && (
                 <EvolutionTree
                     gameState={gameState}
+                    playerId={panelPlayerId}
                     onClose={() => setShowEvolutionTree(false)}
                     t={t}
                 />
