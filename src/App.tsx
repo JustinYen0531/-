@@ -8,7 +8,8 @@ import {
 import {
     UNIT_STATS, ENERGY_CAP_RATIO, MINE_DAMAGE,
     TURN_TIMER, THINKING_TIMER,
-    PLACEMENT_MINE_LIMIT
+    PLACEMENT_MINE_LIMIT,
+    GRID_ROWS, GRID_COLS
 } from './constants';
 
 import {
@@ -73,14 +74,27 @@ const isMineTypeValue = (value: unknown): value is MineType => (
     typeof value === 'string' && MINE_TYPES.includes(value as MineType)
 );
 
+const isInteger = (value: unknown): value is number => (
+    typeof value === 'number' && Number.isInteger(value)
+);
+
+const isBoardCoordinate = (r: unknown, c: unknown): boolean => (
+    isInteger(r) &&
+    isInteger(c) &&
+    r >= 0 &&
+    r < GRID_ROWS &&
+    c >= 0 &&
+    c < GRID_COLS
+);
+
 const isMovePayload = (payload: unknown): payload is MovePayload => {
     if (!payload || typeof payload !== 'object') return false;
     const candidate = payload as Partial<MovePayload>;
     return (
         typeof candidate.unitId === 'string' &&
-        typeof candidate.r === 'number' &&
-        typeof candidate.c === 'number' &&
-        typeof candidate.cost === 'number'
+        isBoardCoordinate(candidate.r, candidate.c) &&
+        typeof candidate.cost === 'number' &&
+        Number.isFinite(candidate.cost)
     );
 };
 
@@ -98,8 +112,7 @@ const isScanPayload = (payload: unknown): payload is ScanPayload => {
     const candidate = payload as Partial<ScanPayload>;
     return (
         typeof candidate.unitId === 'string' &&
-        typeof candidate.r === 'number' &&
-        typeof candidate.c === 'number'
+        isBoardCoordinate(candidate.r, candidate.c)
     );
 };
 
@@ -108,8 +121,7 @@ const isSensorScanPayload = (payload: unknown): payload is SensorScanPayload => 
     const candidate = payload as Partial<SensorScanPayload>;
     return (
         typeof candidate.unitId === 'string' &&
-        typeof candidate.r === 'number' &&
-        typeof candidate.c === 'number'
+        isBoardCoordinate(candidate.r, candidate.c)
     );
 };
 
@@ -118,8 +130,7 @@ const isPlaceMinePayload = (payload: unknown): payload is PlaceMinePayload => {
     const candidate = payload as Partial<PlaceMinePayload>;
     return (
         typeof candidate.unitId === 'string' &&
-        typeof candidate.r === 'number' &&
-        typeof candidate.c === 'number' &&
+        isBoardCoordinate(candidate.r, candidate.c) &&
         isMineTypeValue(candidate.mineType)
     );
 };
@@ -2888,6 +2899,12 @@ export default function App() {
         }
 
         const expectedRemoteOwner = isHost ? PlayerID.P2 : PlayerID.P1;
+        const isValidRemoteActionWindow = () => (
+            state.phase === 'action' &&
+            state.currentPlayer === expectedRemoteOwner &&
+            state.turnCount === lastIncomingPacket.turn &&
+            !state.gameOver
+        );
 
         applyingRemoteActionRef.current = true;
         try {
@@ -3007,6 +3024,9 @@ export default function App() {
             }
 
             if (type === 'MOVE') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
                 if (!isMovePayload(payload)) {
                     return;
                 }
@@ -3022,6 +3042,9 @@ export default function App() {
             }
 
             if (type === 'ATTACK') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
                 if (!isAttackPayload(payload)) {
                     return;
                 }
@@ -3038,6 +3061,9 @@ export default function App() {
             }
 
             if (type === 'SCAN') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
                 if (!isScanPayload(payload)) {
                     return;
                 }
@@ -3053,6 +3079,9 @@ export default function App() {
             }
 
             if (type === 'SENSOR_SCAN') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
                 if (!isSensorScanPayload(payload)) {
                     return;
                 }
@@ -3068,6 +3097,9 @@ export default function App() {
             }
 
             if (type === 'PLACE_MINE') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
                 if (!isPlaceMinePayload(payload)) {
                     return;
                 }
@@ -3083,6 +3115,9 @@ export default function App() {
             }
 
             if (type === 'EVOLVE') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
                 if (!isEvolvePayload(payload)) {
                     return;
                 }
@@ -3099,6 +3134,9 @@ export default function App() {
             }
 
             if (type === 'END_TURN') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
                 if (!isEndTurnPayload(payload)) {
                     return;
                 }
@@ -3110,6 +3148,9 @@ export default function App() {
             }
 
             if (type === 'SKIP_TURN') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
                 executeSkipTurnAction('remote');
                 if (isHost) {
                     sendGameStateDeferred('remote_skip_turn_applied');

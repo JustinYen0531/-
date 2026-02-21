@@ -214,6 +214,7 @@ const GameModals: React.FC<GameModalsProps> = ({
     const [networkUiError, setNetworkUiError] = useState<string | null>(null);
     const [showPveDifficultyPanel, setShowPveDifficultyPanel] = useState(false);
     const [showDeveloperLogModal, setShowDeveloperLogModal] = useState(false);
+    const [delayedConnectionError, setDelayedConnectionError] = useState<string | null>(null);
     const helloSentKeyRef = useRef('');
 
     const {
@@ -281,6 +282,20 @@ const GameModals: React.FC<GameModalsProps> = ({
     const latestDeveloperLog = derivedLogs[0] ?? null;
     const isLowDetail = detailMode === 'low';
     const isUltraLowDetail = detailMode === 'ultra_low';
+    const visibleConnectionError = networkUiError || delayedConnectionError;
+
+    useEffect(() => {
+        setDelayedConnectionError(null);
+        if (!connectionError || isConnected || connectionStatus === 'connected') {
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            setDelayedConnectionError(connectionError);
+        }, 2000);
+
+        return () => window.clearTimeout(timer);
+    }, [connectionError, isConnected, connectionStatus]);
 
     useEffect(() => {
         if (joinMode !== 'create') {
@@ -550,7 +565,7 @@ const GameModals: React.FC<GameModalsProps> = ({
                             <div className="flex flex-wrap items-stretch justify-center gap-3">
                                 <button
                                     onClick={() => setShowPveDifficultyPanel(prev => !prev)}
-                                    className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
+                                    className="min-w-[170px] px-8 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 rounded-xl font-black text-lg shadow-2xl shadow-violet-500/50 transform scale-[1.08] hover:scale-[1.12] transition-all duration-200 flex items-center justify-center gap-3 border-2 border-violet-300"
                                 >
                                     <Cpu size={22} />
                                     {t('pve_mode')}
@@ -756,9 +771,9 @@ const GameModals: React.FC<GameModalsProps> = ({
                                         <div className="break-all">{uiText.remotePeer}: {remotePeerId || '-'}</div>
                                     </div>
 
-                                    {(networkUiError || connectionError) && (
+                                    {visibleConnectionError && (
                                         <div className="rounded border border-red-500/50 bg-red-950/40 p-2 text-xs text-red-200">
-                                            {networkUiError || connectionError}
+                                            {visibleConnectionError}
                                         </div>
                                     )}
 
