@@ -331,7 +331,7 @@ const GameField: React.FC<GameFieldProps> = ({
                                                     <path d="M31 16C31 23.5 16 39.5 16 39.5C16 39.5 1 23.5 1 16C1 7.71573 7.71573 1 16 1C24.2843 1 31 7.71573 31 16Z" stroke="#22d3ee" strokeWidth="2" />
                                                 </svg>
                                                 <div className="absolute top-0 left-0 w-[32px] h-[42px] flex items-center justify-center">
-                                                    <span className="text-cyan-300 font-black text-xs leading-none -mt-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]">
+                                                    <span className="text-cyan-300 font-black text-[18px] leading-none -mt-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]">
                                                         {countResult.count}
                                                     </span>
                                                 </div>
