@@ -317,14 +317,7 @@ const GameField: React.FC<GameFieldProps> = ({
                                         <div className="group/scanpin relative mb-6 animate-float-pin flex flex-col items-center opacity-100">
                                             <div className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] pointer-events-none">
                                                 <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <defs>
-                                                        <linearGradient id={`scan-pin-fill-${r}-${c}`} x1="16" y1="0" x2="16" y2="42" gradientUnits="userSpaceOnUse">
-                                                            <stop offset="0%" stopColor="#1e293b" stopOpacity="0.62" />
-                                                            <stop offset="55%" stopColor="#1e293b" stopOpacity="0.84" />
-                                                            <stop offset="100%" stopColor="#1e293b" stopOpacity="0.98" />
-                                                        </linearGradient>
-                                                    </defs>
-                                                    <path d="M32 16C32 24.8366 16 42 16 42C16 42 0 24.8366 0 16C0 7.16344 7.16344 0 16 0C24.8366 0 32 7.16344 32 16Z" fill={`url(#scan-pin-fill-${r}-${c})`} />
+                                                    <path d="M32 16C32 24.8366 16 42 16 42C16 42 0 24.8366 0 16C0 7.16344 7.16344 0 16 0C24.8366 0 32 7.16344 32 16Z" fill="#000000" />
                                                     <path d="M31 16C31 23.5 16 39.5 16 39.5C16 39.5 1 23.5 1 16C1 7.71573 7.71573 1 16 1C24.2843 1 31 7.71573 31 16Z" stroke="#22d3ee" strokeWidth="2.2" />
                                                 </svg>
                                                 <div className="absolute top-0 left-0 w-[32px] h-[42px] flex items-center justify-center">
