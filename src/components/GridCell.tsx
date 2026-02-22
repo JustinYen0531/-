@@ -634,7 +634,7 @@ const GridCell: React.FC<GridCellProps> = ({
     if (building.type === 'tower') {
       const towerOwnerColor = building.owner === PlayerID.P1 ? '#22d3ee' : '#f87171';
       return (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[45] overflow-visible">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[145] overflow-visible">
           {/* Effect Range Indicator */}
           <div
             className={`building-range-indicator tower-range-indicator ${isAreaFocused(cell.r, cell.c, '3x3') ? 'range-focused' : ''}`}
@@ -693,7 +693,7 @@ const GridCell: React.FC<GridCellProps> = ({
       const hubLvl2 = building.level >= 2;
       const hubLvl3 = building.level >= 3;
       return (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[45] overflow-visible">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[145] overflow-visible">
           {/* Hub Boundary: Stepped Manhattan Distance 2 Diamond */}
           <svg
             className="absolute pointer-events-none overflow-visible"
@@ -773,7 +773,7 @@ const GridCell: React.FC<GridCellProps> = ({
 
 
       return (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[45] overflow-visible">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[145] overflow-visible">
           {/* Effect Range Indicator */}
           {isLvl3 ? (
             <svg
