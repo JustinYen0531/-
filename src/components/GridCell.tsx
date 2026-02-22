@@ -359,7 +359,6 @@ const GridCell: React.FC<GridCellProps> = ({
   // Determine if THIS cell is a center of a focused building or domain
   // We need this to lift the center cell's Z-Index so its child range indicator overlays neighbors
   const isThisCellFocusedCenter = (() => {
-    if (isSelected) return true;
     if (!hoveredPos) return false;
 
     const mouseR = hoveredPos.r;
@@ -450,9 +449,6 @@ const GridCell: React.FC<GridCellProps> = ({
   // so we no longer apply per-cell borders here for better visual clarity.
 
   const isAreaFocused = (targetR: number, targetC: number, rangeType: '3x3' | '5x5' | 'manhattan2'): boolean => {
-    // If the building/unit is selected, focus its range
-    if (isSelected && cell.r === targetR && cell.c === targetC) return true;
-
     if (!hoveredPos) return false;
 
     // Check if the current mouse position (hoveredPos) is within the domain of the target
