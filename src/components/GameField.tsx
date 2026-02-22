@@ -200,6 +200,15 @@ const GameField: React.FC<GameFieldProps> = ({
                         ) || [];
                         const countResult = [...cellSensorResults].reverse().find(sr => (sr.kind ?? 'count') === 'count');
                         const markResult = [...cellSensorResults].reverse().find(sr => sr.kind === 'mark');
+                        const isBlueCountOwner = (countResult?.owner ?? viewerPlayer) === PlayerID.P1;
+                        const pinStroke = isBlueCountOwner ? '#22d3ee' : '#f87171';
+                        const pinTextClass = isBlueCountOwner ? 'text-cyan-100' : 'text-red-100';
+                        const pinTextGlow = isBlueCountOwner
+                            ? 'drop-shadow-[0_0_4px_rgba(34,211,238,0.95)]'
+                            : 'drop-shadow-[0_0_4px_rgba(248,113,113,0.95)]';
+                        const pinCloseClass = isBlueCountOwner
+                            ? 'bg-slate-900/85 border-cyan-200/80 text-cyan-100 hover:bg-slate-800'
+                            : 'bg-slate-900/85 border-red-200/80 text-red-100 hover:bg-slate-800';
 
                         let cellIsValidMove = false;
                         if (selectedUnit && targetMode === 'move') {
@@ -318,10 +327,10 @@ const GameField: React.FC<GameFieldProps> = ({
                                             <div className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] pointer-events-none">
                                                 <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                     <path d="M32 16C32 24.8366 16 42 16 42C16 42 0 24.8366 0 16C0 7.16344 7.16344 0 16 0C24.8366 0 32 7.16344 32 16Z" fill="#000000" />
-                                                    <path d="M31 16C31 23.5 16 39.5 16 39.5C16 39.5 1 23.5 1 16C1 7.71573 7.71573 1 16 1C24.2843 1 31 7.71573 31 16Z" stroke="#22d3ee" strokeWidth="2.2" />
+                                                    <path d="M31 16C31 23.5 16 39.5 16 39.5C16 39.5 1 23.5 1 16C1 7.71573 7.71573 1 16 1C24.2843 1 31 7.71573 31 16Z" stroke={pinStroke} strokeWidth="2.2" />
                                                 </svg>
                                                 <div className="absolute top-0 left-0 w-[32px] h-[42px] flex items-center justify-center">
-                                                    <span className="text-cyan-100 font-black text-[18px] leading-none -mt-2 drop-shadow-[0_0_4px_rgba(34,211,238,0.95)]">
+                                                    <span className={`${pinTextClass} font-black text-[18px] leading-none -mt-2 ${pinTextGlow}`}>
                                                         {countResult.count}
                                                     </span>
                                                 </div>
@@ -329,7 +338,7 @@ const GameField: React.FC<GameFieldProps> = ({
                                             {onDismissCount && (
                                                 <button
                                                     type="button"
-                                                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-900/85 border border-cyan-200/80 text-cyan-100 text-[10px] leading-none font-black flex items-center justify-center pointer-events-auto opacity-0 group-hover/scanpin:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 hover:bg-slate-800"
+                                                    className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border text-[10px] leading-none font-black flex items-center justify-center pointer-events-auto opacity-0 group-hover/scanpin:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 ${pinCloseClass}`}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onDismissCount(r, c, viewerPlayer);
