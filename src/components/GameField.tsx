@@ -313,7 +313,7 @@ const GameField: React.FC<GameFieldProps> = ({
                                         );
                                     })}
                                 {countResult && (
-                                    <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center">
+                                    <div className="absolute inset-0 z-[260] flex flex-col items-center justify-center">
                                         <div className="group/scanpin relative mb-6 animate-float-pin flex flex-col items-center opacity-100">
                                             <div className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] pointer-events-none">
                                                 <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">
