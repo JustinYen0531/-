@@ -352,10 +352,13 @@ const fromSerializableGameState = (input: unknown): GameState | null => {
 const mergePlacementMines = (localMines: Mine[], syncedMines: Mine[]): Mine[] => {
     const merged = [...syncedMines];
     const seenIds = new Set(merged.map(m => m.id));
+    const seenCells = new Set(merged.map(m => `${m.owner}:${m.r},${m.c}`));
     for (const mine of localMines) {
-        if (seenIds.has(mine.id)) continue;
+        const cellKey = `${mine.owner}:${mine.r},${mine.c}`;
+        if (seenIds.has(mine.id) || seenCells.has(cellKey)) continue;
         merged.push(mine);
         seenIds.add(mine.id);
+        seenCells.add(cellKey);
     }
     return merged;
 };
@@ -3677,7 +3680,7 @@ export default function App() {
                     placedSuccessfully = true;
                     return {
                         ...prev,
-                        mines: [...prev.mines, { id: `pm-${Date.now()}`, owner: actingPlayerId, type: MineType.NORMAL, r, c, revealedTo: [actingPlayerId] }],
+                        mines: [...prev.mines, { id: `pm-${actingPlayerId}-${r}-${c}`, owner: actingPlayerId, type: MineType.NORMAL, r, c, revealedTo: [actingPlayerId] }],
                         players: {
                             ...prev.players,
                             [actingPlayerId]: { ...p, placementMinesPlaced: p.placementMinesPlaced + 1 }

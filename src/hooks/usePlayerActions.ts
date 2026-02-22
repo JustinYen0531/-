@@ -1625,15 +1625,27 @@ export const usePlayerActions = ({
             return;
         }
 
-        const cost = swpB >= 3 ? 4 : 5;
-        if (!checkEnergyCap(unit, player, cost)) return;
-
-        const finalCost = cost;
-        if (unit.owner === state.currentPlayer && player.energy < finalCost) return;
+        const baseCost = swpB >= 3 ? 4 : 5;
+        const finalCost = getEnemyTerritoryEnergyCost(unit, baseCost);
+        if (player.energy < finalCost) {
+            addLog('log_low_energy', 'info', { cost: finalCost });
+            return;
+        }
+        if (!checkEnergyCap(unit, player, finalCost)) return;
 
         const enemyId = unit.owner === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
 
         setGameState(prev => {
+            const nextPlayerState = prev.players[unit.owner];
+            const nextUnitState = nextPlayerState.units.find(u => u.id === unitId);
+            if (!nextUnitState) return prev;
+
+            const nextSwpB = nextPlayerState.evolutionLevels[UnitType.MINESWEEPER].b;
+            const nextBaseCost = nextSwpB >= 3 ? 4 : 5;
+            const nextFinalCost = getEnemyTerritoryEnergyCost(nextUnitState, nextBaseCost);
+            if (nextPlayerState.energy < nextFinalCost) return prev;
+            if (!engineCheckEnergyCap(nextUnitState, nextFinalCost)) return prev;
+
             let nextMines = [...prev.mines];
             let nextSensorResults = [...prev.sensorResults];
 
@@ -1680,10 +1692,10 @@ export const usePlayerActions = ({
             }
 
             const nextPlayer = {
-                ...prev.players[unit.owner],
-                energy: prev.players[unit.owner].energy - finalCost,
-                units: prev.players[unit.owner].units.map(u =>
-                    u.id === unitId ? { ...u, energyUsedThisTurn: u.energyUsedThisTurn + finalCost } : u
+                ...nextPlayerState,
+                energy: nextPlayerState.energy - nextFinalCost,
+                units: nextPlayerState.units.map(u =>
+                    u.id === unitId ? { ...u, energyUsedThisTurn: u.energyUsedThisTurn + nextFinalCost } : u
                 )
             };
 
