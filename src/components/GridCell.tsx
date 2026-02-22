@@ -260,6 +260,10 @@ const GridCell: React.FC<GridCellProps> = ({
       if (manhattanDist <= attackRange && isCardinalDirection) {
         isInActionScope = true;
         actionRangeColor = 'cell-range-red';
+        // Strong highlight if there's an enemy unit to attack
+        if (unit && unit.owner !== currentPlayer && !unit.isDead) {
+          isInActionRange = true;
+        }
       }
     } else if (targetMode === 'place_mine') {
       const factories = buildings.filter(b => b.owner === selectedUnit.owner && b.type === 'factory');
@@ -986,7 +990,7 @@ const GridCell: React.FC<GridCellProps> = ({
               <span
                 className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-slate-800 border border-red-300 text-red-200 flex items-center justify-center text-[8px] font-bold leading-none opacity-0 group-hover/miss:opacity-100 transition-opacity duration-150 hover:bg-red-700 hover:border-white hover:text-white shadow-md"
               >
-                ??
+                X
               </span>
             )}
           </div>
@@ -1625,55 +1629,10 @@ const GridCell: React.FC<GridCellProps> = ({
       )}
 
       {foregroundHighlightClass && (
-        <div className={`absolute inset-0 rounded-sm pointer-events-none z-[165] ${foregroundHighlightClass}`} />
+        <div className={`absolute inset-0 rounded-sm pointer-events-none z-[155] ${foregroundHighlightClass}`} />
       )}
     </div >
   );
 };
 
-export default React.memo(GridCell, (prevProps, nextProps) => {
-  // --- Performance Strategy ---
-  // A cell only needs to re-render when hoveredPos changes IF it has a building or is a flag position.
-  // This prevents 576 cells from re-rendering on every mouse move.
-  const hasRangePrev = prevProps.building || (prevProps.p1FlagLoc.r === prevProps.cell.r && prevProps.p1FlagLoc.c === prevProps.cell.c) || (prevProps.p2FlagLoc.r === prevProps.cell.r && prevProps.p2FlagLoc.c === prevProps.cell.c);
-  const hasRangeNext = nextProps.building || (nextProps.p1FlagLoc.r === nextProps.cell.r && nextProps.p1FlagLoc.c === nextProps.cell.c) || (nextProps.p2FlagLoc.r === nextProps.cell.r && nextProps.p2FlagLoc.c === nextProps.cell.c);
-
-  if (prevProps.hoveredPos !== nextProps.hoveredPos) {
-    // If either or both cells have ranges, they must re-render to potentially update their highlights
-    if (hasRangePrev || hasRangeNext) return false;
-  }
-
-  // Check all other functional props
-  if (prevProps.selectedGeneralLevelA !== nextProps.selectedGeneralLevelA) return false;
-  if (prevProps.evolutionLevelA !== nextProps.evolutionLevelA) return false;
-  if (prevProps.evolutionLevelB !== nextProps.evolutionLevelB) return false;
-  if (prevProps.targetMode !== nextProps.targetMode) return false;
-  if (prevProps.phase !== nextProps.phase) return false;
-  if (prevProps.selectedUnit !== nextProps.selectedUnit) return false;
-  if (prevProps.isSelected !== nextProps.isSelected) return false;
-  if (prevProps.isValidMove !== nextProps.isValidMove) return false;
-  if (prevProps.isAttackTarget !== nextProps.isAttackTarget) return false;
-  if (prevProps.cell !== nextProps.cell) return false;
-  if (prevProps.unit !== nextProps.unit) return false;
-  if (prevProps.mine !== nextProps.mine) return false;
-  if (prevProps.building !== nextProps.building) return false;
-  if (prevProps.buildings !== nextProps.buildings) return false;
-  if (prevProps.p1FlagLoc !== nextProps.p1FlagLoc) return false;
-  if (prevProps.p2FlagLoc !== nextProps.p2FlagLoc) return false;
-  if (prevProps.scanMarkSuccess !== nextProps.scanMarkSuccess) return false;
-  if (prevProps.selectedUnitLevelB !== nextProps.selectedUnitLevelB) return false;
-  if (prevProps.p1GeneralVariantB !== nextProps.p1GeneralVariantB) return false;
-  if (prevProps.p2GeneralVariantB !== nextProps.p2GeneralVariantB) return false;
-  if (prevProps.evolutionVariantA !== nextProps.evolutionVariantA) return false;
-  if (prevProps.evolutionVariantB !== nextProps.evolutionVariantB) return false;
-  if (prevProps.p1GeneralLevelB !== nextProps.p1GeneralLevelB) return false;
-  if (prevProps.p2GeneralLevelB !== nextProps.p2GeneralLevelB) return false;
-  if (prevProps.isSmoked !== nextProps.isSmoked) return false;
-  if (prevProps.smokeOwner !== nextProps.smokeOwner) return false;
-  if (prevProps.forceShowMines !== nextProps.forceShowMines) return false;
-  if (prevProps.isUnitStealthed !== nextProps.isUnitStealthed) return false;
-  if (prevProps.evolutionFxNonce !== nextProps.evolutionFxNonce) return false;
-  if (prevProps.evolutionFxBranch !== nextProps.evolutionFxBranch) return false;
-  if (prevProps.currentPlayer !== nextProps.currentPlayer) return false;
-  return true;
-});
+export default React.memo(GridCell);

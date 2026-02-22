@@ -123,6 +123,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         setTargetMode(mode);
     };
 
+    const getLiveUnit = (id: string | null): Unit | null => {
+        if (!id) return null;
+        const p1 = gameState.players[PlayerID.P1].units.find(u => u.id === id);
+        if (p1) return p1;
+        const p2 = gameState.players[PlayerID.P2].units.find(u => u.id === id);
+        if (p2) return p2;
+        return helpers.getUnit(id);
+    };
+
     // Calculate detailed income breakdown
     const interest = Math.min(Math.floor(player.energy / 10), MAX_INTEREST);
 
@@ -323,7 +332,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                             handleSetTargetMode('move');
                                                         }}
                                                         className={`w-[82px] h-[74px] rounded flex flex-col items-center justify-center gap-1 transition-all relative font-bold border-2 ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-500' : (() => {
-                                                            const u = helpers.getUnit(gameState.selectedUnitId);
+                                                            const u = getLiveUnit(gameState.selectedUnitId);
                                                             const isRB3 = u && u.type === UnitType.RANGER &&
                                                                 gameState.players[u.owner].evolutionLevels[UnitType.RANGER].b >= 3 &&
                                                                 gameState.players[u.owner].evolutionLevels[UnitType.RANGER].bVariant === 1;
@@ -338,16 +347,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                 : 'bg-emerald-900/40 hover:bg-emerald-800/60 border-emerald-800/50 text-emerald-100/70';
                                                         })()}`}
                                                     >
-                                                        <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('move', helpers.getUnit(gameState.selectedUnitId))}</div>
+                                                        <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('move', getLiveUnit(gameState.selectedUnitId))}</div>
                                                         {(() => {
-                                                            const u = helpers.getUnit(gameState.selectedUnitId);
+                                                            const u = getLiveUnit(gameState.selectedUnitId);
                                                             const isRB3 = u?.type === UnitType.RANGER &&
                                                                 gameState.players[u.owner].evolutionLevels[UnitType.RANGER].b >= 3 &&
                                                                 gameState.players[u.owner].evolutionLevels[UnitType.RANGER].bVariant === 1;
                                                             return isRB3 ? <Ghost size={28} /> : <SpeedyShoe size={34} />;
                                                         })()}
                                                         <span className="text-xs">{(() => {
-                                                            const u = helpers.getUnit(gameState.selectedUnitId);
+                                                            const u = getLiveUnit(gameState.selectedUnitId);
                                                             const isRB3 = u?.type === UnitType.RANGER &&
                                                                 gameState.players[u.owner].evolutionLevels[UnitType.RANGER].b >= 3 &&
                                                                 gameState.players[u.owner].evolutionLevels[UnitType.RANGER].bVariant === 1;
@@ -358,19 +367,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                         <Zap size={12} className="text-yellow-400" />
                                                         <span>{(() => {
                                                             const unit = helpers.getUnit(gameState.selectedUnitId);
-                                                            if (!unit) return 3;
-                                                            const genLvlB = gameState.players[unit.owner].evolutionLevels[UnitType.GENERAL].b;
-                                                            const genVarB = gameState.players[unit.owner].evolutionLevels[UnitType.GENERAL].bVariant;
-                                                            let baseCost = (unit.hasFlag)
-                                                                ? ((genLvlB >= 3 && genVarB === 1) ? 4 : (unit.type === UnitType.GENERAL ? 5 : 3))
-                                                                : (unit.type === UnitType.RANGER && unit.carriedMine ? 3 : UNIT_STATS[unit.type].moveCost);
-                                                            return helpers.getDisplayCost(unit, baseCost);
+                                                            const live = getLiveUnit(gameState.selectedUnitId) ?? unit;
+                                                            if (!live) return 3;
+                                                            const genLvlB = gameState.players[live.owner].evolutionLevels[UnitType.GENERAL].b;
+                                                            const genVarB = gameState.players[live.owner].evolutionLevels[UnitType.GENERAL].bVariant;
+                                                            let baseCost = (live.hasFlag)
+                                                                ? ((genLvlB >= 3 && genVarB === 1) ? 4 : (live.type === UnitType.GENERAL ? 5 : 3))
+                                                                : (live.type === UnitType.RANGER && live.carriedMine ? 3 : UNIT_STATS[live.type].moveCost);
+                                                            return helpers.getDisplayCost(live, baseCost);
                                                         })()}</span>
                                                     </div>
                                                 </div>
 
                                                 {(() => {
-                                                    const unit = helpers.getUnit(gameState.selectedUnitId);
+                                                    const unit = getLiveUnit(gameState.selectedUnitId);
                                                     if (!unit || unit.owner !== gameState.currentPlayer) return null;
                                                     const buttons = [];
 
@@ -551,7 +561,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                     >
                                                                         <div className="absolute top-0.5 left-1.5 text-sm font-black text-white/90">{helpers.getActionButtonIndex('detonate_tower', unit)}</div>
                                                                         <Radiation size={28} />
-                                                                        <span className="text-xs">爆破指令</span>
+                                                                        <span className="text-xs">Detonation</span>
                                                                     </button>
                                                                     <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {helpers.getDisplayCost(unit, 2, gameState, 'detonate_tower')}</div>
                                                                 </div>

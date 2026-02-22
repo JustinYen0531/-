@@ -231,11 +231,10 @@ export const useGameLoop = ({
                 buttons.push({ type: 'place_mine', action: 'place_mine' });
             } else if (unit.type === UnitType.RANGER) {
                 const rngLevelB = player.evolutionLevels[UnitType.RANGER].b;
-                const pickupRadius = rngLevelB >= 1 ? 1 : 0;
+                const pickupRadius = rngLevelB >= 1 ? 2 : 0;
                 // Replicating App.tsx logic for button presence:
                 const mineInRange = state.mines.find(m =>
-                    Math.abs(m.r - unit.r) <= pickupRadius &&
-                    Math.abs(m.c - unit.c) <= pickupRadius &&
+                    (Math.abs(m.r - unit.r) + Math.abs(m.c - unit.c) <= pickupRadius) &&
                     (m.owner === unit.owner || m.revealedTo.includes(unit.owner))
                 );
 

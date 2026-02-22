@@ -57,6 +57,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }
             }
         }));
+        notifyStateMutated('add_energy');
     };
 
     const evolveCurrentUnit = (branch: 'a' | 'b', variant?: 1 | 2) => {
@@ -98,6 +99,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }, ...prev.logs]
             };
         });
+        notifyStateMutated(`evolve_${branch}`);
     };
 
     const downgradeCurrentUnit = (branch: 'a' | 'b') => {
@@ -109,13 +111,14 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
             const p = prev.players[unit.owner];
             const newLevels = JSON.parse(JSON.stringify(p.evolutionLevels));
             const curLevel = newLevels[unit.type][branch];
+            const variantKey = branch === 'a' ? 'aVariant' : 'bVariant';
 
             if (curLevel <= 0) return prev;
 
-            newLevels[unit.type][branch] = curLevel - 1;
-            if (curLevel === 3) {
-                if (branch === 'a') delete newLevels[unit.type].aVariant;
-                else delete newLevels[unit.type].bVariant;
+            const newLevel = curLevel - 1;
+            newLevels[unit.type][branch] = newLevel;
+            if (newLevel < 3) {
+                newLevels[unit.type][variantKey] = null;
             }
 
             return {
@@ -126,6 +129,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }
             };
         });
+        notifyStateMutated(`downgrade_${branch}`);
     };
 
     const toggleGodMode = () => {
@@ -134,6 +138,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
             isGodMode: !prev.isGodMode,
             logs: [{ turn: prev.turnCount, messageKey: !prev.isGodMode ? 'God Mode Enabled' : 'God Mode Disabled', params: {}, type: 'info' as const }, ...prev.logs]
         }));
+        notifyStateMutated('toggle_god_mode');
     };
 
     const skipToNextRound = () => {
@@ -190,6 +195,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }
             };
         });
+        notifyStateMutated(`update_unit_${stat}`);
     };
 
     return (

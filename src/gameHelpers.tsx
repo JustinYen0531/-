@@ -128,8 +128,8 @@ export const getDisplayCost = (unit: Unit | null, baseCost: number, state: GameS
         }
     }
 
-    // Special Case: Teleport action always ignores territory cost.
-    if (actionType === 'teleport') {
+    // Special Case: Teleport and Evolution always ignore territory cost.
+    if (actionType === 'teleport' || actionType === 'evolve') {
         return baseCost;
     }
 

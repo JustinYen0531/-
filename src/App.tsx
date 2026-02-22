@@ -16,7 +16,8 @@ import {
     createInitialState
 } from './gameInit';
 import {
-    checkEnergyCap as engineCheckEnergyCap
+    checkEnergyCap as engineCheckEnergyCap,
+    applyFlagAuraDamageReduction
 } from './gameEngine';
 import {
     getUnitNameKey, getEnemyTerritoryEnergyCost, getDisplayCost as getDisplayCostRaw
@@ -216,10 +217,6 @@ const ONCE_PER_TURN_HINT_LOG_KEYS = new Set([
     'log_flag_move_limit'
 ]);
 const PRIVATE_HINT_LOG_TTL_TURNS = 1;
-const EVOLUTION_SIDE_COLOR_LOG_KEYS = new Set([
-    'log_evol_gen_b_dmg_reduce',
-    'log_heavy_steps'
-]);
 
 const dedupeLogsBySignature = (logs: GameLog[]): GameLog[] => {
     const seen = new Set<string>();
@@ -407,6 +404,7 @@ export default function App() {
     const applyingRemoteActionRef = useRef(false);
     const lastHandledPacketSeqRef = useRef<number | null>(null);
     const lastLogEmitRef = useRef<Map<string, number>>(new Map());
+    const logScrollRef = useRef<HTMLDivElement>(null);
     const {
         isConnected: isNetworkConnected,
         lastIncomingPacket,
@@ -513,12 +511,50 @@ export default function App() {
         }
     }, [gameState, isHost, targetMode]);
 
-    // Safety: entering Planning (thinking) should not carry previous selections/active units
+    // Safety: entering Planning/Action should not carry previous selections/active units.
     const prevPhaseRef = useRef(gameState.phase);
     useEffect(() => {
-        if (gameState.phase === 'thinking' && prevPhaseRef.current !== 'thinking') {
+        const enteredThinking = gameState.phase === 'thinking' && prevPhaseRef.current !== 'thinking';
+        const enteredAction = gameState.phase === 'action' && prevPhaseRef.current !== 'action';
+        if (enteredThinking || enteredAction) {
             setTargetMode(null);
-            setGameState(prev => ({ ...prev, selectedUnitId: null, activeUnitId: null, targetMode: null }));
+            setGameState(prev => {
+                let next = prev;
+                let changed = false;
+
+                if (prev.selectedUnitId !== null || prev.activeUnitId !== null) {
+                    next = { ...next, selectedUnitId: null, activeUnitId: null };
+                    changed = true;
+                }
+
+                if (enteredThinking) {
+                    const hasRoundStartLog = next.logs.some(log =>
+                        log.turn === next.turnCount && log.messageKey === 'log_round_start'
+                    );
+                    if (!hasRoundStartLog) {
+                        next = {
+                            ...next,
+                            logs: [{ turn: next.turnCount, messageKey: 'log_round_start', params: { round: next.turnCount }, type: 'info' as const }, ...next.logs]
+                        };
+                        changed = true;
+                    }
+                }
+
+                if (enteredAction) {
+                    const hasActionPhaseLog = next.logs.some(log =>
+                        log.turn === next.turnCount && log.messageKey === 'log_action_phase'
+                    );
+                    if (!hasActionPhaseLog) {
+                        next = {
+                            ...next,
+                            logs: [{ turn: next.turnCount, messageKey: 'log_action_phase', type: 'info' as const }, ...next.logs]
+                        };
+                        changed = true;
+                    }
+                }
+
+                return changed ? next : prev;
+            });
         }
         prevPhaseRef.current = gameState.phase;
     }, [gameState.phase]);
@@ -537,7 +573,10 @@ export default function App() {
             ?? fallbackZhCn[key]
             ?? key;
         if (params) {
-            Object.entries(params).forEach(([k, v]) => {
+            text = text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match: string, rawKey: string) => {
+                const v = params[rawKey];
+                if (v === undefined || v === null) return '';
+
                 let strVal = String(v);
                 // Auto-translate: if the whole value is a known translation key
                 if (translations[strVal] || fallbackEn[strVal] || fallbackZhTw[strVal] || fallbackZhCn[strVal]) {
@@ -553,7 +592,7 @@ export default function App() {
                         (match) => translations[match] ?? fallbackEn[match] ?? fallbackZhTw[match] ?? fallbackZhCn[match] ?? match
                     );
                 }
-                text = text.replace(`{{${k}}}`, strVal);
+                return strVal;
             });
         }
         return text;
@@ -666,7 +705,25 @@ export default function App() {
             return state.currentPlayer;
         })();
         const resolvedOwner = owner ?? (PRIVATE_HINT_LOG_KEYS.has(messageKey) ? localActor : undefined);
-        const paramSignature = serializeLogParams(params);
+        let normalizedParams = params;
+        if (messageKey === 'log_evol_gen_a_mine_vuln') {
+            const incomingStacks = Number(params?.stacks);
+            if (!Number.isFinite(incomingStacks)) {
+                const unitName = params?.unit;
+                const existingStacks = gameStateRef.current.logs
+                    .filter(log =>
+                        log.messageKey === 'log_evol_gen_a_mine_vuln' &&
+                        log.owner === resolvedOwner &&
+                        (!unitName || log.params?.unit === unitName)
+                    )
+                    .map(log => Number(log.params?.stacks))
+                    .filter(v => Number.isFinite(v));
+                const highestSeen = existingStacks.length > 0 ? Math.max(...existingStacks) : 0;
+                const inferredStacks = Math.min(2, Math.max(1, highestSeen + 1));
+                normalizedParams = { ...(params ?? {}), stacks: inferredStacks };
+            }
+        }
+        const paramSignature = serializeLogParams(normalizedParams);
         const logSignature = `${messageKey}|${resolvedOwner ?? 'global'}|${paramSignature}`;
         const now = Date.now();
         const lastEmitAt = lastLogEmitRef.current.get(logSignature) ?? 0;
@@ -718,7 +775,7 @@ export default function App() {
             lastLogEmitRef.current.set(logSignature, now);
             return {
                 ...prev,
-                logs: [{ turn: prev.turnCount, messageKey, params, type, owner: resolvedOwner }, ...prev.logs].slice(0, 100)
+                logs: [{ turn: prev.turnCount, messageKey, params: normalizedParams, type, owner: resolvedOwner }, ...prev.logs].slice(0, 100)
             };
         });
     };
@@ -989,7 +1046,7 @@ export default function App() {
                         selectedUnitId: null,
                         targetMode: null,
                         pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
-                        logs: [{ turn: 1, messageKey: 'log_planning_phase', params: { round: 1 }, type: 'info' as const }, ...newLogs]
+                        logs: [{ turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...newLogs]
                     };
                 } else {
                     // Only this player confirmed -> stay in placement, mark ready
@@ -1008,7 +1065,7 @@ export default function App() {
                 timeLeft: THINKING_TIMER,
                 selectedUnitId: null,
                 targetMode: null,
-                logs: [{ turn: 1, messageKey: 'log_planning_phase', params: { round: 1 }, type: 'info' as const }, ...newLogs]
+                logs: [{ turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...newLogs]
             };
         });
     };
@@ -1120,16 +1177,26 @@ export default function App() {
         setTargetMode(null);
     };
 
-    const clearMissMarksImmediatelyAt = (targetR: number, targetC: number) => {
+    const clearMissMarksImmediatelyAt = (targetR: number, targetC: number, owner?: PlayerID) => {
         flushSync(() => {
             setGameState(prev => {
+                const ownerToClear = owner ?? resolveLocalPlayer(prev);
                 const filtered = prev.sensorResults.filter(
-                    sr => !(sr.kind === 'mark' && sr.owner === prev.currentPlayer && sr.r === targetR && sr.c === targetC && sr.success !== true)
+                    sr => !(sr.kind === 'mark' && sr.owner === ownerToClear && sr.r === targetR && sr.c === targetC && sr.success !== true)
                 );
                 if (filtered.length === prev.sensorResults.length) return prev;
                 return { ...prev, sensorResults: filtered };
             });
         });
+    };
+
+    const clearScanMarksAtCells = (
+        sensorResults: GameState['sensorResults'],
+        cells: Array<{ r: number; c: number }>
+    ): GameState['sensorResults'] => {
+        if (!cells.length) return sensorResults;
+        const keys = new Set(cells.map(cell => `${cell.r},${cell.c}`));
+        return sensorResults.filter(sr => !(sr.kind === 'mark' && keys.has(`${sr.r},${sr.c}`)));
     };
 
     const clearCountMarkersImmediatelyAt = (targetR: number, targetC: number, owner: PlayerID) => {
@@ -1182,23 +1249,10 @@ export default function App() {
         }
 
         if (state.phase === 'thinking') {
-            // During planning phase, only allow selecting own units
-            if (unit.owner !== state.currentPlayer) return;
-
-            // REFINED: Disable order adjustment in thinking phase (per user request)
-            /* 
-            const player = state.players[state.currentPlayer];
-            const activeUnitId = player.unitDisplayOrder.find(id => {
-                const u = player.units.find(un => un.id === id);
-                return u && !u.isDead;
-            });
- 
-            if (activeUnitId && activeUnitId !== unit.id) {
-                swapUnitDisplayOrder(activeUnitId, unit.id);
+            // Planning phase: disable unit selection entirely to avoid carrying pre-selection into action phase.
+            if (state.selectedUnitId || state.activeUnitId) {
+                setGameState(prev => ({ ...prev, selectedUnitId: null, activeUnitId: null, targetMode: null }));
             }
-            */
-
-            setGameState(prev => ({ ...prev, selectedUnitId: unit.id }));
             setTargetMode(null);
             return;
         }
@@ -1442,10 +1496,16 @@ export default function App() {
             addLog('log_low_energy', 'info', { cost });
             return;
         }
+        if (!checkEnergyCap(unit, gameState.players[unit.owner], cost)) return;
 
         spendEnergy(unit.owner, cost);
         lockUnit(unit.id);
         towers.forEach(t => addVFX('explosion', t.r, t.c, 'large'));
+        const minesToBlast = gameState.mines.filter(m =>
+            m.owner !== unit.owner &&
+            towers.some(t => Math.abs(m.r - t.r) <= 1 && Math.abs(m.c - t.c) <= 1)
+        );
+        minesToBlast.forEach(m => addVFX('explosion', m.r, m.c));
 
         setGameState(prev => {
             const towers = prev.buildings.filter(b => b.owner === unit.owner && b.type === 'tower');
@@ -1456,6 +1516,9 @@ export default function App() {
                 m.owner !== unit.owner &&
                 towers.some(t => Math.abs(m.r - t.r) <= 1 && Math.abs(m.c - t.c) <= 1)
             ).map(m => m.id));
+            const removedMineCells = prev.mines
+                .filter(m => minesToRemove.has(m.id))
+                .map(m => ({ r: m.r, c: m.c }));
 
             const enemyId = unit.owner === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
             let enemyGeneralKilled = false;
@@ -1464,7 +1527,8 @@ export default function App() {
                 const inTowerRange = towers.some(t => Math.abs(u.r - t.r) <= 1 && Math.abs(u.c - t.c) <= 1);
                 if (!inTowerRange) return u;
 
-                const newHp = Math.max(0, u.hp - 3);
+                const detonateDmg = applyFlagAuraDamageReduction(3, u, prev.players[enemyId]).damage;
+                const newHp = Math.max(0, u.hp - detonateDmg);
                 const isDead = newHp === 0;
                 if (isDead && u.type === UnitType.GENERAL) enemyGeneralKilled = true;
 
@@ -1483,6 +1547,7 @@ export default function App() {
             return {
                 ...prev,
                 mines: prev.mines.filter(m => !minesToRemove.has(m.id)),
+                sensorResults: clearScanMarksAtCells(prev.sensorResults, removedMineCells),
                 buildings: remainingBuildings,
                 players: {
                     ...prev.players,
@@ -1536,17 +1601,18 @@ export default function App() {
 
 
     const handleRangerAction = (subAction: 'pickup' | 'drop') => {
-        const unitId = gameState.selectedUnitId;
+        const state = gameStateRef.current;
+        const unitId = state.selectedUnitId;
         if (!unitId) return;
-        const unit = getUnit(unitId);
+        const unit = getUnit(unitId, state);
         if (!unit || unit.type !== UnitType.RANGER) return;
-        const p = gameState.players[unit.owner];
+        const p = state.players[unit.owner];
 
         if (subAction === 'pickup') {
             const rngLevelB = p.evolutionLevels[UnitType.RANGER].b;
             const pickupRange = rngLevelB >= 1 ? 2 : 0;
 
-            const minesInRange = gameState.mines.filter(m =>
+            const minesInRange = state.mines.filter(m =>
                 (Math.abs(m.r - unit.r) + Math.abs(m.c - unit.c) <= pickupRange) &&
                 (m.owner === unit.owner || m.revealedTo.includes(unit.owner))
             );
@@ -1563,12 +1629,12 @@ export default function App() {
             }
         } else {
             if (!unit.carriedMine) return;
-            const existingMine = gameState.mines.find(m => m.r === unit.r && m.c === unit.c);
+            const existingMine = state.mines.find(m => m.r === unit.r && m.c === unit.c);
             if (existingMine) {
                 addLog('log_space_has_mine', 'info');
                 return;
             }
-            if (gameState.cells[unit.r][unit.c].isObstacle) {
+            if (state.cells[unit.r][unit.c].isObstacle) {
                 addLog('log_obstacle', 'info');
                 return;
             }
@@ -1590,6 +1656,7 @@ export default function App() {
                 return {
                     ...prev,
                     mines: [...prev.mines, newMine],
+                    sensorResults: clearScanMarksAtCells(prev.sensorResults, [{ r: unit.r, c: unit.c }]),
                     players: {
                         ...prev.players,
                         [unit.owner]: { ...p, units: newUnits }
@@ -1604,6 +1671,28 @@ export default function App() {
     };
 
     const handlePickupMineAt = (unit: Unit, r: number, c: number) => {
+        const liveState = gameStateRef.current;
+        const liveUnit = getUnit(unit.id, liveState);
+        if (!liveUnit || liveUnit.type !== UnitType.RANGER) {
+            addLog('log_no_mine', 'error');
+            setTargetMode(null);
+            return;
+        }
+        const livePlayer = liveState.players[liveUnit.owner];
+        const livePickupRange = livePlayer.evolutionLevels[UnitType.RANGER].b >= 1 ? 2 : 0;
+        const liveDist = Math.abs(liveUnit.r - r) + Math.abs(liveUnit.c - c);
+        const livePickableAtCell = liveState.mines.some(m =>
+            m.r === r &&
+            m.c === c &&
+            liveDist <= livePickupRange &&
+            (m.owner === liveUnit.owner || m.revealedTo.includes(liveUnit.owner))
+        );
+        if (!livePickableAtCell) {
+            addLog('log_no_mine', 'error');
+            setTargetMode(null);
+            return;
+        }
+
         let pickedMine: Mine | null = null;
         let pickedUnitId: string | null = null;
 
@@ -1644,6 +1733,7 @@ export default function App() {
             return {
                 ...prev,
                 mines: prev.mines.filter(m => m.id !== mine.id),
+                sensorResults: clearScanMarksAtCells(prev.sensorResults, [{ r, c }]),
                 players: { ...prev.players, [owner]: { ...p, units: newUnits, questStats: qStats } },
                 lastActionTime: Date.now(),
                 isTimeFrozen: true
@@ -1897,11 +1987,12 @@ export default function App() {
 
             if (targetUnits.length > 0) {
                 targetUnits.forEach(tu => {
-                    const dmg = Math.floor(MINE_DAMAGE * 0.5);
+                    const baseDmg = Math.floor(MINE_DAMAGE * 0.5);
                     const targetPId = tu.owner;
                     const targetP = newState.players[targetPId];
                     const damagedUnits = targetP.units.map(u => {
                         if (u.id === tu.id) {
+                            const dmg = applyFlagAuraDamageReduction(baseDmg, u, newState.players[targetPId]).damage;
                             const newHp = Math.max(0, u.hp - dmg);
                             const isDead = newHp === 0;
                             return {
@@ -1914,7 +2005,8 @@ export default function App() {
                         return u;
                     });
                     newState.players[targetPId] = { ...targetP, units: damagedUnits };
-                    addLog('log_hit_mine', 'mine', { unit: getUnitNameKey(tu.type), dmg }, unit.owner);
+                    const loggedDmg = applyFlagAuraDamageReduction(baseDmg, tu, newState.players[targetPId]).damage;
+                    addLog('log_hit_mine', 'mine', { unit: getUnitNameKey(tu.type), dmg: loggedDmg }, unit.owner);
                 });
             } else {
                 const newMine: Mine = {
@@ -1926,6 +2018,7 @@ export default function App() {
                     revealedTo: [unit.owner]
                 };
                 newState.mines = [...prev.mines, newMine];
+                newState.sensorResults = clearScanMarksAtCells(prev.sensorResults, [{ r, c }]);
             }
 
             return newState;
@@ -2077,6 +2170,7 @@ export default function App() {
                 return {
                     ...prev,
                     mines: newMines,
+                    sensorResults: clearScanMarksAtCells(prev.sensorResults, [{ r, c }]),
                     players: { ...prev.players, [unit.owner]: { ...prev.players[unit.owner], questStats: qStats, units: prev.players[unit.owner].units.map(u => u.id === unit.id ? { ...u, energyUsedThisTurn: u.energyUsedThisTurn + cost } : u) } },
                     lastActionTime: Date.now(),
                     isTimeFrozen: true
@@ -2122,7 +2216,12 @@ export default function App() {
         const tc = Math.abs(unit.c - toC);
         if (tr + tc > 2) return;
 
-        const mineIndex = gameState.mines.findIndex(m => m.r === fromR && m.c === fromC && m.owner !== unit.owner);
+        const mineIndex = gameState.mines.findIndex(m =>
+            m.r === fromR &&
+            m.c === fromC &&
+            m.owner !== unit.owner &&
+            m.revealedTo.includes(unit.owner)
+        );
         if (mineIndex === -1) return;
 
         if (!checkEnergyCap(unit, gameState.players[unit.owner], cost)) return;
@@ -2140,7 +2239,11 @@ export default function App() {
 
             if (isVariantDamage && enemyAtTarget) {
                 // Damage Logic
-                const dmg = Math.floor(MINE_DAMAGE * 0.4);
+                const dmg = applyFlagAuraDamageReduction(
+                    Math.floor(MINE_DAMAGE * 0.4),
+                    enemyAtTarget,
+                    prev.players[enemyId]
+                ).damage;
                 const newHp = Math.max(0, enemyAtTarget.hp - dmg);
                 const isDead = newHp === 0;
                 let respawnTimer = 0;
@@ -2154,6 +2257,7 @@ export default function App() {
                 return {
                     ...prev,
                     mines: newMines.filter((_, i) => i !== mineIndex),
+                    sensorResults: clearScanMarksAtCells(prev.sensorResults, [{ r: fromR, c: fromC }, { r: toR, c: toC }]),
                     players: {
                         ...prev.players,
                         [enemyId]: {
@@ -2175,6 +2279,7 @@ export default function App() {
             return {
                 ...prev,
                 mines: newMines,
+                sensorResults: clearScanMarksAtCells(prev.sensorResults, [{ r: fromR, c: fromC }, { r: toR, c: toC }]),
                 players: {
                     ...prev.players,
                     [unit.owner]: {
@@ -2205,7 +2310,12 @@ export default function App() {
             return;
         }
 
-        const mineIndex = gameState.mines.findIndex(m => m.r === r && m.c === c && m.owner !== unit.owner);
+        const mineIndex = gameState.mines.findIndex(m =>
+            m.r === r &&
+            m.c === c &&
+            m.owner !== unit.owner &&
+            m.revealedTo.includes(unit.owner)
+        );
         if (mineIndex === -1) return;
 
         // Range Check: Manhattan distance <= 2
@@ -2238,6 +2348,7 @@ export default function App() {
             return {
                 ...prev,
                 mines: newMines,
+                sensorResults: clearScanMarksAtCells(prev.sensorResults, [{ r, c }]),
                 players: {
                     ...prev.players,
                     [unit.owner]: {
@@ -2902,7 +3013,10 @@ export default function App() {
                 emitEvolutionFx(state.currentPlayer, unitType, branch);
             }
             if (didEvolve && shouldBroadcast) {
-                sendGameState('evolve');
+                // Wait one frame so gameStateRef has committed the evolved levels before syncing.
+                window.setTimeout(() => {
+                    sendGameState('evolve_after_commit');
+                }, 16);
             }
             return;
         }
@@ -3155,12 +3269,13 @@ export default function App() {
                         !PRIVATE_HINT_LOG_KEYS.has(log.messageKey) || log.owner === localPlayer
                     );
                     const mergedLogs = dedupeLogsBySignature([...preservedLocalPrivateLogs, ...syncedPublicLogs]).slice(0, 100);
+                    const keepLocalSelection = prev.phase === nextSyncedState.phase && nextSyncedState.phase === 'action';
                     return {
                         ...nextSyncedState,
                         logs: mergedLogs,
                         // Preserve LOCAL UI state
-                        selectedUnitId: prev.selectedUnitId,
-                        activeUnitId: prev.activeUnitId,
+                        selectedUnitId: keepLocalSelection ? prev.selectedUnitId : null,
+                        activeUnitId: keepLocalSelection ? prev.activeUnitId : null,
                         // Do NOT preserve pause flags locally; sandbox pause must sync across both players.
                         isPaused: nextSyncedState.isPaused,
                         isSandboxTimerPaused: nextSyncedState.isSandboxTimerPaused,
@@ -3209,8 +3324,10 @@ export default function App() {
                                 ...prev,
                                 phase: 'thinking',
                                 timeLeft: THINKING_TIMER,
+                                selectedUnitId: null,
+                                activeUnitId: null,
                                 pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
-                                logs: [{ turn: 1, messageKey: 'log_planning_phase', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
+                                logs: [{ turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
                             };
                         } else {
                             const updatedMines = applyRadarScans(prev);
@@ -3218,6 +3335,8 @@ export default function App() {
                                 ...prev,
                                 phase: 'action',
                                 timeLeft: TURN_TIMER,
+                                selectedUnitId: null,
+                                activeUnitId: null,
                                 mines: updatedMines,
                                 pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false }, // Reset but won't be used in action phase
                                 players: {
@@ -3450,17 +3569,18 @@ export default function App() {
 
         // Manual dismiss for MISS markers: clicking that MISS cell clears it immediately.
         console.log('[DEBUG MISS] handleCellClick called at', r, c, 'sensorResults:', state.sensorResults.filter(sr => sr.kind === 'mark'));
+        const localPlayer = resolveLocalPlayer(state);
         const clickedCellHasMiss = state.sensorResults.some(
             sr => sr.kind === 'mark' &&
-                sr.owner === state.currentPlayer &&
+                sr.owner === localPlayer &&
                 sr.r === r &&
                 sr.c === c &&
                 sr.success !== true
         );
-        console.log('[DEBUG MISS] clickedCellHasMiss:', clickedCellHasMiss, 'currentPlayer:', state.currentPlayer);
+        console.log('[DEBUG MISS] clickedCellHasMiss:', clickedCellHasMiss, 'localPlayer:', localPlayer);
         if (clickedCellHasMiss) {
             console.log('[DEBUG MISS] Clearing miss at', r, c);
-            clearMissMarksImmediatelyAt(r, c);
+            clearMissMarksImmediatelyAt(r, c, localPlayer);
             return;
         }
 
@@ -3641,7 +3761,12 @@ export default function App() {
                     return;
                 }
                 if (targetMode === 'move_mine_start' && unit.type === UnitType.DEFUSER) {
-                    const mine = state.mines.find(m => m.r === r && m.c === c && m.owner !== unit.owner);
+                    const mine = state.mines.find(m =>
+                        m.r === r &&
+                        m.c === c &&
+                        m.owner !== unit.owner &&
+                        m.revealedTo.includes(unit.owner)
+                    );
                     if (mine) {
                         setSelectedMineId(mine.id);
                         setTargetMode('move_mine_end');
@@ -3659,7 +3784,15 @@ export default function App() {
                     return;
                 }
                 if (targetMode === 'convert_mine' && unit.type === UnitType.DEFUSER) {
-                    handleConvertEnemyMineAction(unit, r, c);
+                    const mine = state.mines.find(m =>
+                        m.r === r &&
+                        m.c === c &&
+                        m.owner !== unit.owner &&
+                        m.revealedTo.includes(unit.owner)
+                    );
+                    if (mine) {
+                        handleConvertEnemyMineAction(unit, r, c);
+                    }
                     return;
                 }
                 if (targetMode === 'pickup_mine_select' && unit.type === UnitType.RANGER) {
@@ -3849,13 +3982,24 @@ export default function App() {
     });
     // Keep existing rows stable: older messages stay on top, new ones append below.
     const displayedLogs = filteredLogs.slice().reverse();
+    const latestDisplayedLog = displayedLogs[displayedLogs.length - 1];
+    const latestDisplayedLogSignature = latestDisplayedLog
+        ? `${latestDisplayedLog.turn}|${latestDisplayedLog.messageKey}|${latestDisplayedLog.owner ?? 'global'}|${serializeLogParams(latestDisplayedLog.params)}|${latestDisplayedLog.type}`
+        : '';
+
+    useEffect(() => {
+        if (!showLog) return;
+        const logList = logScrollRef.current;
+        if (!logList) return;
+        logList.scrollTop = logList.scrollHeight;
+    }, [latestDisplayedLogSignature, showLog]);
 
     return (
         <div className="w-full h-screen bg-slate-950 text-white flex flex-col overflow-hidden font-sans select-none">
             {/* Background Music */}
             <audio
                 ref={audioRef}
-                src={view === 'lobby' ? '/日常?描??bgmdaily???素材.mp3' : '/the-final-boss-battle-158700.mp3'}
+                src={view === 'lobby' ? '/日常を描いたbgmdailyフリー素材.mp3' : '/the-final-boss-battle-158700.mp3'}
                 loop
             />
 
@@ -4083,7 +4227,7 @@ export default function App() {
                                     onDismissMiss={clearMissMarksImmediatelyAt}
                                     onDismissCount={clearCountMarkersImmediatelyAt}
                                     isFlipped={pvpPerspectivePlayer === PlayerID.P2}
-                                    viewerPlayerId={pvpPerspectivePlayer || undefined}
+                                    viewerPlayerId={gameState.gameMode === 'pvp' ? (pvpPerspectivePlayer ?? undefined) : gameState.gameMode === 'sandbox' ? gameState.currentPlayer : PlayerID.P1}
                                     hoveredPos={hoveredPos}
                                     onHoverCell={handleHoverCell}
                                     disableBoardShake={disableBoardShake}
@@ -4154,15 +4298,11 @@ export default function App() {
                                         <span className="text-lg whitespace-nowrap overflow-hidden">{t('update_log')}</span>
                                     </div>
 
-                                    <div className="flex-1 overflow-y-auto p-2 space-y-2 text-sm scrollbar-thin scrollbar-thumb-white/30">
+                                    <div ref={logScrollRef} className="flex-1 overflow-y-auto p-2 space-y-2 text-sm scrollbar-thin scrollbar-thumb-white/30">
                                         {displayedLogs.map((log, i) => {
-                                            const logKey = `${log.turn}|${log.messageKey}|${log.owner ?? 'global'}|${serializeLogParams(log.params)}|${i}`;
-                                            const isEvolutionLog =
-                                                log.type === 'evolution' ||
-                                                log.messageKey === 'log_evolved' ||
-                                                log.messageKey.startsWith('log_evol_');
-                                            const isSideColorEvolution = EVOLUTION_SIDE_COLOR_LOG_KEYS.has(log.messageKey);
-                                            const evolutionPrefix = isEvolutionLog && log.owner
+                                            const logKey = `${log.turn}|${log.messageKey}|${log.type}|${log.owner ?? 'global'}|${serializeLogParams(log.params)}|${displayedLogs.length - i}`;
+                                            const isEvolutionAnnouncementLog = log.messageKey === 'log_evolved';
+                                            const evolutionPrefix = isEvolutionAnnouncementLog && log.owner
                                                 ? (
                                                     language === 'en'
                                                         ? (log.owner === localLogOwnerPlayerId ? '[ALLY] ' : '[ENEMY] ')
@@ -4178,11 +4318,7 @@ export default function App() {
 
                                             if (PRIVATE_HINT_LOG_KEYS.has(log.messageKey)) {
                                                 bgColor = 'bg-slate-700/40 border-slate-500 text-slate-200';
-                                            } else if (isSideColorEvolution && log.owner === PlayerID.P1) {
-                                                bgColor = 'bg-blue-950/40 border-blue-500 text-blue-200';
-                                            } else if (isSideColorEvolution && log.owner === PlayerID.P2) {
-                                                bgColor = 'bg-red-950/40 border-red-500 text-red-200';
-                                            } else if (isEvolutionLog) {
+                                            } else if (isEvolutionAnnouncementLog) {
                                                 bgColor = 'bg-purple-950/40 border-purple-500 text-purple-200';
                                             } else if (log.owner === PlayerID.P1) {
                                                 bgColor = 'bg-blue-950/40 border-blue-500 text-blue-200';

@@ -7,7 +7,7 @@ interface GameFieldProps {
     targetMode: TargetMode;
     handleCellClick: (r: number, c: number) => void;
     handleUnitClick: (unit: Unit) => void;
-    onDismissMiss?: (r: number, c: number) => void;
+    onDismissMiss?: (r: number, c: number, owner?: PlayerID) => void;
     onDismissCount?: (r: number, c: number, owner: PlayerID) => void;
     isFlipped?: boolean;
     viewerPlayerId?: PlayerID;
@@ -107,6 +107,21 @@ const GameField: React.FC<GameFieldProps> = ({
             onMouseMove={handleBoardMouseMove}
             onMouseLeave={handleBoardMouseLeave}
         >
+            <style>{`
+                @keyframes boardExplosionPulse {
+                    0% { transform: scale(0.25); opacity: 0.95; }
+                    65% { transform: scale(1.1); opacity: 0.8; }
+                    100% { transform: scale(1.5); opacity: 0; }
+                }
+                @keyframes boardExplosionSpark {
+                    0% { transform: scale(0.2); opacity: 0.9; }
+                    100% { transform: scale(1.9); opacity: 0; }
+                }
+                @keyframes boardScanPing {
+                    0% { transform: scale(0.2); opacity: 0.95; }
+                    100% { transform: scale(1.4); opacity: 0; }
+                }
+            `}</style>
             <div ref={boardRef} className="grid gap-0 border-4 border-white bg-slate-900 rounded-lg overflow-hidden relative z-10 shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                 style={{
                     gridTemplateColumns: `repeat(${colCount || 15}, 48px)`,
@@ -251,9 +266,52 @@ const GameField: React.FC<GameFieldProps> = ({
                                     forceShowMines={gameState.sandboxShowAllMines}
                                     evolutionFxNonce={cellEvolutionFxNonce}
                                     evolutionFxBranch={cellEvolutionFxBranch}
-                                    onDismissMiss={markResult?.success === false && onDismissMiss ? () => onDismissMiss(r, c) : undefined}
+                                    onDismissMiss={markResult?.success === false && onDismissMiss ? () => onDismissMiss(r, c, viewerPlayer) : undefined}
                                     hoveredPos={hoveredPos}
                                 />
+                                {gameState.vfx
+                                    .filter(v => v.r === r && v.c === c)
+                                    .map(v => {
+                                        const sizePx = v.size === 'large' ? 44 : v.size === 'small' ? 22 : 32;
+                                        const isExplosion = v.type === 'explosion';
+                                        const isScan = v.type === 'scan';
+                                        if (!isExplosion && !isScan) return null;
+                                        return (
+                                            <div
+                                                key={v.id}
+                                                className="absolute inset-0 pointer-events-none z-[70] flex items-center justify-center"
+                                            >
+                                                <div
+                                                    style={{
+                                                        width: `${sizePx}px`,
+                                                        height: `${sizePx}px`,
+                                                        borderRadius: '9999px',
+                                                        background: isExplosion
+                                                            ? 'radial-gradient(circle, rgba(255,245,180,0.95) 0%, rgba(255,130,0,0.9) 38%, rgba(255,40,0,0.55) 62%, rgba(255,40,0,0) 100%)'
+                                                            : 'radial-gradient(circle, rgba(180,255,255,0.95) 0%, rgba(56,189,248,0.7) 45%, rgba(56,189,248,0) 100%)',
+                                                        boxShadow: isExplosion
+                                                            ? '0 0 14px rgba(255,120,0,0.9), 0 0 24px rgba(255,70,0,0.55)'
+                                                            : '0 0 14px rgba(56,189,248,0.85)',
+                                                        animation: isExplosion
+                                                            ? 'boardExplosionPulse 420ms ease-out forwards'
+                                                            : 'boardScanPing 520ms ease-out forwards'
+                                                    }}
+                                                />
+                                                {isExplosion && (
+                                                    <div
+                                                        style={{
+                                                            position: 'absolute',
+                                                            width: `${Math.round(sizePx * 0.55)}px`,
+                                                            height: `${Math.round(sizePx * 0.55)}px`,
+                                                            borderRadius: '9999px',
+                                                            border: '2px solid rgba(255,230,150,0.9)',
+                                                            animation: 'boardExplosionSpark 380ms ease-out forwards'
+                                                        }}
+                                                    />
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 {countResult && (
                                     <div className="absolute inset-0 pointer-events-none z-[60] flex flex-col items-center justify-center">
                                         <div className="relative mb-6 animate-float-pin flex flex-col items-center opacity-85">
@@ -272,8 +330,10 @@ const GameField: React.FC<GameFieldProps> = ({
                                                     <path d="M32 16C32 24.8366 16 42 16 42C16 42 0 24.8366 0 16C0 7.16344 7.16344 0 16 0C24.8366 0 32 7.16344 32 16Z" fill="#1e293b" />
                                                     <path d="M31 16C31 23.5 16 39.5 16 39.5C16 39.5 1 23.5 1 16C1 7.71573 7.71573 1 16 1C24.2843 1 31 7.71573 31 16Z" stroke="#22d3ee" strokeWidth="2" />
                                                 </svg>
-                                                <div className="absolute top-0 left-0 w-32 h-32 flex items-center justify-center">
-                                                    <span className="text-cyan-400 font-black text-xs mt-[-10px]">{countResult.count}</span>
+                                                <div className="absolute top-0 left-0 w-[32px] h-[42px] flex items-center justify-center">
+                                                    <span className="text-cyan-300 font-black text-xs leading-none -mt-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]">
+                                                        {countResult.count}
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div className="w-4 h-1 bg-black/40 blur-[2px] rounded-full mt-1 animate-pulse"></div>

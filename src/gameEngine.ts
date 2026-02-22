@@ -1,6 +1,6 @@
 import {
     Unit, Mine, UnitType, MineType, PlayerState, PlayerID,
-    UnitStatus, SmokeEffect, QuestStats, Cell
+    UnitStatus, SmokeEffect, QuestStats, Cell, Coordinates
 } from './types';
 import {
     UNIT_STATS, MINE_DAMAGE, ENERGY_CAP_RATIO,
@@ -21,17 +21,9 @@ export const calculateAttackDamage = (
     let dmg = UNIT_STATS[UnitType.GENERAL].attackDmg;
     let logKey: string | undefined;
 
-    // General Evolution Path B: Damage Reduction Aura (Target Side) (Tier 2)
-    const genLevelB_Target = targetPlayer.evolutionLevels[UnitType.GENERAL].b;
-    if (genLevelB_Target >= 2) {
-        const flag = targetPlayer.flagPosition;
-        // Chebyshev distance
-        const distToFlag = Math.max(Math.abs(target.r - flag.r), Math.abs(target.c - flag.c));
-        if (distToFlag <= 2) { // 5x5 area -> radius 2
-            dmg = Math.floor(dmg * 0.75);
-            logKey = 'log_evol_gen_b_dmg_reduce';
-        }
-    }
+    const reduced = applyFlagAuraDamageReduction(dmg, target, targetPlayer);
+    dmg = reduced.damage;
+    if (reduced.reduced) logKey = 'log_evol_gen_b_dmg_reduce';
 
     if (isGodMode) dmg = 0;
 
@@ -55,6 +47,28 @@ export const calculateEnergyIncome = (
 
     const interest = Math.min(Math.floor(currentEnergy / 10), MAX_INTEREST);
     return currentEnergy + currentRegen + interest + oreIncome + killIncome;
+};
+
+/**
+ * General Evolution Path B Tier 2:
+ * Allies in 5x5 around own flag take 25% reduced incoming damage.
+ */
+export const applyFlagAuraDamageReduction = (
+    damage: number,
+    target: Unit,
+    targetPlayer: PlayerState,
+    atPos?: Coordinates
+): { damage: number; reduced: boolean } => {
+    const genLevelB = targetPlayer.evolutionLevels[UnitType.GENERAL].b;
+    if (genLevelB < 2) return { damage, reduced: false };
+
+    const posR = atPos?.r ?? target.r;
+    const posC = atPos?.c ?? target.c;
+    const flag = targetPlayer.flagPosition;
+    const distToFlag = Math.max(Math.abs(posR - flag.r), Math.abs(posC - flag.c));
+    if (distToFlag > 2) return { damage, reduced: false };
+
+    return { damage: Math.floor(damage * 0.75), reduced: true };
 };
 
 /**
@@ -213,15 +227,11 @@ export const calculateMineInteraction = (
     // Vulnerability Debuff
     dmg += (unit.status.mineVulnerability || 0);
 
-    // General Evol B2 (Owner Aura)
-    const genLevelB = unitOwnerState.evolutionLevels[UnitType.GENERAL].b;
-    if (genLevelB >= 2) {
-        const flag = unitOwnerState.flagPosition;
-        const distToFlag = Math.max(Math.abs(unit.r - flag.r), Math.abs(unit.c - flag.c));
-        if (distToFlag <= 2) {
-            dmg = Math.floor(dmg * 0.75);
-            result.logKeys.push('log_evol_gen_b_dmg_reduce');
-        }
+    // General Evol B2 (Owner Aura), evaluated at trigger location.
+    const auraReduced = applyFlagAuraDamageReduction(dmg, unit, unitOwnerState, { r: targetR, c: targetC });
+    dmg = auraReduced.damage;
+    if (auraReduced.reduced) {
+        result.logKeys.push('log_evol_gen_b_dmg_reduce');
     }
 
     // Defuser Logic (Active Skills / Team Buffs)

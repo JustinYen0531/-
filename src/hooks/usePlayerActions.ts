@@ -5,6 +5,7 @@ import {
 } from '../types';
 import {
     calculateAttackDamage,
+    applyFlagAuraDamageReduction,
     checkEnergyCap as engineCheckEnergyCap,
     calculateEnergyIncome,
     calculateOreReward,
@@ -176,11 +177,11 @@ export const usePlayerActions = ({
                 if (enemyGenLevels.b >= 3 && enemyGenLevels.bVariant === 2 && !u.isDead) { // B3-2
                     const flag = enemyPlayerState.flagPosition;
                     if (Math.abs(u.r - flag.r) <= 1 && Math.abs(u.c - flag.c) <= 1) {
-                        roundEndDmg = 4;
+                        roundEndDmg = applyFlagAuraDamageReduction(4, u, playerState).damage;
                         playerLogs.push({
                             turn: nextTurn,
                             messageKey: 'log_attack_hit',
-                            params: { attacker: 'evol_gen_b_r3_2', target: getLocalizedUnitName(u.type), dmg: 4 },
+                            params: { attacker: 'evol_gen_b_r3_2', target: getLocalizedUnitName(u.type), dmg: roundEndDmg },
                             type: 'combat',
                             owner: enemyPlayerState.id
                         });
@@ -694,7 +695,7 @@ export const usePlayerActions = ({
 
             const alreadyTookDmg = qStats.flagSpiritDamageTakenThisTurn?.has(unit.id);
             if (!wasInZone && isInZone && !alreadyTookDmg) {
-                const kDmg = 2;
+                const kDmg = applyFlagAuraDamageReduction(2, unit, player, { r, c }).damage;
                 newHp = Math.max(0, newHp - kDmg);
                 addLog('log_attack_hit', 'combat', { attacker: 'evol_gen_b_r3_2', target: getLocalizedUnitName(unit.type), dmg: kDmg }, enemyPlayerId);
 
@@ -715,6 +716,7 @@ export const usePlayerActions = ({
                 if (unit.type === UnitType.DEFUSER) {
                     chainHitDmg = Math.floor(chainHitDmg * 0.5);
                 }
+                chainHitDmg = applyFlagAuraDamageReduction(chainHitDmg, unit, state.players[unit.owner], { r, c }).damage;
                 dmg = chainHitDmg;
                 addLog('log_hit_mine', 'mine', { unit: getLocalizedUnitName(unit.type), dmg: chainHitDmg }, unit.owner);
 
@@ -741,6 +743,7 @@ export const usePlayerActions = ({
                             if (u.type === UnitType.DEFUSER) {
                                 aoeDmg = Math.floor(aoeDmg * 0.5);
                             }
+                            aoeDmg = applyFlagAuraDamageReduction(aoeDmg, u, state.players[u.owner]).damage;
 
                             if (u.id === unit.id) {
                                 // Accumulate damage for the triggering unit (handled by newHp later)
@@ -813,6 +816,7 @@ export const usePlayerActions = ({
                                 if (targetUnit.owner === mine.owner) {
                                     damageToApply = 6; // Friendly fire takes half damage
                                 }
+                                damageToApply = applyFlagAuraDamageReduction(damageToApply, targetUnit, state.players[targetUnit.owner]).damage;
                                 let targetNewHp = Math.max(0, targetUnit.hp - damageToApply);
                                 let targetIsDead = targetNewHp === 0;
                                 let targetRespawnTimer = (targetIsDead && targetUnit.type !== UnitType.GENERAL) ? (state.turnCount <= 10 ? 2 : 3) : 0;
@@ -880,6 +884,7 @@ export const usePlayerActions = ({
                     respawnTimer: (newHp <= 0 && unit.type !== UnitType.GENERAL) ? (prev.turnCount <= 10 ? 2 : 3) : 0,
                     hasFlag: unit.hasFlag, hasActedThisRound: false,
                     energyUsedThisTurn: u.energyUsedThisTurn + totalCost,
+                    carriedMine: u.carriedMine ? { ...u.carriedMine, r, c } : u.carriedMine,
                     status: (unit.type === UnitType.RANGER &&
                         prevPlayerState.evolutionLevels[UnitType.RANGER].b >= 3 &&
                         prevPlayerState.evolutionLevels[UnitType.RANGER].bVariant === 1 &&
@@ -900,11 +905,12 @@ export const usePlayerActions = ({
                     if (livingEnemies.length > 0) {
                         livingEnemies.sort((a, b) => a.hp - b.hp || a.id.localeCompare(b.id));
                         const target = livingEnemies[0];
-                        const newEnemyHp = Math.max(0, target.hp - reflectDmg);
+                        const reflected = applyFlagAuraDamageReduction(reflectDmg, target, prev.players[enemyId]);
+                        const newEnemyHp = Math.max(0, target.hp - reflected.damage);
                         const isEnemyDead = newEnemyHp === 0;
                         const enemyUpdatedUnits = enemyState.units.map(u => u.id === target.id ? { ...u, hp: newEnemyHp, isDead: isEnemyDead, respawnTimer: (isEnemyDead && u.type !== UnitType.GENERAL) ? (prev.turnCount <= 10 ? 2 : 3) : 0 } : u);
                         playersUpdates[enemyId] = { ...enemyState, units: enemyUpdatedUnits };
-                        addLog('log_evol_def_reflect_hit', 'move', { unit: getLocalizedUnitName(target.type), dmg: reflectDmg }, unit.owner);
+                        addLog('log_evol_def_reflect_hit', 'move', { unit: getLocalizedUnitName(target.type), dmg: reflected.damage }, unit.owner);
                     }
                 }
             } else {
@@ -1023,6 +1029,16 @@ export const usePlayerActions = ({
 
         let isDead = targetUnit.hp - dmg <= 0;
         let killReward = isDead ? 3 + Math.floor(state.players[targetUnit.owner].energy * 0.15) : 0;
+        const previousMineVulnerability = targetUnit.status.mineVulnerability ?? 0;
+        const nextMineVulnerability = genLevelA >= 1
+            ? Math.min(2, previousMineVulnerability + 1)
+            : previousMineVulnerability;
+        const mineVulnerabilityIncreased =
+            previousMineVulnerability < 2 &&
+            nextMineVulnerability > previousMineVulnerability;
+        const heavyStepsAlreadyActive =
+            (targetUnit.status.moveCostDebuff ?? 0) > 0 &&
+            (targetUnit.status.moveCostDebuffDuration ?? 0) > 0;
 
         setGameState(prev => {
             const pStats = prev.players[attacker.owner];
@@ -1099,10 +1115,13 @@ export const usePlayerActions = ({
         });
 
         addLog('log_attack_hit', 'combat', { attacker: getLocalizedUnitName(attacker.type), target: getLocalizedUnitName(targetUnit.type), dmg }, attacker.owner);
-        if (genLevelA >= 1) {
-            addLog('log_evol_gen_a_mine_vuln', 'evolution', { unit: getLocalizedUnitName(targetUnit.type) }, targetUnit.owner);
+        if (genLevelA >= 1 && mineVulnerabilityIncreased) {
+            addLog('log_evol_gen_a_mine_vuln', 'evolution', {
+                unit: getLocalizedUnitName(targetUnit.type),
+                stacks: nextMineVulnerability
+            }, targetUnit.owner);
         }
-        if (genLevelA >= 2) {
+        if (genLevelA >= 2 && !heavyStepsAlreadyActive) {
             addLog('log_evol_gen_a_heavy_steps_temp', 'evolution', { unit: getLocalizedUnitName(targetUnit.type) }, targetUnit.owner);
         }
         if (killReward > 0) addLog('log_kill_reward', 'info', { amount: killReward });
@@ -1321,6 +1340,7 @@ export const usePlayerActions = ({
                     revealedTo: [],
                     immuneUnitIds: prev.players[PlayerID.P1].units.concat(prev.players[PlayerID.P2].units).filter(u => u.r === targetR && u.c === targetC).map(u => u.id)
                 }],
+                sensorResults: prev.sensorResults.filter(sr => !(sr.kind === 'mark' && sr.r === targetR && sr.c === targetC)),
                 players: {
                     ...prev.players,
                     [unit.owner]: {
@@ -1448,7 +1468,22 @@ export const usePlayerActions = ({
 
             return {
                 ...prev,
-                players: { ...prev.players, [unit.owner]: { ...p, energy: p.energy - cost, units: p.units.map(u => u.id === unit.id ? { ...u, r: hub.r, c: hub.c, energyUsedThisTurn: u.energyUsedThisTurn + cost } : u) } },
+                players: {
+                    ...prev.players,
+                    [unit.owner]: {
+                        ...p,
+                        energy: p.energy - cost,
+                        units: p.units.map(u => u.id === unit.id
+                            ? {
+                                ...u,
+                                r: hub.r,
+                                c: hub.c,
+                                carriedMine: u.carriedMine ? { ...u.carriedMine, r: hub.r, c: hub.c } : u.carriedMine,
+                                energyUsedThisTurn: u.energyUsedThisTurn + cost
+                            }
+                            : u)
+                    }
+                },
                 lastActionTime: Date.now(), isTimeFrozen: true
             };
         });
@@ -1497,7 +1532,13 @@ export const usePlayerActions = ({
 
         const cost = 2;
         if (state.players[unit.owner].energy < cost) { addLog('log_low_energy', 'info', { cost }); return; }
+        if (!checkEnergyCap(unit, state.players[unit.owner], cost)) return;
         towers.forEach(t => addVFX('explosion', t.r, t.c, 'large'));
+        const minesToBlast = state.mines.filter(m =>
+            m.owner !== unit.owner &&
+            towers.some(t => Math.abs(m.r - t.r) <= 1 && Math.abs(m.c - t.c) <= 1)
+        );
+        minesToBlast.forEach(m => addVFX('explosion', m.r, m.c));
 
         setGameState(prev => {
             const p = prev.players[unit.owner];
@@ -1512,7 +1553,8 @@ export const usePlayerActions = ({
                 if (u.isDead) return u;
                 const inTowerRange = activeTowers.some(t => Math.abs(u.r - t.r) <= 1 && Math.abs(u.c - t.c) <= 1);
                 if (!inTowerRange) return u;
-                const newHp = Math.max(0, u.hp - 3);
+                const detonateDmg = applyFlagAuraDamageReduction(3, u, prev.players[enemyId]).damage;
+                const newHp = Math.max(0, u.hp - detonateDmg);
                 const isDead = newHp === 0;
                 return {
                     ...u,
@@ -1546,9 +1588,8 @@ export const usePlayerActions = ({
         const state = gameStateRef.current;
         const unit = getUnit(unitId, state);
         if (!unit) return;
-        const cost = getEnemyTerritoryEnergyCost(unit, 10);
-        if (state.players[unit.owner].energy < cost) { addLog('log_low_energy', 'info', { cost }); return; }
 
+        // Match App.tsx behavior: stealth toggle has no energy cost.
         setGameState(prev => {
             const p = prev.players[unit.owner];
             return {
@@ -1556,16 +1597,18 @@ export const usePlayerActions = ({
                 players: {
                     ...prev.players,
                     [unit.owner]: {
-                        ...p, energy: p.energy - cost,
-                        units: p.units.map(u => u.id === unitId ? { ...u, isStealth: true, energyUsedThisTurn: u.energyUsedThisTurn + cost } : u)
+                        ...p,
+                        units: p.units.map(u => u.id === unitId ? {
+                            ...u,
+                            status: { ...u.status, isStealthed: !u.status.isStealthed }
+                        } : u)
                     }
                 },
-                lastActionTime: Date.now(), isTimeFrozen: true
+                lastActionTime: Date.now(),
+                isTimeFrozen: true
             };
         });
-        addLog('log_stealth_activated', 'move', { unit: getLocalizedUnitName(unit.type) }, unit.owner);
-        handleActionComplete(unitId);
-    }, [gameStateRef, getUnit, addLog, setGameState, handleActionComplete]);
+    }, [gameStateRef, getUnit, setGameState]);
 
     const handleSensorScan = useCallback((unitId: string, r: number, c: number) => {
         const state = gameStateRef.current;
@@ -1662,18 +1705,53 @@ export const usePlayerActions = ({
         const state = gameStateRef.current;
         const player = state.players[state.currentPlayer];
         const currentLevel = player.evolutionLevels[unitType][branch];
+        // Quick pre-check (non-authoritative, just for fast UI feedback)
         if (currentLevel >= 3) return false;
-        const cost = EVOLUTION_COSTS[currentLevel as keyof typeof EVOLUTION_COSTS];
-        if (player.energy < cost) { addLog('log_low_energy', 'info', { cost }); return false; }
+        const preCheckCost = EVOLUTION_COSTS[currentLevel as keyof typeof EVOLUTION_COSTS];
+        if (player.energy < preCheckCost) { addLog('log_low_energy', 'info', { cost: preCheckCost }); return false; }
+
+        // Authoritative check inside reducer to prevent race conditions from rapid clicks
+        let didEvolve = false;
+        let evolvedLevel = 0;
+        const actingPlayer = state.currentPlayer;
 
         setGameState(prev => {
-            const p = prev.players[prev.currentPlayer];
-            const newLevels = { ...p.evolutionLevels, [unitType]: { ...p.evolutionLevels[unitType], [branch]: currentLevel + 1, [branch + 'Variant']: variant || p.evolutionLevels[unitType][branch + 'Variant' as keyof typeof p.evolutionLevels[typeof unitType]] } };
-            return { ...prev, players: { ...prev.players, [prev.currentPlayer]: { ...p, energy: p.energy - cost, evolutionLevels: newLevels } }, lastActionTime: Date.now(), isTimeFrozen: true };
+            const p = prev.players[actingPlayer];
+            const actualLevel = p.evolutionLevels[unitType][branch];
+            if (actualLevel >= 3) return prev; // Already maxed (race: another click beat us)
+            const cost = EVOLUTION_COSTS[actualLevel as keyof typeof EVOLUTION_COSTS];
+            if (p.energy < cost) return prev; // Insufficient energy (race: energy was spent)
+
+            const newLevel = actualLevel + 1;
+            const variantKey = (branch + 'Variant') as keyof typeof p.evolutionLevels[typeof unitType];
+            const newLevels = {
+                ...p.evolutionLevels,
+                [unitType]: {
+                    ...p.evolutionLevels[unitType],
+                    [branch]: newLevel,
+                    [variantKey]: variant || p.evolutionLevels[unitType][variantKey]
+                }
+            };
+
+            didEvolve = true;
+            evolvedLevel = newLevel;
+
+            return {
+                ...prev,
+                players: {
+                    ...prev.players,
+                    [actingPlayer]: { ...p, energy: p.energy - cost, evolutionLevels: newLevels }
+                },
+                lastActionTime: Date.now(),
+                isTimeFrozen: true
+            };
         });
-        addLog('log_evolved', 'move', { unit: getLocalizedUnitName(unitType), unitType, branch, level: currentLevel + 1 }, state.currentPlayer);
-        if (currentLevel + 1 === 3) setShowEvolutionTree(false);
-        return true;
+
+        if (didEvolve) {
+            addLog('log_evolved', 'move', { unit: getLocalizedUnitName(unitType), unitType, branch, level: evolvedLevel }, actingPlayer);
+            if (evolvedLevel === 3) setShowEvolutionTree(false);
+        }
+        return didEvolve;
     }, [gameStateRef, addLog, setGameState, setShowEvolutionTree]);
 
     return {
