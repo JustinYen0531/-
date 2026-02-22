@@ -281,10 +281,35 @@ const GameField: React.FC<GameFieldProps> = ({
                                 {gameState.vfx
                                     .filter(v => v.r === r && v.c === c)
                                     .map(v => {
-                                        const sizePx = v.size === 'large' ? 44 : v.size === 'small' ? 22 : 32;
-                                        const isExplosion = v.type === 'explosion';
+                                        const sizePx = v.size === 'large' ? 64 : v.size === 'small' ? 34 : 48;
+                                        const isMineTriggerFx = v.type === 'explosion' || v.type === 'nuke' || v.type === 'smoke' || v.type === 'slow' || v.type === 'chain';
                                         const isScan = v.type === 'scan';
-                                        if (!isExplosion && !isScan) return null;
+                                        if (!isMineTriggerFx && !isScan) return null;
+                                        const mineFxColors =
+                                            v.type === 'nuke'
+                                                ? {
+                                                    background: 'radial-gradient(circle, rgba(255,255,210,0.98) 0%, rgba(250,204,21,0.92) 28%, rgba(249,115,22,0.8) 52%, rgba(220,38,38,0.55) 72%, rgba(220,38,38,0) 100%)',
+                                                    boxShadow: '0 0 18px rgba(250,204,21,0.95), 0 0 34px rgba(220,38,38,0.75)'
+                                                }
+                                                : v.type === 'smoke'
+                                                    ? {
+                                                        background: 'radial-gradient(circle, rgba(241,245,249,0.95) 0%, rgba(148,163,184,0.82) 42%, rgba(71,85,105,0.55) 70%, rgba(51,65,85,0) 100%)',
+                                                        boxShadow: '0 0 14px rgba(148,163,184,0.9), 0 0 28px rgba(71,85,105,0.65)'
+                                                    }
+                                                    : v.type === 'slow'
+                                                        ? {
+                                                            background: 'radial-gradient(circle, rgba(219,234,254,0.95) 0%, rgba(56,189,248,0.82) 42%, rgba(37,99,235,0.58) 70%, rgba(37,99,235,0) 100%)',
+                                                            boxShadow: '0 0 14px rgba(56,189,248,0.9), 0 0 28px rgba(37,99,235,0.65)'
+                                                        }
+                                                        : v.type === 'chain'
+                                                            ? {
+                                                                background: 'radial-gradient(circle, rgba(243,232,255,0.95) 0%, rgba(168,85,247,0.86) 40%, rgba(124,58,237,0.62) 68%, rgba(91,33,182,0) 100%)',
+                                                                boxShadow: '0 0 16px rgba(168,85,247,0.95), 0 0 30px rgba(124,58,237,0.7)'
+                                                            }
+                                                            : {
+                                                                background: 'radial-gradient(circle, rgba(255,245,180,0.95) 0%, rgba(255,130,0,0.9) 38%, rgba(255,40,0,0.55) 62%, rgba(255,40,0,0) 100%)',
+                                                                boxShadow: '0 0 14px rgba(255,120,0,0.9), 0 0 24px rgba(255,70,0,0.55)'
+                                                            };
                                         return (
                                             <div
                                                 key={v.id}
@@ -295,18 +320,18 @@ const GameField: React.FC<GameFieldProps> = ({
                                                         width: `${sizePx}px`,
                                                         height: `${sizePx}px`,
                                                         borderRadius: '9999px',
-                                                        background: isExplosion
-                                                            ? 'radial-gradient(circle, rgba(255,245,180,0.95) 0%, rgba(255,130,0,0.9) 38%, rgba(255,40,0,0.55) 62%, rgba(255,40,0,0) 100%)'
+                                                        background: isMineTriggerFx
+                                                            ? mineFxColors.background
                                                             : 'radial-gradient(circle, rgba(180,255,255,0.95) 0%, rgba(56,189,248,0.7) 45%, rgba(56,189,248,0) 100%)',
-                                                        boxShadow: isExplosion
-                                                            ? '0 0 14px rgba(255,120,0,0.9), 0 0 24px rgba(255,70,0,0.55)'
+                                                        boxShadow: isMineTriggerFx
+                                                            ? mineFxColors.boxShadow
                                                             : '0 0 14px rgba(56,189,248,0.85)',
-                                                        animation: isExplosion
+                                                        animation: isMineTriggerFx
                                                             ? 'boardExplosionPulse 420ms ease-out forwards'
                                                             : 'boardScanPing 520ms ease-out forwards'
                                                     }}
                                                 />
-                                                {isExplosion && (
+                                                {isMineTriggerFx && (
                                                     <div
                                                         style={{
                                                             position: 'absolute',

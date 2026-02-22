@@ -731,7 +731,7 @@ export const usePlayerActions = ({
                 // Each chained normal mine explodes in Manhattan distance 2 for 8 damage to enemy units
                 normalMinesInRange.forEach(nm => {
                     addLog('log_evol_mkr_chain', 'mine', { r: nm.r + 1, c: nm.c + 1 }, mine.owner);
-                    addVFX('explosion', nm.r, nm.c); // Show normal explosion for secondary mines
+                    addVFX('explosion', nm.r, nm.c, 'large'); // Show normal explosion for secondary mines
 
                     // Find enemy units in Manhattan distance 2 around this normal mine
                     const enemyPlayer = mine.owner === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
@@ -830,13 +830,13 @@ export const usePlayerActions = ({
 
                     // Trigger VFX based on mine type
                     if (result.isNukeTriggered) {
-                        addVFX('nuke', mine.r, mine.c);
+                        addVFX('nuke', mine.r, mine.c, 'large');
                     } else if (mine.type === MineType.SMOKE) {
-                        addVFX('smoke', mine.r, mine.c);
+                        addVFX('smoke', mine.r, mine.c, 'large');
                     } else if (mine.type === MineType.SLOW) {
-                        addVFX('slow', mine.r, mine.c);
+                        addVFX('slow', mine.r, mine.c, 'large');
                     } else {
-                        addVFX('explosion', mine.r, mine.c);
+                        addVFX('explosion', mine.r, mine.c, 'large');
                     }
 
                     addLog('log_hit_mine', 'mine', { unit: getLocalizedUnitName(unit.type), dmg }, unit.owner);
