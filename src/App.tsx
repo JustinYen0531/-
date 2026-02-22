@@ -1472,6 +1472,9 @@ export default function App() {
             };
         });
         setTargetMode(null);
+        if (!applyingRemoteActionRef.current && roomId && isNetworkConnected) {
+            sendGameStateDeferred('place_tower');
+        }
     };
 
     const handleDetonateTowerAction = (unit: Unit) => {
@@ -1845,6 +1848,9 @@ export default function App() {
             };
         });
         setTargetMode(null);
+        if (!applyingRemoteActionRef.current && roomId && isNetworkConnected) {
+            sendGameStateDeferred('place_hub');
+        }
     };
 
     const handleTeleportToHubAction = (unit: Unit) => {
@@ -2088,6 +2094,9 @@ export default function App() {
             };
         });
         setTargetMode(null);
+        if (!applyingRemoteActionRef.current && roomId && isNetworkConnected) {
+            sendGameStateDeferred('place_factory');
+        }
     };
 
     const handleDisarmAction = (unit: Unit, r: number, c: number) => {
