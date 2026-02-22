@@ -313,21 +313,18 @@ const GameField: React.FC<GameFieldProps> = ({
                                         );
                                     })}
                                 {countResult && (
-                                    <div className="absolute inset-0 pointer-events-none z-[60] flex flex-col items-center justify-center">
-                                        <div className="relative mb-6 animate-float-pin flex flex-col items-center opacity-85">
-                                            <div className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]">
-                                                <button
-                                                    type="button"
-                                                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-900/85 border border-cyan-200/80 text-cyan-100 text-[10px] leading-none font-black flex items-center justify-center pointer-events-auto hover:bg-slate-800"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (onDismissCount) onDismissCount(r, c, viewerPlayer);
-                                                    }}
-                                                >
-                                                    ×
-                                                </button>
+                                    <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center">
+                                        <div className="group/scanpin relative mb-6 animate-float-pin flex flex-col items-center opacity-85">
+                                            <div className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] pointer-events-none">
                                                 <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <path d="M32 16C32 24.8366 16 42 16 42C16 42 0 24.8366 0 16C0 7.16344 7.16344 0 16 0C24.8366 0 32 7.16344 32 16Z" fill="#1e293b" />
+                                                    <defs>
+                                                        <linearGradient id={`scan-pin-fill-${r}-${c}`} x1="16" y1="0" x2="16" y2="42" gradientUnits="userSpaceOnUse">
+                                                            <stop offset="0%" stopColor="#1e293b" stopOpacity="0.38" />
+                                                            <stop offset="55%" stopColor="#1e293b" stopOpacity="0.7" />
+                                                            <stop offset="100%" stopColor="#1e293b" stopOpacity="0.96" />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <path d="M32 16C32 24.8366 16 42 16 42C16 42 0 24.8366 0 16C0 7.16344 7.16344 0 16 0C24.8366 0 32 7.16344 32 16Z" fill={`url(#scan-pin-fill-${r}-${c})`} />
                                                     <path d="M31 16C31 23.5 16 39.5 16 39.5C16 39.5 1 23.5 1 16C1 7.71573 7.71573 1 16 1C24.2843 1 31 7.71573 31 16Z" stroke="#22d3ee" strokeWidth="2" />
                                                 </svg>
                                                 <div className="absolute top-0 left-0 w-[32px] h-[42px] flex items-center justify-center">
@@ -336,7 +333,19 @@ const GameField: React.FC<GameFieldProps> = ({
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className="w-4 h-1 bg-black/40 blur-[2px] rounded-full mt-1 animate-pulse"></div>
+                                            {onDismissCount && (
+                                                <button
+                                                    type="button"
+                                                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-900/85 border border-cyan-200/80 text-cyan-100 text-[10px] leading-none font-black flex items-center justify-center pointer-events-auto opacity-0 group-hover/scanpin:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 hover:bg-slate-800"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onDismissCount(r, c, viewerPlayer);
+                                                    }}
+                                                >
+                                                    x
+                                                </button>
+                                            )}
+                                            <div className="w-4 h-1 bg-black/40 blur-[2px] rounded-full mt-1 animate-pulse pointer-events-none"></div>
                                         </div>
                                     </div>
                                 )}
