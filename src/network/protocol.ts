@@ -94,9 +94,15 @@ export interface EndTurnPayload {
 
 export type ReadyPhase = 'placement' | 'thinking';
 
+export interface ReadySetupMine {
+    r: number;
+    c: number;
+}
+
 export interface ReadyPayload {
     playerId: PlayerID;
     phase: ReadyPhase;
+    setupMines?: ReadySetupMine[];
 }
 
 export interface StateSyncPayload {

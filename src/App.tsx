@@ -49,7 +49,8 @@ import {
     SensorScanPayload,
     StartGamePayload,
     StateSyncPayload,
-    ReadyPayload
+    ReadyPayload,
+    ReadySetupMine
 } from './network/protocol';
 
 const isPlayerId = (value: unknown): value is PlayerID => (
@@ -59,9 +60,14 @@ const isPlayerId = (value: unknown): value is PlayerID => (
 const isReadyPayload = (payload: unknown): payload is ReadyPayload => {
     if (!payload || typeof payload !== 'object') return false;
     const candidate = payload as Partial<ReadyPayload>;
+    const hasValidSetupMines = candidate.setupMines === undefined || (
+        Array.isArray(candidate.setupMines) &&
+        candidate.setupMines.every(m => isBoardCoordinate(m?.r, m?.c))
+    );
     return (
         isPlayerId(candidate.playerId) &&
-        (candidate.phase === 'placement' || candidate.phase === 'thinking')
+        (candidate.phase === 'placement' || candidate.phase === 'thinking') &&
+        hasValidSetupMines
     );
 };
 
@@ -1023,6 +1029,12 @@ export default function App() {
         return state.currentPlayer;
     };
 
+    const buildPlacementReadySnapshot = (state: GameState, playerId: PlayerID): ReadySetupMine[] => {
+        return getSetupMines(state.mines)
+            .filter(m => m.owner === playerId)
+            .map(m => ({ r: m.r, c: m.c }));
+    };
+
 
 
     const finishPlacementPhase = () => {
@@ -1036,11 +1048,12 @@ export default function App() {
 
         // Send ready packet in PvP
         if (state.gameMode === 'pvp' && roomId && isNetworkConnected) {
+            const setupMines = buildPlacementReadySnapshot(state, localPlayer);
             sendActionPacket({
                 type: 'PLAYER_READY',
                 matchId: roomId,
                 turn: state.turnCount,
-                payload: { playerId: localPlayer, phase: 'placement' }
+                payload: { playerId: localPlayer, phase: 'placement', setupMines }
             });
         }
 
@@ -2858,7 +2871,10 @@ export default function App() {
                 turn: state.turnCount,
                 payload: {
                     playerId: localPlayer,
-                    phase: state.phase
+                    phase: state.phase,
+                    setupMines: state.phase === 'placement'
+                        ? buildPlacementReadySnapshot(state, localPlayer)
+                        : undefined
                 }
             });
 
@@ -2868,7 +2884,7 @@ export default function App() {
         }, 1500);
 
         return () => clearInterval(retryTimer);
-    }, [getLocalNetworkPlayer, isHost, isNetworkConnected, roomId, sendActionPacket, sendGameState]);
+    }, [buildPlacementReadySnapshot, getLocalNetworkPlayer, isHost, isNetworkConnected, roomId, sendActionPacket, sendGameState]);
 
     const executeMoveAction = useCallback((
         unitId: string,
@@ -3357,8 +3373,28 @@ export default function App() {
 
                 // Mark remote player as ready
                 setGameState(prev => {
+                    const incomingSetupMines = payload.phase === 'placement'
+                        ? (payload.setupMines ?? []).map(m => ({
+                            id: `pm-${payload.playerId}-${m.r}-${m.c}`,
+                            owner: payload.playerId,
+                            type: MineType.NORMAL,
+                            r: m.r,
+                            c: m.c,
+                            revealedTo: [payload.playerId]
+                        } as Mine))
+                        : [];
+                    const mergedSetupMines = payload.phase === 'placement'
+                        ? unionPlacementMines(getSetupMines(prev.mines), incomingSetupMines)
+                        : getSetupMines(prev.mines);
+                    if (payload.phase === 'placement') {
+                        placementMinesRef.current = unionPlacementMines(placementMinesRef.current, incomingSetupMines);
+                    }
+                    const nextMines = payload.phase === 'placement'
+                        ? [...prev.mines.filter(m => !m.id.startsWith('pm-')), ...mergedSetupMines]
+                        : prev.mines;
+
                     const logsWithRemotePlacement = payload.phase === 'placement'
-                        ? upsertPlacementLogs(prev.logs, prev, payload.playerId)
+                        ? upsertPlacementLogs(prev.logs, { ...prev, mines: nextMines }, payload.playerId)
                         : prev.logs;
                     const newReadyState = {
                         [PlayerID.P1]: prev.pvpReadyState?.[PlayerID.P1] ?? false,
@@ -3376,7 +3412,7 @@ export default function App() {
                     if (bothReady) {
                         if (payload.phase === 'placement') {
                             const stabilizedSetupMines = unionPlacementMines(
-                                getSetupMines(prev.mines),
+                                mergedSetupMines,
                                 placementMinesRef.current
                             );
                             return {
@@ -3419,6 +3455,7 @@ export default function App() {
 
                     return {
                         ...prev,
+                        mines: nextMines,
                         pvpReadyState: newReadyState,
                         logs: logsWithRemotePlacement
                     };
