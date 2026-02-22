@@ -430,6 +430,7 @@ const GridCell: React.FC<GridCellProps> = ({
     (Math.abs(cell.r - b.r) + Math.abs(cell.c - b.c) <= 2)
   );
   const isHub31Smoke = !!hubSmokeBuilding;
+  const hasVisibleScanMiss = scanMarkSuccess === false && !isLocallyDismissed;
   // Functional colors based on building type, matching buttons
   const towerColor = '#fb923c'; // Amber/Orange for Detection Tower
   const hubColor = '#c084fc';   // Purple for Hub
@@ -900,6 +901,9 @@ const GridCell: React.FC<GridCellProps> = ({
         ${!cell.isObstacle ? 'hover:bg-opacity-90 hover:scale-[1.02]' : ''}
         ${(() => {
           // Priority Hierarchy (Highest to Lowest):
+          // 0. Active sensor miss marker:
+          // lift the whole cell above nearby building cells so marker stays visible/clickable.
+          if (hasVisibleScanMiss) return 'z-[180]';
           // 1. Building / Domain source cells:
           // keep their extended range borders above any occupying units.
           if (building || isP1FlagHere || isP2FlagHere || isThisCellFocusedCenter) return 'z-[160]';
@@ -971,7 +975,7 @@ const GridCell: React.FC<GridCellProps> = ({
 
       {/* Scan miss mark (kept below mine layer so mine visuals are never blocked) */}
       {scanMarkSuccess === false && !isLocallyDismissed && (
-        <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 group/miss">
+        <div className="absolute top-1 left-1/2 -translate-x-1/2 z-[190] group/miss">
           <div
             className="relative px-1.5 py-0.5 rounded text-[10px] font-black border bg-red-600/90 text-red-50 border-red-200 pointer-events-auto cursor-pointer select-none"
             onClick={(e) => {
