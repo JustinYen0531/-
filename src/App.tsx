@@ -3726,9 +3726,19 @@ export default function App() {
                         return prev;
                     }
                     placedSuccessfully = true;
+                    const newSetupMine: Mine = {
+                        id: `pm-${actingPlayerId}-${r}-${c}`,
+                        owner: actingPlayerId,
+                        type: MineType.NORMAL,
+                        r,
+                        c,
+                        revealedTo: [actingPlayerId]
+                    };
+                    // Keep placement mine cache in lockstep with reducer updates to avoid ready-click races.
+                    placementMinesRef.current = unionPlacementMines(placementMinesRef.current, [newSetupMine]);
                     return {
                         ...prev,
-                        mines: [...prev.mines, { id: `pm-${actingPlayerId}-${r}-${c}`, owner: actingPlayerId, type: MineType.NORMAL, r, c, revealedTo: [actingPlayerId] }],
+                        mines: [...prev.mines, newSetupMine],
                         players: {
                             ...prev.players,
                             [actingPlayerId]: { ...p, placementMinesPlaced: p.placementMinesPlaced + 1 }
