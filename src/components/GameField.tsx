@@ -14,6 +14,15 @@ interface GameFieldProps {
     hoveredPos: { r: number, c: number } | null;
     onHoverCell?: (r: number, c: number | null) => void;
     disableBoardShake?: boolean;
+    evolutionFxEvent?: {
+        owner: PlayerID;
+        unitType: UnitType;
+        unitId: string;
+        r: number;
+        c: number;
+        branch: 'a' | 'b';
+        nonce: number;
+    } | null;
 }
 
 const GameField: React.FC<GameFieldProps> = ({
@@ -27,7 +36,8 @@ const GameField: React.FC<GameFieldProps> = ({
     viewerPlayerId,
     hoveredPos,
     onHoverCell,
-    disableBoardShake = false
+    disableBoardShake = false,
+    evolutionFxEvent = null
 }) => {
     const boardRef = useRef<HTMLDivElement>(null);
     const viewerPlayer = viewerPlayerId ?? gameState.currentPlayer;
@@ -153,6 +163,22 @@ const GameField: React.FC<GameFieldProps> = ({
                         const selectedUnitOwner = selectedUnit ? gameState.players[selectedUnit.owner] : null;
                         const selectedGeneralLevelA = selectedUnitOwner ? selectedUnitOwner.evolutionLevels[UnitType.GENERAL].a : 0;
                         const cellUnitLevelA = unit ? gameState.players[unit.owner].evolutionLevels[unit.type].a : 0;
+                        const cellEvolutionFxNonce =
+                            unit &&
+                                evolutionFxEvent &&
+                                unit.id === evolutionFxEvent.unitId &&
+                                r === evolutionFxEvent.r &&
+                                c === evolutionFxEvent.c
+                                ? evolutionFxEvent.nonce
+                                : 0;
+                        const cellEvolutionFxBranch: 'a' | 'b' | null =
+                            unit &&
+                                evolutionFxEvent &&
+                                unit.id === evolutionFxEvent.unitId &&
+                                r === evolutionFxEvent.r &&
+                                c === evolutionFxEvent.c
+                                ? evolutionFxEvent.branch
+                                : null;
 
                         const cellSensorResults = gameState.sensorResults?.filter(sr =>
                             sr.r === r && sr.c === c && sr.owner === viewerPlayer
@@ -194,6 +220,12 @@ const GameField: React.FC<GameFieldProps> = ({
                                             handleCellClick(r, c);
                                             return;
                                         }
+                                        // In placement phase, unit clicks should always go to unit handling
+                                        // so swap/selection keeps working even when setup-mine mode is active.
+                                        if (gameState.phase === 'placement' && unit) {
+                                            handleUnitClick(unit);
+                                            return;
+                                        }
                                         const isSkillTargeting = targetMode && targetMode !== 'move';
                                         if (isSkillTargeting) handleCellClick(r, c);
                                         else if (unit) handleUnitClick(unit);
@@ -217,6 +249,8 @@ const GameField: React.FC<GameFieldProps> = ({
                                     isSmoked={isSmoked}
                                     smokeOwner={smokesAtCell[0]?.owner}
                                     forceShowMines={gameState.sandboxShowAllMines}
+                                    evolutionFxNonce={cellEvolutionFxNonce}
+                                    evolutionFxBranch={cellEvolutionFxBranch}
                                     onDismissMiss={markResult?.success === false && onDismissMiss ? () => onDismissMiss(r, c) : undefined}
                                     hoveredPos={hoveredPos}
                                 />

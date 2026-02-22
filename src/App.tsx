@@ -41,6 +41,7 @@ import {
     AttackPayload,
     EndTurnPayload,
     EvolvePayload,
+    FlagActionPayload,
     MovePayload,
     PlaceMinePayload,
     ScanPayload,
@@ -93,8 +94,8 @@ const isMovePayload = (payload: unknown): payload is MovePayload => {
     return (
         typeof candidate.unitId === 'string' &&
         isBoardCoordinate(candidate.r, candidate.c) &&
-        typeof candidate.cost === 'number' &&
-        Number.isFinite(candidate.cost)
+        isInteger(candidate.cost) &&
+        candidate.cost >= 0
     );
 };
 
@@ -133,6 +134,12 @@ const isPlaceMinePayload = (payload: unknown): payload is PlaceMinePayload => {
         isBoardCoordinate(candidate.r, candidate.c) &&
         isMineTypeValue(candidate.mineType)
     );
+};
+
+const isFlagActionPayload = (payload: unknown): payload is FlagActionPayload => {
+    if (!payload || typeof payload !== 'object') return false;
+    const candidate = payload as Partial<FlagActionPayload>;
+    return typeof candidate.unitId === 'string';
 };
 
 const isEvolvePayload = (payload: unknown): payload is EvolvePayload => {
@@ -202,6 +209,30 @@ const PRIVATE_HINT_LOG_KEYS = new Set([
     'log_scan_smoke_blocked'
 ]);
 
+const ONCE_PER_TURN_HINT_LOG_KEYS = new Set([
+    'log_energy_cap',
+    'log_unit_acted',
+    'log_general_flag_move_limit',
+    'log_flag_move_limit'
+]);
+const PRIVATE_HINT_LOG_TTL_TURNS = 1;
+const EVOLUTION_SIDE_COLOR_LOG_KEYS = new Set([
+    'log_evol_gen_b_dmg_reduce',
+    'log_heavy_steps'
+]);
+
+const dedupeLogsBySignature = (logs: GameLog[]): GameLog[] => {
+    const seen = new Set<string>();
+    const deduped: GameLog[] = [];
+    for (const log of logs) {
+        const signature = `${log.turn}|${log.messageKey}|${log.owner ?? 'global'}|${serializeLogParams(log.params)}|${log.type}`;
+        if (seen.has(signature)) continue;
+        seen.add(signature);
+        deduped.push(log);
+    }
+    return deduped;
+};
+
 type SfxName = 'click' | 'place_mine' | 'attack' | 'mine_hit' | 'error' | 'victory' | 'defeat';
 
 const SFX_SOURCE: Record<SfxName, string> = {
@@ -233,10 +264,6 @@ const LOG_SFX_MAP: Partial<Record<string, { sound: SfxName; cooldownMs?: number;
 const serializeLogParams = (params?: Record<string, any>) => JSON.stringify(params ?? {});
 
 const upsertPlacementLogs = (logs: GameLog[], state: GameState, playerId: PlayerID): GameLog[] => {
-    const nextLogs = [...logs];
-    const alreadyHas = (messageKey: string) =>
-        nextLogs.some(log => log.messageKey === messageKey && log.owner === playerId);
-
     const playerState = state.players[playerId];
     const unitPositions = playerState.units
         .map(u => `${getUnitNameKey(u.type)}(${u.r + 1},${u.c + 1})`)
@@ -244,8 +271,17 @@ const upsertPlacementLogs = (logs: GameLog[], state: GameState, playerId: Player
     const playerMines = state.mines.filter(m => m.owner === playerId);
     const minePositions = playerMines.map(m => `(${m.r + 1},${m.c + 1})`).join(', ');
 
-    if (unitPositions && !alreadyHas('log_placement_units')) {
-        nextLogs.unshift({
+    // Replace stale placement logs for this player with the latest snapshot.
+    const filteredLogs = logs.filter(log =>
+        !(
+            log.owner === playerId &&
+            (log.messageKey === 'log_placement_units' || log.messageKey === 'log_placement_mines')
+        )
+    );
+
+    const newPlacementLogs: GameLog[] = [];
+    if (unitPositions) {
+        newPlacementLogs.push({
             turn: 1,
             messageKey: 'log_placement_units',
             params: { units: unitPositions },
@@ -253,9 +289,8 @@ const upsertPlacementLogs = (logs: GameLog[], state: GameState, playerId: Player
             owner: playerId
         });
     }
-
-    if (minePositions && state.gameMode === 'pvp' && !alreadyHas('log_placement_mines')) {
-        nextLogs.unshift({
+    if (minePositions) {
+        newPlacementLogs.push({
             turn: 1,
             messageKey: 'log_placement_mines',
             params: { mines: minePositions },
@@ -264,7 +299,7 @@ const upsertPlacementLogs = (logs: GameLog[], state: GameState, playerId: Player
         });
     }
 
-    return nextLogs;
+    return [...newPlacementLogs, ...filteredLogs];
 };
 
 const toSerializableGameState = (state: GameState): unknown => {
@@ -352,11 +387,23 @@ export default function App() {
     const [hoveredPos, setHoveredPos] = useState<{ r: number, c: number } | null>(null);
     const [aiDebug] = useState(false);
     const [aiDecision, setAiDecision] = useState<AIDecisionInfo | null>(null);
+    const [evolutionFxEvent, setEvolutionFxEvent] = useState<{
+        owner: PlayerID;
+        unitType: UnitType;
+        unitId: string;
+        r: number;
+        c: number;
+        branch: 'a' | 'b';
+        nonce: number;
+    } | null>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
     const sfxAudioRef = useRef<Map<SfxName, HTMLAudioElement>>(new Map());
     const sfxLastPlayedRef = useRef<Map<SfxName, number>>(new Map());
     const lastSfxLogRef = useRef<string>('');
     const lastWinnerSfxRef = useRef<string>('');
+    const lastEvolutionFxFromLogRef = useRef<string>('');
+    const lastEvolutionFxEmitRef = useRef<{ signature: string; ts: number } | null>(null);
+    const evolutionFxClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const applyingRemoteActionRef = useRef(false);
     const lastHandledPacketSeqRef = useRef<number | null>(null);
     const lastLogEmitRef = useRef<Map<string, number>>(new Map());
@@ -517,6 +564,56 @@ export default function App() {
         gameStateRef.current = gameState;
     }, [gameState]);
 
+    const emitEvolutionFx = useCallback((owner: PlayerID, unitType: UnitType, branch: 'a' | 'b') => {
+        const ownerUnits = gameStateRef.current.players[owner].units;
+        const targetUnit = ownerUnits.find(u => u.type === unitType && !u.isDead);
+        if (!targetUnit) return;
+        const signature = `${owner}|${unitType}|${branch}`;
+        lastEvolutionFxEmitRef.current = { signature, ts: Date.now() };
+        const nonce = Date.now() + Math.random();
+        setEvolutionFxEvent({
+            owner,
+            unitType,
+            unitId: targetUnit.id,
+            r: targetUnit.r,
+            c: targetUnit.c,
+            branch,
+            nonce
+        });
+        if (evolutionFxClearTimerRef.current) {
+            clearTimeout(evolutionFxClearTimerRef.current);
+        }
+        // Keep event alive briefly for one render/animation trigger, then clear
+        // so future movement into another cell cannot replay the same upgrade effect.
+        evolutionFxClearTimerRef.current = setTimeout(() => {
+            setEvolutionFxEvent(prev => (prev && prev.nonce === nonce ? null : prev));
+        }, 120);
+    }, []);
+
+    useEffect(() => () => {
+        if (evolutionFxClearTimerRef.current) {
+            clearTimeout(evolutionFxClearTimerRef.current);
+        }
+    }, []);
+
+    useEffect(() => {
+        const latestLog = gameState.logs[0];
+        if (!latestLog || latestLog.messageKey !== 'log_evolved' || !latestLog.owner) return;
+        const unitTypeRaw = latestLog.params?.unitType;
+        if (!isUnitTypeValue(unitTypeRaw)) return;
+        const branchRaw = String(latestLog.params?.branch ?? '').trim().toLowerCase();
+        const branch: 'a' | 'b' = branchRaw.startsWith('b') ? 'b' : 'a';
+        const signature = `${latestLog.turn}|${latestLog.owner}|${unitTypeRaw}|${branch}|${String(latestLog.params?.level ?? '')}`;
+        if (signature === lastEvolutionFxFromLogRef.current) return;
+        lastEvolutionFxFromLogRef.current = signature;
+
+        const directSig = `${latestLog.owner}|${unitTypeRaw}|${branch}`;
+        const recent = lastEvolutionFxEmitRef.current;
+        if (recent && recent.signature === directSig && Date.now() - recent.ts < 700) return;
+
+        emitEvolutionFx(latestLog.owner, unitTypeRaw, branch);
+    }, [emitEvolutionFx, gameState.logs]);
+
     // Reset selected mine type on mount to prevent persistence
     useEffect(() => {
         setSelectedMineType(MineType.NORMAL);
@@ -596,6 +693,17 @@ export default function App() {
             }
 
             if (PRIVATE_HINT_LOG_KEYS.has(messageKey)) {
+                if (ONCE_PER_TURN_HINT_LOG_KEYS.has(messageKey)) {
+                    const existsThisTurn = prev.logs.some(log =>
+                        log.turn === prev.turnCount &&
+                        log.messageKey === messageKey &&
+                        log.owner === resolvedOwner
+                    );
+                    if (existsThisTurn) {
+                        return prev;
+                    }
+                }
+
                 const existsInCurrentTurn = prev.logs.some(log =>
                     log.turn === prev.turnCount &&
                     log.messageKey === messageKey &&
@@ -683,7 +791,7 @@ export default function App() {
         return () => clearInterval(timer);
     }, []);
 
-    const getUnit = (id: string, state: GameState = gameState) => {
+    const getUnit = (id: string, state: GameState = gameStateRef.current) => {
         const p1Unit = state.players[PlayerID.P1].units.find(u => u.id === id);
         if (p1Unit) return p1Unit;
         return state.players[PlayerID.P2].units.find(u => u.id === id);
@@ -782,6 +890,29 @@ export default function App() {
         return getDisplayCostRaw(unit, baseCost, state, actionType);
     };
 
+    const getAuthoritativeMoveCost = useCallback((unit: Unit, state: GameState): number => {
+        const player = state.players[unit.owner];
+        const genLevelB = player.evolutionLevels[UnitType.GENERAL].b;
+        const genVariantB = player.evolutionLevels[UnitType.GENERAL].bVariant;
+
+        let baseCost = UNIT_STATS[unit.type].moveCost;
+        if (unit.hasFlag) {
+            if (unit.type === UnitType.GENERAL) {
+                // B3-1: General flag move cost reduced to 4.
+                baseCost = (genLevelB >= 3 && genVariantB === 1)
+                    ? 4
+                    : UNIT_STATS[UnitType.GENERAL].flagMoveCost;
+            } else {
+                // B3-1: Any unit carrying flag uses cost 4.
+                baseCost = (genLevelB >= 3 && genVariantB === 1) ? 4 : 5;
+            }
+        } else if (unit.type === UnitType.RANGER && unit.carriedMine) {
+            baseCost = 3;
+        }
+
+        return getDisplayCost(unit, baseCost, state, 'move');
+    }, [getDisplayCost]);
+
     // Rule 1: Energy Cap Check
     const checkEnergyCap = (unit: Unit, _player: PlayerState, cost: number) => {
         if (!engineCheckEnergyCap(unit, cost)) {
@@ -838,39 +969,7 @@ export default function App() {
         }
 
         setGameState(prev => {
-            const currentPlayerState = prev.players[localPlayer];
-
-            // Get placed mines for this player (only log for PvP; hide in PvE)
-            const playerMines = prev.mines.filter(m => m.owner === localPlayer);
-            const minePositions = playerMines.map(m => `(${m.r + 1},${m.c + 1})`).join(', ');
-
-            // Get unit positions for this player
-            const unitPositions = currentPlayerState.units
-                .map(u => `${getUnitNameKey(u.type)}(${u.r + 1},${u.c + 1})`)
-                .join(', ');
-
-            // Create logs
-            const newLogs = [...prev.logs];
-
-            if (unitPositions) {
-                newLogs.unshift({
-                    turn: 1,
-                    messageKey: 'log_placement_units',
-                    params: { units: unitPositions },
-                    type: 'move' as const,
-                    owner: localPlayer
-                });
-            }
-
-            if (minePositions && prev.gameMode === 'pvp') {
-                newLogs.unshift({
-                    turn: 1,
-                    messageKey: 'log_placement_mines',
-                    params: { mines: minePositions },
-                    type: 'move' as const,
-                    owner: localPlayer
-                });
-            }
+            const newLogs = upsertPlacementLogs(prev.logs, prev, localPlayer);
 
             // PvP mode: mark this player as ready, only transition when both are ready
             if (prev.gameMode === 'pvp') {
@@ -1093,7 +1192,7 @@ export default function App() {
                 const u = player.units.find(un => un.id === id);
                 return u && !u.isDead;
             });
-
+ 
             if (activeUnitId && activeUnitId !== unit.id) {
                 swapUnitDisplayOrder(activeUnitId, unit.id);
             }
@@ -1111,7 +1210,6 @@ export default function App() {
 
         if (state.activeUnitId && state.activeUnitId !== unit.id) {
             if (unit.owner === state.currentPlayer) {
-                addLog('log_committed', 'info');
                 return;
             }
             // Allow attacking enemy units even if another unit is active
@@ -1480,7 +1578,8 @@ export default function App() {
                 const newUnits = p.units.map(u => u.id === unit.id ? { ...u, carriedMine: null } : u);
 
                 const newMine: Mine = {
-                    id: `m-${Date.now()}`,
+                    // Preserve mine identity across pickup/drop in the same match.
+                    id: unit.carriedMine!.id,
                     owner: unit.owner,
                     type: unit.carriedMine!.type,
                     r: unit.r,
@@ -1819,7 +1918,8 @@ export default function App() {
                 });
             } else {
                 const newMine: Mine = {
-                    id: `m-${Date.now()}`,
+                    // Preserve mine identity so per-round quest dedupe stays stable.
+                    id: unit.carriedMine!.id,
                     owner: unit.owner,
                     type: (unit.carriedMine as any).type,
                     r, c,
@@ -2620,6 +2720,9 @@ export default function App() {
         if (!unit) {
             return;
         }
+        // Never trust packet-supplied movement energy in PvP.
+        // Recalculate from current authoritative state on receiver.
+        const authoritativeCost = getAuthoritativeMoveCost(unit, state);
 
         const shouldBroadcast = origin === 'local' && canBroadcastAction(unit.owner) && !!roomId;
         if (shouldBroadcast && roomId) {
@@ -2631,17 +2734,19 @@ export default function App() {
                     unitId,
                     r,
                     c,
-                    cost
+                    cost: authoritativeCost
                 }
             });
         }
 
-        playerActions.attemptMove(unitId, r, c, cost);
+        // `cost` here is packet/request value; ignored in favor of authoritativeCost.
+        void cost;
+        playerActions.attemptMove(unitId, r, c, authoritativeCost);
 
         if (shouldBroadcast) {
             sendGameStateDeferred('move');
         }
-    }, [canBroadcastAction, getUnit, playerActions.attemptMove, roomId, sendActionPacket, sendGameStateDeferred]);
+    }, [canBroadcastAction, getAuthoritativeMoveCost, getUnit, playerActions.attemptMove, roomId, sendActionPacket, sendGameStateDeferred]);
 
     const executeAttackAction = useCallback((
         attackerId: string,
@@ -2789,17 +2894,24 @@ export default function App() {
             });
         }
         if (origin === 'local') {
+            let didEvolve = false;
             flushSync(() => {
-                playerActions.handleEvolution(unitType, branch, variant);
+                didEvolve = playerActions.handleEvolution(unitType, branch, variant);
             });
-            if (shouldBroadcast) {
+            if (didEvolve) {
+                emitEvolutionFx(state.currentPlayer, unitType, branch);
+            }
+            if (didEvolve && shouldBroadcast) {
                 sendGameState('evolve');
             }
             return;
         }
 
-        playerActions.handleEvolution(unitType, branch, variant);
-    }, [canBroadcastAction, playerActions.handleEvolution, roomId, sendActionPacket, sendGameState]);
+        const didEvolve = playerActions.handleEvolution(unitType, branch, variant);
+        if (didEvolve) {
+            emitEvolutionFx(state.currentPlayer, unitType, branch);
+        }
+    }, [canBroadcastAction, emitEvolutionFx, playerActions.handleEvolution, roomId, sendActionPacket, sendGameState]);
 
     const executeEndTurnAction = useCallback((
         actedUnitId: string | null,
@@ -2892,6 +3004,62 @@ export default function App() {
         }
     }, [canBroadcastAction, playerActions.handleSkipTurn, roomId, sendActionPacket, sendGameStateDeferred]);
 
+    const executePickupFlagAction = useCallback((
+        origin: 'local' | 'remote' = 'local'
+    ) => {
+        const state = gameStateRef.current;
+        const selectedUnitId = state.selectedUnitId;
+        if (!selectedUnitId) return;
+        const unit = getUnit(selectedUnitId, state);
+        if (!unit) return;
+        if (unit.hasFlag) return;
+        const player = state.players[unit.owner];
+        if (unit.r !== player.flagPosition.r || unit.c !== player.flagPosition.c) return;
+
+        const shouldBroadcast = origin === 'local' && canBroadcastAction(unit.owner) && !!roomId;
+        if (shouldBroadcast && roomId) {
+            sendActionPacket({
+                type: 'PICKUP_FLAG',
+                matchId: roomId,
+                turn: state.turnCount,
+                payload: { unitId: unit.id }
+            });
+        }
+
+        playerActions.handlePickupFlag();
+
+        if (shouldBroadcast) {
+            sendGameStateDeferred('pickup_flag');
+        }
+    }, [canBroadcastAction, getUnit, playerActions.handlePickupFlag, roomId, sendActionPacket, sendGameStateDeferred]);
+
+    const executeDropFlagAction = useCallback((
+        origin: 'local' | 'remote' = 'local'
+    ) => {
+        const state = gameStateRef.current;
+        const selectedUnitId = state.selectedUnitId;
+        if (!selectedUnitId) return;
+        const unit = getUnit(selectedUnitId, state);
+        if (!unit) return;
+        if (!unit.hasFlag) return;
+
+        const shouldBroadcast = origin === 'local' && canBroadcastAction(unit.owner) && !!roomId;
+        if (shouldBroadcast && roomId) {
+            sendActionPacket({
+                type: 'DROP_FLAG',
+                matchId: roomId,
+                turn: state.turnCount,
+                payload: { unitId: unit.id }
+            });
+        }
+
+        playerActions.handleDropFlag();
+
+        if (shouldBroadcast) {
+            sendGameStateDeferred('drop_flag');
+        }
+    }, [canBroadcastAction, getUnit, playerActions.handleDropFlag, roomId, sendActionPacket, sendGameStateDeferred]);
+
     useEffect(() => {
         if (!lastIncomingPacket) return;
         if (lastHandledPacketSeqRef.current === lastIncomingPacket.seq) return;
@@ -2983,8 +3151,10 @@ export default function App() {
                     const preservedLocalPrivateLogs = prev.logs.filter(
                         log => PRIVATE_HINT_LOG_KEYS.has(log.messageKey) && log.owner === localPlayer
                     );
-
-                    const mergedLogs = [...preservedLocalPrivateLogs, ...nextSyncedState.logs].slice(0, 100);
+                    const syncedPublicLogs = nextSyncedState.logs.filter(log =>
+                        !PRIVATE_HINT_LOG_KEYS.has(log.messageKey) || log.owner === localPlayer
+                    );
+                    const mergedLogs = dedupeLogsBySignature([...preservedLocalPrivateLogs, ...syncedPublicLogs]).slice(0, 100);
                     return {
                         ...nextSyncedState,
                         logs: mergedLogs,
@@ -3168,6 +3338,44 @@ export default function App() {
                 return;
             }
 
+            if (type === 'PICKUP_FLAG') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
+                if (!isFlagActionPayload(payload)) {
+                    return;
+                }
+                const unit = getUnit(payload.unitId, state);
+                if (!unit || unit.owner !== expectedRemoteOwner) {
+                    return;
+                }
+                setGameState(prev => ({ ...prev, selectedUnitId: payload.unitId }));
+                executePickupFlagAction('remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_pickup_flag_applied');
+                }
+                return;
+            }
+
+            if (type === 'DROP_FLAG') {
+                if (!isValidRemoteActionWindow()) {
+                    return;
+                }
+                if (!isFlagActionPayload(payload)) {
+                    return;
+                }
+                const unit = getUnit(payload.unitId, state);
+                if (!unit || unit.owner !== expectedRemoteOwner) {
+                    return;
+                }
+                setGameState(prev => ({ ...prev, selectedUnitId: payload.unitId }));
+                executeDropFlagAction('remote');
+                if (isHost) {
+                    sendGameStateDeferred('remote_drop_flag_applied');
+                }
+                return;
+            }
+
             if (type === 'EVOLVE') {
                 if (!isValidRemoteActionWindow()) {
                     return;
@@ -3215,9 +3423,11 @@ export default function App() {
         }
     }, [
         executeAttackAction,
+        executeDropFlagAction,
         executeEndTurnAction,
         executeEvolveAction,
         executeMoveAction,
+        executePickupFlagAction,
         executePlaceMineAction,
         executeScanAction,
         executeSensorScanAction,
@@ -3529,6 +3739,8 @@ export default function App() {
         handleDisarmAction,
         handleDetonateTowerAction,
         handleRangerAction,
+        handlePickupFlag: executePickupFlagAction,
+        handleDropFlag: executeDropFlagAction,
         setShowEvolutionTree,
         getLocalizedUnitName: (type: UnitType) => t(getUnitNameKey(type)),
     };
@@ -3543,12 +3755,6 @@ export default function App() {
         : PlayerID.P1;
     const shouldHideEnemyMineLogs = gameState.gameMode === 'pvp' || gameState.gameMode === 'pve';
     const shouldFlipBoard = gameState.gameMode === 'pvp' && localPerspectivePlayer === PlayerID.P2;
-    const viewerPlayerId = gameState.gameMode === 'pvp'
-        ? (localPerspectivePlayer ?? gameState.currentPlayer)
-        : gameState.gameMode === 'sandbox'
-            ? gameState.currentPlayer
-            : PlayerID.P1;
-
     useGameLoop({
         gameStateRef,
         setGameState,
@@ -3556,6 +3762,7 @@ export default function App() {
         targetMode,
         setTargetMode,
         isBoardFlippedForLocal: shouldFlipBoard,
+        localPlayerId: localPerspectivePlayer,
         actions: gameLoopActions
     });
 
@@ -3585,8 +3792,8 @@ export default function App() {
             handleRangerAction,
             handleDisarm: handleDisarmAction,
             handleEvolution: executeEvolveAction,
-            handlePickupFlag: playerActions.handlePickupFlag,
-            handleDropFlag: playerActions.handleDropFlag,
+            handlePickupFlag: executePickupFlagAction,
+            handleDropFlag: executeDropFlagAction,
             handleActionComplete: executeEndTurnAction
         }
     });
@@ -3627,24 +3834,28 @@ export default function App() {
         : gameState.gameMode === 'sandbox'
             ? true
             : (gameState.currentPlayer === PlayerID.P1);
+    const privateHintMinTurn = Math.max(1, gameState.turnCount - PRIVATE_HINT_LOG_TTL_TURNS + 1);
     const filteredLogs = gameState.logs.filter((log) => {
         if (log.messageKey === 'log_mine_limit') return false;
         if (gameState.gameMode === 'sandbox') return true;
         if (PRIVATE_HINT_LOG_KEYS.has(log.messageKey)) {
-            return !!log.owner && log.owner === localLogOwnerPlayerId;
+            if (!log.owner || log.owner !== localLogOwnerPlayerId) return false;
+            return log.turn >= privateHintMinTurn;
         }
         if (!shouldHideEnemyMineLogs) return true;
         if (!log.owner) return true;
         if (!ENEMY_MINE_LOG_KEYS.has(log.messageKey)) return true;
         return log.owner === localLogOwnerPlayerId;
     });
+    // Keep existing rows stable: older messages stay on top, new ones append below.
+    const displayedLogs = filteredLogs.slice().reverse();
 
     return (
         <div className="w-full h-screen bg-slate-950 text-white flex flex-col overflow-hidden font-sans select-none">
             {/* Background Music */}
             <audio
                 ref={audioRef}
-                src={view === 'lobby' ? '/日常を描いたbgmdailyフリー素材.mp3' : '/the-final-boss-battle-158700.mp3'}
+                src={view === 'lobby' ? '/日常?描??bgmdaily???素材.mp3' : '/the-final-boss-battle-158700.mp3'}
                 loop
             />
 
@@ -3876,6 +4087,7 @@ export default function App() {
                                     hoveredPos={hoveredPos}
                                     onHoverCell={handleHoverCell}
                                     disableBoardShake={disableBoardShake}
+                                    evolutionFxEvent={evolutionFxEvent}
                                 />
 
                                 {/* Timer Bar Below Board */}
@@ -3943,31 +4155,50 @@ export default function App() {
                                     </div>
 
                                     <div className="flex-1 overflow-y-auto p-2 space-y-2 text-sm scrollbar-thin scrollbar-thumb-white/30">
-                                        {filteredLogs.map((log, i) => {
-                                            // Determine color based on type and owner
-                                            // Blue = P1 (always viewer), Red = P2 (always enemy)
+                                        {displayedLogs.map((log, i) => {
+                                            const logKey = `${log.turn}|${log.messageKey}|${log.owner ?? 'global'}|${serializeLogParams(log.params)}|${i}`;
+                                            const isEvolutionLog =
+                                                log.type === 'evolution' ||
+                                                log.messageKey === 'log_evolved' ||
+                                                log.messageKey.startsWith('log_evol_');
+                                            const isSideColorEvolution = EVOLUTION_SIDE_COLOR_LOG_KEYS.has(log.messageKey);
+                                            const evolutionPrefix = isEvolutionLog && log.owner
+                                                ? (
+                                                    language === 'en'
+                                                        ? (log.owner === localLogOwnerPlayerId ? '[ALLY] ' : '[ENEMY] ')
+                                                        : language === 'zh_cn'
+                                                            ? (log.owner === localLogOwnerPlayerId ? '[我方] ' : '[敌方] ')
+                                                            : (log.owner === localLogOwnerPlayerId ? '[我方] ' : '[敵方] ')
+                                                )
+                                                : '';
+                                            const logText = `${evolutionPrefix}${t(log.messageKey, log.params)}`;
+                                            // Determine color primarily by owner side.
+                                            // Any owned log is side-colored so players can see who acted.
                                             let bgColor = 'bg-slate-800/50 border-white text-white';
 
-                                            if (log.type === 'error') {
-                                                bgColor = 'bg-slate-700/40 border-slate-500 text-slate-300';
-                                            } else if (log.type === 'evolution') {
+                                            if (PRIVATE_HINT_LOG_KEYS.has(log.messageKey)) {
+                                                bgColor = 'bg-slate-700/40 border-slate-500 text-slate-200';
+                                            } else if (isSideColorEvolution && log.owner === PlayerID.P1) {
+                                                bgColor = 'bg-blue-950/40 border-blue-500 text-blue-200';
+                                            } else if (isSideColorEvolution && log.owner === PlayerID.P2) {
+                                                bgColor = 'bg-red-950/40 border-red-500 text-red-200';
+                                            } else if (isEvolutionLog) {
                                                 bgColor = 'bg-purple-950/40 border-purple-500 text-purple-200';
-                                            } else if (log.type === 'combat' || log.type === 'mine' || log.type === 'move') {
-                                                // Combat/Mine/Move: Blue if P1, Red if P2
-                                                if (log.owner === PlayerID.P1) {
-                                                    bgColor = 'bg-blue-950/40 border-blue-500 text-blue-200';
-                                                } else if (log.owner === PlayerID.P2) {
-                                                    bgColor = 'bg-red-950/40 border-red-500 text-red-200';
-                                                }
+                                            } else if (log.owner === PlayerID.P1) {
+                                                bgColor = 'bg-blue-950/40 border-blue-500 text-blue-200';
+                                            } else if (log.owner === PlayerID.P2) {
+                                                bgColor = 'bg-red-950/40 border-red-500 text-red-200';
+                                            } else if (log.type === 'error') {
+                                                bgColor = 'bg-slate-700/40 border-slate-500 text-slate-300';
                                             } else {
-                                                // Info/System: Yellow
+                                                // Ownerless system/info logs
                                                 bgColor = 'bg-yellow-950/40 border-yellow-500 text-yellow-200';
                                             }
 
                                             return (
-                                                <div key={i} className={`p-2 rounded border-l-4 leading-tight font-bold text-xs ${bgColor}`}>
+                                                <div key={logKey} className={`p-2 rounded border-l-4 leading-tight font-bold text-xs ${bgColor}`}>
                                                     <span className="opacity-60 text-[10px] mr-2 font-bold text-gray-400">[{log.turn}]</span>
-                                                    {t(log.messageKey, log.params)}
+                                                    {logText}
                                                 </div>
                                             );
                                         })}
@@ -3997,8 +4228,8 @@ export default function App() {
                             handleScanAction: executeScanAction,
                             handlePlaceMineAction: executePlaceMineAction,
                             handleEvolve: executeEvolveAction,
-                            handlePickupFlag: playerActions.handlePickupFlag,
-                            handleDropFlag: playerActions.handleDropFlag,
+                            handlePickupFlag: executePickupFlagAction,
+                            handleDropFlag: executeDropFlagAction,
                             handleAttack: executeAttackAction,
                             handleStealth: handleStealthAction,
                         }}
@@ -4068,3 +4299,7 @@ export default function App() {
         </div>
     );
 }
+
+
+
+

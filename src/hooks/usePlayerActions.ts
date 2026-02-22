@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import {
     GameState, PlayerID, Unit, Mine, UnitType,
     MineType, GameLog, Coordinates, PlayerState, VFXEffect, TargetMode, Building
@@ -45,6 +45,8 @@ export const usePlayerActions = ({
     addVFX,
     addLog,
 }: UsePlayerActionsProps) => {
+    const energyCapWarnedTurnsRef = useRef<Set<string>>(new Set());
+    const energyCapWarnedTurnCounterRef = useRef<number>(-1);
 
     const getLocalizedUnitName = useCallback((type: UnitType) => getUnitNameKey(type), []);
 
@@ -57,13 +59,24 @@ export const usePlayerActions = ({
     // getDisplayCost removed as it was unused inside the hook body
 
     const checkEnergyCap = useCallback((unit: Unit, _player: PlayerState, cost: number) => {
+        const state = gameStateRef.current;
+        if (energyCapWarnedTurnCounterRef.current !== state.turnCount) {
+            energyCapWarnedTurnCounterRef.current = state.turnCount;
+            energyCapWarnedTurnsRef.current.clear();
+        }
+
         if (!engineCheckEnergyCap(unit, cost)) {
-            const cap = Math.floor(unit.startOfActionEnergy * ENERGY_CAP_RATIO);
-            addLog('log_energy_cap', 'error', { cap });
+            // One energy-cap warning per unit-action window to avoid log spam.
+            const warnKey = `${state.turnCount}|${unit.owner}|${unit.id}|${unit.startOfActionEnergy}`;
+            if (!energyCapWarnedTurnsRef.current.has(warnKey)) {
+                energyCapWarnedTurnsRef.current.add(warnKey);
+                const cap = Math.floor(unit.startOfActionEnergy * ENERGY_CAP_RATIO);
+                addLog('log_energy_cap', 'error', { cap });
+            }
             return false;
         }
         return true;
-    }, [addLog]);
+    }, [addLog, gameStateRef]);
 
     const checkVictory = useCallback(() => {
         const state = gameStateRef.current;
@@ -167,7 +180,7 @@ export const usePlayerActions = ({
                         playerLogs.push({
                             turn: nextTurn,
                             messageKey: 'log_attack_hit',
-                            params: { attacker: '旗靈領域', target: getLocalizedUnitName(u.type), dmg: 4 },
+                            params: { attacker: 'evol_gen_b_r3_2', target: getLocalizedUnitName(u.type), dmg: 4 },
                             type: 'combat',
                             owner: enemyPlayerState.id
                         });
@@ -683,7 +696,7 @@ export const usePlayerActions = ({
             if (!wasInZone && isInZone && !alreadyTookDmg) {
                 const kDmg = 2;
                 newHp = Math.max(0, newHp - kDmg);
-                addLog('log_attack_hit', 'combat', { attacker: '旗靈領域', target: getLocalizedUnitName(unit.type), dmg: kDmg }, enemyPlayerId);
+                addLog('log_attack_hit', 'combat', { attacker: 'evol_gen_b_r3_2', target: getLocalizedUnitName(unit.type), dmg: kDmg }, enemyPlayerId);
 
                 if (!qStats.flagSpiritDamageTakenThisTurn) qStats.flagSpiritDamageTakenThisTurn = new Set();
                 qStats.flagSpiritDamageTakenThisTurn = new Set(qStats.flagSpiritDamageTakenThisTurn);
@@ -780,7 +793,7 @@ export const usePlayerActions = ({
                         } else if (k === 'log_evol_def_a_heal') {
                             addLog(k, 'move', {}, unit.owner); // Blue for P1, Red for P2
                         } else {
-                            addLog(k, 'evolution');
+                            addLog(k, 'evolution', undefined, unit.owner);
                         }
                     });
                     if (unit.type !== UnitType.DEFUSER) qStats.triggeredMineThisRound = true;
@@ -1006,7 +1019,7 @@ export const usePlayerActions = ({
         if (!checkEnergyCap(attacker, player, cost)) return;
 
         const { damage: dmg, logKey } = calculateAttackDamage(attacker, targetUnit, state.players[attacker.owner], state.players[targetUnit.owner], false);
-        if (logKey) addLog(logKey, 'evolution');
+        if (logKey) addLog(logKey, 'evolution', undefined, targetUnit.owner);
 
         let isDead = targetUnit.hp - dmg <= 0;
         let killReward = isDead ? 3 + Math.floor(state.players[targetUnit.owner].energy * 0.15) : 0;
@@ -1099,6 +1112,7 @@ export const usePlayerActions = ({
         const state = gameStateRef.current;
         const unit = state.selectedUnitId ? getUnit(state.selectedUnitId) : null;
         if (!unit) return;
+        if (unit.hasFlag) return;
         const player = state.players[unit.owner];
         const genLevelB = player.evolutionLevels[UnitType.GENERAL].b;
         const genVariantB = player.evolutionLevels[UnitType.GENERAL].bVariant;
@@ -1109,7 +1123,6 @@ export const usePlayerActions = ({
             const p = prev.players[unit.owner];
             return { ...prev, activeUnitId: unit.id, players: { ...prev.players, [unit.owner]: { ...p, units: p.units.map(u => u.id === unit.id ? { ...u, hasFlag: true } : u) } }, lastActionTime: Date.now(), isTimeFrozen: true };
         });
-        addLog('log_committed', 'info');
         addLog('log_flag_pickup', 'move', { r: unit.r + 1, c: unit.c + 1 }, unit.owner);
     }, [gameStateRef, getUnit, setGameState, addLog]);
 
@@ -1121,7 +1134,6 @@ export const usePlayerActions = ({
             const p = prev.players[unit.owner];
             return { ...prev, activeUnitId: unit.id, players: { ...prev.players, [unit.owner]: { ...p, units: p.units.map(u => u.id === unit.id ? { ...u, hasFlag: false } : u), flagPosition: { r: unit.r, c: unit.c } } }, lastActionTime: Date.now(), isTimeFrozen: true };
         });
-        addLog('log_committed', 'info');
         addLog('log_flag_drop', 'move', { r: unit.r + 1, c: unit.c + 1 }, unit.owner);
     }, [gameStateRef, getUnit, setGameState, addLog]);
 
@@ -1527,8 +1539,8 @@ export const usePlayerActions = ({
     }, [gameStateRef, addLog, addVFX, setGameState, handleActionComplete]);
 
     const handleRanger = useCallback((_subAction: 'pickup' | 'drop') => {
-        addLog('log_committed', 'info');
-    }, [addLog]);
+        return;
+    }, []);
 
     const handleStealth = useCallback((unitId: string) => {
         const state = gameStateRef.current;
@@ -1562,6 +1574,13 @@ export const usePlayerActions = ({
         const player = state.players[unit.owner];
         const swpB = player.evolutionLevels[UnitType.MINESWEEPER].b;
         const variantB = player.evolutionLevels[UnitType.MINESWEEPER].bVariant;
+
+        // Sensor Scan is a 5x5 target area around caster (Chebyshev <= 2).
+        const chebyshevDist = Math.max(Math.abs(unit.r - r), Math.abs(unit.c - c));
+        if (chebyshevDist > 2) {
+            addLog('log_scan_range', 'info');
+            return;
+        }
 
         const cost = swpB >= 3 ? 4 : 5;
         if (!checkEnergyCap(unit, player, cost)) return;
@@ -1639,21 +1658,22 @@ export const usePlayerActions = ({
     }, [gameStateRef, getUnit, checkEnergyCap, addLog, setGameState, addVFX, setTargetMode]);
 
 
-    const handleEvolve = useCallback((unitType: UnitType, branch: 'a' | 'b', variant?: number) => {
+    const handleEvolve = useCallback((unitType: UnitType, branch: 'a' | 'b', variant?: number): boolean => {
         const state = gameStateRef.current;
         const player = state.players[state.currentPlayer];
         const currentLevel = player.evolutionLevels[unitType][branch];
-        if (currentLevel >= 3) return;
+        if (currentLevel >= 3) return false;
         const cost = EVOLUTION_COSTS[currentLevel as keyof typeof EVOLUTION_COSTS];
-        if (player.energy < cost) { addLog('log_low_energy', 'info', { cost }); return; }
+        if (player.energy < cost) { addLog('log_low_energy', 'info', { cost }); return false; }
 
         setGameState(prev => {
             const p = prev.players[prev.currentPlayer];
             const newLevels = { ...p.evolutionLevels, [unitType]: { ...p.evolutionLevels[unitType], [branch]: currentLevel + 1, [branch + 'Variant']: variant || p.evolutionLevels[unitType][branch + 'Variant' as keyof typeof p.evolutionLevels[typeof unitType]] } };
             return { ...prev, players: { ...prev.players, [prev.currentPlayer]: { ...p, energy: p.energy - cost, evolutionLevels: newLevels } }, lastActionTime: Date.now(), isTimeFrozen: true };
         });
-        addLog('log_evolved', 'move', { unit: getLocalizedUnitName(unitType), branch, level: currentLevel + 1 }, state.currentPlayer);
+        addLog('log_evolved', 'move', { unit: getLocalizedUnitName(unitType), unitType, branch, level: currentLevel + 1 }, state.currentPlayer);
         if (currentLevel + 1 === 3) setShowEvolutionTree(false);
+        return true;
     }, [gameStateRef, addLog, setGameState, setShowEvolutionTree]);
 
     return {

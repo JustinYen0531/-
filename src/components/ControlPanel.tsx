@@ -668,7 +668,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                         <Ghost size={28} />
                                                                         <span className="text-xs">{unit.status.isStealthed ? t('cancel') : t('evol_rng_b_r2')}</span>
                                                                     </button>
-                                                                    <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {unit.status.isStealthed ? 3 : 0}</div>
+                                                                    <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> 0</div>
                                                                 </div>
                                                             );
                                                         }

@@ -10,6 +10,8 @@ export type ActionPacketType =
     | 'SCAN'
     | 'SENSOR_SCAN'
     | 'PLACE_MINE'
+    | 'PICKUP_FLAG'
+    | 'DROP_FLAG'
     | 'EVOLVE'
     | 'END_TURN'
     | 'SKIP_TURN'
@@ -74,6 +76,10 @@ export interface PlaceMinePayload {
     r: number;
     c: number;
     mineType: MineType;
+}
+
+export interface FlagActionPayload {
+    unitId: string;
 }
 
 export interface EvolvePayload {

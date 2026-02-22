@@ -34,6 +34,7 @@ export interface UseGameLoopProps {
     targetMode: TargetMode;
     setTargetMode: (mode: TargetMode) => void;
     isBoardFlippedForLocal?: boolean;
+    localPlayerId?: PlayerID | null;
     actions: GameLoopActions;
 }
 
@@ -44,6 +45,7 @@ export const useGameLoop = ({
     targetMode,
     setTargetMode,
     isBoardFlippedForLocal = false,
+    localPlayerId = null,
     actions
 }: UseGameLoopProps) => {
 
@@ -107,9 +109,11 @@ export const useGameLoop = ({
         if (view !== 'game') return;
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.repeat) return;
             const state = gameStateRef.current;
             if (state.gameOver || state.isPaused) return;
             if (state.gameMode === 'pve' && state.currentPlayer === PlayerID.P2) return;
+            if (state.gameMode === 'pvp' && state.phase !== 'placement' && localPlayerId && state.currentPlayer !== localPlayerId) return;
 
             // ENTER - Ready/Skip Turn
             if (e.key === 'Enter') {
@@ -163,7 +167,7 @@ export const useGameLoop = ({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [view, actions, setGameState, gameStateRef]);
+    }, [view, actions, setGameState, gameStateRef, localPlayerId]);
 
 
     // --- Keyboard Control for Action Selection (1, 2, 3, 4, 5...) ---
@@ -171,10 +175,12 @@ export const useGameLoop = ({
         if (view !== 'game') return;
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.repeat) return;
             const state = gameStateRef.current;
             if (state.gameOver || state.isPaused) return;
             if (state.phase !== 'action') return;
             if (state.gameMode === 'pve' && state.currentPlayer === PlayerID.P2) return;
+            if (state.gameMode === 'pvp' && localPlayerId && state.currentPlayer !== localPlayerId) return;
             if (!state.selectedUnitId) return;
 
             const unit = getUnit(state.selectedUnitId, state);
@@ -341,19 +347,21 @@ export const useGameLoop = ({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [view, actions, setGameState, gameStateRef, setTargetMode]);
+    }, [view, actions, setGameState, gameStateRef, setTargetMode, localPlayerId]);
 
     // --- Keyboard Control for Movement (Arrow Keys Only) ---
     useEffect(() => {
         if (view !== 'game') return;
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.repeat) return;
             const state = gameStateRef.current;
             if (state.gameOver || state.isPaused) return;
             if (state.phase === 'thinking') return;
             if (state.phase === 'placement') return;
 
             if (state.gameMode === 'pve' && state.currentPlayer === PlayerID.P2) return;
+            if (state.gameMode === 'pvp' && localPlayerId && state.currentPlayer !== localPlayerId) return;
 
             if (!state.selectedUnitId) return;
 
@@ -404,13 +412,14 @@ export const useGameLoop = ({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [view, targetMode, actions, gameStateRef, setTargetMode, isBoardFlippedForLocal]);
+    }, [view, targetMode, actions, gameStateRef, setTargetMode, isBoardFlippedForLocal, localPlayerId]);
 
     // --- Keyboard Control for Evolution Tree (Space) ---
     useEffect(() => {
         if (view !== 'game') return;
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.repeat) return;
             if (e.key === ' ') {
                 e.preventDefault();
                 actions.setShowEvolutionTree(prev => !prev);

@@ -95,6 +95,8 @@ interface GridCellProps {
   forceShowMines?: boolean;
   isUnitStealthed?: boolean;
   selectedUnitLevelB?: number;
+  evolutionFxNonce?: number;
+  evolutionFxBranch?: 'a' | 'b' | null;
   hoveredPos?: { r: number, c: number } | null;
   onHover?: (r: number, c: number) => void;
 }
@@ -131,6 +133,8 @@ const GridCell: React.FC<GridCellProps> = ({
   forceShowMines = false,
   isUnitStealthed = false,
   selectedUnitLevelB = 0,
+  evolutionFxNonce = 0,
+  evolutionFxBranch = null,
   hoveredPos = null,
   onHover,
 }) => {
@@ -138,25 +142,24 @@ const GridCell: React.FC<GridCellProps> = ({
   const [flagBurstParticles, setFlagBurstParticles] = React.useState<Array<{ id: string, x: number, y: number, delay: number, size: number, duration: number }>>([]);
   const [flagBurstTheme, setFlagBurstTheme] = React.useState<'a' | 'b'>('a');
   const [isLocallyDismissed, setIsLocallyDismissed] = React.useState(false);
-  const prevLevelA = React.useRef(evolutionLevelA);
-  const prevLevelB = React.useRef(evolutionLevelB);
-  const prevGeneralAuraLevelA = React.useRef(evolutionLevelA);
-  const prevGeneralAuraLevelB = React.useRef(evolutionLevelB);
+  const prevParticleFxNonce = React.useRef(evolutionFxNonce);
+  const prevBurstFxNonce = React.useRef(evolutionFxNonce);
 
   // When the actual prop updates (e.g. cleared by game state or re-scanned), reset local state
   React.useEffect(() => {
     setIsLocallyDismissed(false);
   }, [scanMarkSuccess]);
 
-  // Generate particles ONLY when evolution level changes (not on every render)
+  // Generate particles ONLY when the app emits a real evolution event.
   React.useEffect(() => {
-    const levelAChanged = evolutionLevelA > prevLevelA.current;
-    const levelBChanged = evolutionLevelB > prevLevelB.current;
+    const hasNewFxSignal = evolutionFxNonce > 0 && evolutionFxNonce !== prevParticleFxNonce.current;
+    const shouldPlay = hasNewFxSignal && !!unit && !unit.isDead;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    if (levelAChanged || levelBChanged) {
+    if (shouldPlay) {
       const newParticles = [];
       const particleCount = 12;
-      const color = levelAChanged ? 'blue' : 'orange';
+      const color = evolutionFxBranch === 'b' ? 'orange' : 'blue';
 
       for (let i = 0; i < particleCount; i++) {
         const angle = (i / particleCount) * Math.PI * 2;
@@ -174,15 +177,20 @@ const GridCell: React.FC<GridCellProps> = ({
       }
 
       setParticles(newParticles);
-      const timer = setTimeout(() => setParticles([]), 1200);
-      return () => clearTimeout(timer);
+      timer = setTimeout(() => setParticles([]), 1200);
     }
 
-    prevLevelA.current = evolutionLevelA;
-    prevLevelB.current = evolutionLevelB;
-  }, [evolutionLevelA, evolutionLevelB]);
+    if (evolutionFxNonce > 0) prevParticleFxNonce.current = evolutionFxNonce;
 
-  // 閮??臬?典?瑁???
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead, evolutionLevelA, evolutionLevelB]);
+
+  // Action highlighting:
+  // - isInActionScope: within skill range (faint frame)
+  // - isInActionRange: executable target (strong highlight)
+  let isInActionScope = false;
   let isInActionRange = false;
   let actionRangeColor = '';
 
@@ -208,10 +216,14 @@ const GridCell: React.FC<GridCellProps> = ({
     } else if (targetMode === 'teleport' && !cell.isObstacle && !unit && !building) {
       isInActionRange = true;
       actionRangeColor = 'cell-range-amber';
-    } else if (targetMode === 'pickup_mine_select' && manhattanDist <= (selectedUnitLevelB >= 1 ? 2 : 0)) {
-      if (mine && (mine.revealedTo.includes(currentPlayer) || mine.owner === currentPlayer)) {
-        isInActionRange = true;
+    } else if (targetMode === 'pickup_mine_select') {
+      const pickupRange = selectedUnitLevelB >= 1 ? 2 : 0;
+      if (manhattanDist <= pickupRange) {
+        isInActionScope = true;
         actionRangeColor = 'cell-range-yellow';
+      }
+      if (manhattanDist <= pickupRange && mine && (mine.revealedTo.includes(currentPlayer) || mine.owner === currentPlayer)) {
+        isInActionRange = true;
       }
     } else if (targetMode === 'disarm') {
       const dr = Math.abs(selectedUnit.r - cell.r);
@@ -220,14 +232,20 @@ const GridCell: React.FC<GridCellProps> = ({
 
       if (selectedUnit.type === UnitType.DEFUSER) {
         const range = (selectedUnitLevelB >= 1) ? 3 : 2;
-        if (dr + dc <= range && (mine || (building && building.owner !== currentPlayer))) {
-          isInActionRange = true;
+        if (dr + dc <= range) {
+          isInActionScope = true;
           actionRangeColor = 'cell-range-amber';
+          if (mine || (building && building.owner !== currentPlayer)) {
+            isInActionRange = true;
+          }
         }
       } else {
-        if (chebyshevDist === 0 && building && building.owner !== currentPlayer) {
-          isInActionRange = true;
+        if (chebyshevDist === 0) {
+          isInActionScope = true;
           actionRangeColor = 'cell-range-pink';
+          if (building && building.owner !== currentPlayer) {
+            isInActionRange = true;
+          }
         }
       }
     } else if (targetMode === 'attack' && selectedUnit) {
@@ -240,7 +258,7 @@ const GridCell: React.FC<GridCellProps> = ({
       const isCardinalDirection = dr === 0 || dc === 0;
 
       if (manhattanDist <= attackRange && isCardinalDirection) {
-        isInActionRange = true;
+        isInActionScope = true;
         actionRangeColor = 'cell-range-red';
       }
     } else if (targetMode === 'place_mine') {
@@ -302,16 +320,12 @@ const GridCell: React.FC<GridCellProps> = ({
 
   // One-shot "small fireworks" when any unit upgrades (A=blue, B=orange).
   React.useEffect(() => {
-    const prevAuraA = prevGeneralAuraLevelA.current;
-    const prevAuraB = prevGeneralAuraLevelB.current;
-    const isAliveUnitHere = !!unit && !unit.isDead;
-    const aUpgraded = isAliveUnitHere && evolutionLevelA > prevAuraA;
-    const bUpgraded = isAliveUnitHere && evolutionLevelB > prevAuraB;
-    const shouldBurst = aUpgraded || bUpgraded;
+    const hasNewFxSignal = evolutionFxNonce > 0 && evolutionFxNonce !== prevBurstFxNonce.current;
+    const shouldBurst = hasNewFxSignal && !!unit && !unit.isDead;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     if (shouldBurst) {
-      setFlagBurstTheme(bUpgraded ? 'b' : 'a');
+      setFlagBurstTheme(evolutionFxBranch === 'b' ? 'b' : 'a');
       const count = 30;
       const burst = [];
       for (let i = 0; i < count; i++) {
@@ -331,13 +345,12 @@ const GridCell: React.FC<GridCellProps> = ({
       timer = setTimeout(() => setFlagBurstParticles([]), 980);
     }
 
-    prevGeneralAuraLevelA.current = evolutionLevelA;
-    prevGeneralAuraLevelB.current = evolutionLevelB;
+    if (evolutionFxNonce > 0) prevBurstFxNonce.current = evolutionFxNonce;
 
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [unit, evolutionLevelA, evolutionLevelB]);
+  }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead, evolutionLevelA, evolutionLevelB]);
 
   // Determine if THIS cell is a center of a focused building or domain
   // We need this to lift the center cell's Z-Index so its child range indicator overlays neighbors
@@ -389,12 +402,21 @@ const GridCell: React.FC<GridCellProps> = ({
     bgColor = 'rtx-cell-p2';
   }
 
+  let foregroundHighlightClass = '';
+  let cellHighlightClass = '';
   if (cell.isObstacle) bgColor = 'bg-slate-800/90 border-2 border-slate-400/50 shadow-[0_0_15px_rgba(255,255,255,0.2),inset_0_0_10px_rgba(255,255,255,0.1)] pattern-diagonal-lines brightness-75';
-  if (isInActionRange && targetMode === 'scan') bgColor += ` cell-highlight-action-range ${actionRangeColor}`;
-  else if (isSelected && targetMode !== 'scan') bgColor += ' cell-highlight-selected';
-  else if (isValidMove) bgColor += ' cell-highlight-valid-move';
-  else if (isAttackTarget) bgColor += ' cell-highlight-attack';
-  else if (isInActionRange) bgColor += ` cell-highlight-action-range ${actionRangeColor}`;
+  if (isInActionRange && targetMode === 'scan') cellHighlightClass = `cell-highlight-action-range ${actionRangeColor}`;
+  else if (isSelected && targetMode !== 'scan') cellHighlightClass = 'cell-highlight-selected';
+  else if (isValidMove) cellHighlightClass = 'cell-highlight-valid-move';
+  else if (isAttackTarget) cellHighlightClass = 'cell-highlight-attack';
+  else if (isInActionRange) cellHighlightClass = `cell-highlight-action-range ${actionRangeColor}`;
+  else if (isInActionScope) cellHighlightClass = `cell-highlight-action-scope ${actionRangeColor}`;
+
+  if (cellHighlightClass) {
+    // Render highlight above occupying units so border cues stay visible.
+    if (unit && !unit.isDead) foregroundHighlightClass = cellHighlightClass;
+    else bgColor += ` ${cellHighlightClass}`;
+  }
 
   // Checker for Damage Zone (General Path B 3-2)
   // Building range calculations are now handled by high-level indicators.
@@ -483,61 +505,93 @@ const GridCell: React.FC<GridCellProps> = ({
   };
 
   const renderGeneralBFlagMorph = (owner: PlayerID, levelB: number, variantB: 1 | 2 | null) => {
-    const royalBlue = '#2563eb';
-    const deepBlue = '#1e3a8a';
-    const skyBlue = '#38bdf8';
-    const accentColor = levelB >= 3 && variantB === 2 ? '#93c5fd' : royalBlue;
-    const darkFill = deepBlue;
+    const isBlueOwner = owner === PlayerID.P1;
+    const palette = isBlueOwner
+      ? {
+        base: '#2563eb',
+        deep: '#1e3a8a',
+        highlight: '#38bdf8',
+        variant: '#93c5fd',
+        glow: 'rgba(37,99,235,0.45)',
+        baseStroke: 'rgba(147,197,253,0.7)',
+        clothStrokeLv1: 'rgba(191,219,254,0.9)',
+        clothStrokeLv2: 'rgba(191,219,254,0.95)',
+        clothStrokeLv3: 'rgba(191,219,254,1)',
+        clothStrokeTop: 'rgba(219,234,254,1)',
+        ornamentStroke: 'rgba(191,219,254,0.85)',
+        ornamentStrokeTop: 'rgba(191,219,254,0.9)',
+        ornamentCore: 'rgba(191,219,254,0.95)',
+        ornamentCoreTop: 'rgba(219,234,254,0.98)',
+      }
+      : {
+        base: '#dc2626',
+        deep: '#7f1d1d',
+        highlight: '#f87171',
+        variant: '#fca5a5',
+        glow: 'rgba(220,38,38,0.45)',
+        baseStroke: 'rgba(248,113,113,0.7)',
+        clothStrokeLv1: 'rgba(254,202,202,0.9)',
+        clothStrokeLv2: 'rgba(254,202,202,0.95)',
+        clothStrokeLv3: 'rgba(254,202,202,1)',
+        clothStrokeTop: 'rgba(254,226,226,1)',
+        ornamentStroke: 'rgba(254,202,202,0.85)',
+        ornamentStrokeTop: 'rgba(254,202,202,0.9)',
+        ornamentCore: 'rgba(254,202,202,0.95)',
+        ornamentCoreTop: 'rgba(254,226,226,0.98)',
+      };
+    const accentColor = levelB >= 3 && variantB === 2 ? palette.variant : palette.base;
+    const darkFill = palette.deep;
+    const highlightFill = palette.highlight;
 
     return (
       <div className="absolute z-10 pointer-events-none left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <svg viewBox="0 0 48 48" className="relative z-10 w-[40px] h-[40px] drop-shadow-[0_0_10px_rgba(37,99,235,0.45)]">
+        <svg viewBox="0 0 48 48" className="relative z-10 w-[40px] h-[40px]" style={{ filter: `drop-shadow(0 0 10px ${palette.glow})` }}>
           {/* Pole + base (shared) */}
           <rect x="21.7" y="8" width="3.1" height="26.5" rx="1.4" fill="rgba(255,255,255,0.92)" />
-          <rect x="14.5" y="35" width="19" height="5" rx="1.8" fill="rgba(15,23,42,0.92)" stroke="rgba(147,197,253,0.7)" strokeWidth="1" />
+          <rect x="14.5" y="35" width="19" height="5" rx="1.8" fill="rgba(15,23,42,0.92)" stroke={palette.baseStroke} strokeWidth="1" />
 
           {/* Lv0: plain starter pennant */}
           {levelB === 0 && (
             <>
-              <path d="M24.8 11.8 L35.8 14.4 L24.8 17.8 Z" className="flag-cloth flag-cloth-lv1" fill={accentColor} stroke="rgba(191,219,254,0.9)" strokeWidth="1.05" />
+              <path d="M24.8 11.8 L35.8 14.4 L24.8 17.8 Z" className="flag-cloth flag-cloth-lv1" fill={accentColor} stroke={palette.clothStrokeLv1} strokeWidth="1.05" />
             </>
           )}
 
           {/* Lv1: shifted from old Lv2 */}
           {levelB === 1 && (
             <>
-              <path d="M24.8 10.8 L41 14.8 L35.8 17.2 L41 19.6 L24.8 23.7 Z" className="flag-cloth flag-cloth-lv2" fill={accentColor} stroke="rgba(191,219,254,0.95)" strokeWidth="1.25" />
+              <path d="M24.8 10.8 L41 14.8 L35.8 17.2 L41 19.6 L24.8 23.7 Z" className="flag-cloth flag-cloth-lv2" fill={accentColor} stroke={palette.clothStrokeLv2} strokeWidth="1.25" />
               <path d="M28.3 13.6 L36.2 15.6 L28.3 17.7 Z" fill={darkFill} opacity="0.6" />
-              <path d="M28.3 17.9 L36.2 19.9 L28.3 22 Z" fill={skyBlue} opacity="0.5" />
-              <path d="M24 9.7 L21.8 11.8 L24 13.9 L26.2 11.8 Z" fill={skyBlue} opacity="0.9" />
+              <path d="M28.3 17.9 L36.2 19.9 L28.3 22 Z" fill={highlightFill} opacity="0.5" />
+              <path d="M24 9.7 L21.8 11.8 L24 13.9 L26.2 11.8 Z" fill={highlightFill} opacity="0.9" />
             </>
           )}
 
           {/* Lv2: shifted from old Lv3 */}
           {levelB === 2 && (
             <>
-              <path d="M24.8 9.2 L44 14.2 L38.4 17.4 L44 20.6 L24.8 25.6 L29 17.4 Z" className="flag-cloth flag-cloth-lv3" fill={accentColor} stroke="rgba(191,219,254,1)" strokeWidth="1.45" />
+              <path d="M24.8 9.2 L44 14.2 L38.4 17.4 L44 20.6 L24.8 25.6 L29 17.4 Z" className="flag-cloth flag-cloth-lv3" fill={accentColor} stroke={palette.clothStrokeLv3} strokeWidth="1.45" />
               <path d="M30.2 13.4 L40 16.1 L30.2 18.8 Z" fill={darkFill} opacity="0.72" />
-              <path d="M30.2 19 L40 21.7 L30.2 24.4 Z" fill={skyBlue} opacity="0.62" />
-              <path d="M26.4 10.9 L22.8 12.9 L26.4 14.9 Z" fill={skyBlue} opacity="0.78" />
-              <path d="M26.4 19.9 L22.8 21.9 L26.4 23.9 Z" fill={skyBlue} opacity="0.78" />
-              <path d="M24 7.1 L26.9 10.2 L24 13.2 L21.1 10.2 Z" fill={skyBlue} />
-              <path d="M19.6 5.2 L24 2.2 L28.4 5.2 L27 9.8 L24 11.8 L21 9.8 Z" fill={skyBlue} opacity="0.9" stroke="rgba(191,219,254,0.85)" strokeWidth="0.9" />
-              <circle cx="24" cy="17.4" r="1.2" fill="rgba(191,219,254,0.95)" />
+              <path d="M30.2 19 L40 21.7 L30.2 24.4 Z" fill={highlightFill} opacity="0.62" />
+              <path d="M26.4 10.9 L22.8 12.9 L26.4 14.9 Z" fill={highlightFill} opacity="0.78" />
+              <path d="M26.4 19.9 L22.8 21.9 L26.4 23.9 Z" fill={highlightFill} opacity="0.78" />
+              <path d="M24 7.1 L26.9 10.2 L24 13.2 L21.1 10.2 Z" fill={highlightFill} />
+              <path d="M19.6 5.2 L24 2.2 L28.4 5.2 L27 9.8 L24 11.8 L21 9.8 Z" fill={highlightFill} opacity="0.9" stroke={palette.ornamentStroke} strokeWidth="0.9" />
+              <circle cx="24" cy="17.4" r="1.2" fill={palette.ornamentCore} />
             </>
           )}
 
           {/* Lv3: imperial commander standard (new highest) */}
           {levelB >= 3 && (
             <>
-              <path d="M24.8 8.6 L45.2 13.8 L39.1 17.4 L45.2 21 L24.8 26.2 L30.1 17.4 Z" className="flag-cloth flag-cloth-lv3" fill={accentColor} stroke="rgba(219,234,254,1)" strokeWidth="1.6" />
+              <path d="M24.8 8.6 L45.2 13.8 L39.1 17.4 L45.2 21 L24.8 26.2 L30.1 17.4 Z" className="flag-cloth flag-cloth-lv3" fill={accentColor} stroke={palette.clothStrokeTop} strokeWidth="1.6" />
               <path d="M31.2 13.1 L41.7 16 L31.2 18.9 Z" fill={darkFill} opacity="0.78" />
-              <path d="M31.2 19.1 L41.7 22 L31.2 24.9 Z" fill={skyBlue} opacity="0.7" />
-              <path d="M27.2 10.5 L22 13.2 L27.2 15.9 Z" fill={skyBlue} opacity="0.86" />
-              <path d="M27.2 18.9 L22 21.6 L27.2 24.3 Z" fill={skyBlue} opacity="0.86" />
-              <path d="M21.4 6.2 L24 3.6 L26.6 6.2 L26 9.7 L24 11.3 L22 9.7 Z" fill={skyBlue} opacity="0.92" stroke="rgba(191,219,254,0.9)" strokeWidth="0.85" />
-              <path d="M24 1.8 L27 3.7 L25.9 6.8 L22.1 6.8 L21 3.7 Z" fill={skyBlue} opacity="0.95" />
-              <circle cx="24" cy="17.4" r="1.5" fill="rgba(219,234,254,0.98)" />
+              <path d="M31.2 19.1 L41.7 22 L31.2 24.9 Z" fill={highlightFill} opacity="0.7" />
+              <path d="M27.2 10.5 L22 13.2 L27.2 15.9 Z" fill={highlightFill} opacity="0.86" />
+              <path d="M27.2 18.9 L22 21.6 L27.2 24.3 Z" fill={highlightFill} opacity="0.86" />
+              <path d="M21.4 6.2 L24 3.6 L26.6 6.2 L26 9.7 L24 11.3 L22 9.7 Z" fill={highlightFill} opacity="0.92" stroke={palette.ornamentStrokeTop} strokeWidth="0.85" />
+              <path d="M24 1.8 L27 3.7 L25.9 6.8 L22.1 6.8 L21 3.7 Z" fill={highlightFill} opacity="0.95" />
+              <circle cx="24" cy="17.4" r="1.5" fill={palette.ornamentCoreTop} />
               <rect x="18.8" y="34.2" width="7.4" height="1.2" rx="0.6" fill={accentColor} opacity="0.92" />
             </>
           )}
@@ -658,12 +712,13 @@ const GridCell: React.FC<GridCellProps> = ({
           >
             <path
               d="M 40 4 A 4 4 0 0 1 44 0 L 56 0 A 4 4 0 0 1 60 4 L 60 16 A 4 4 0 0 0 64 20 L 76 20 A 4 4 0 0 1 80 24 L 80 36 A 4 4 0 0 0 84 40 L 96 40 A 4 4 0 0 1 100 44 L 100 56 A 4 4 0 0 1 96 60 L 84 60 A 4 4 0 0 0 80 64 L 80 76 A 4 4 0 0 1 76 80 L 64 80 A 4 4 0 0 0 60 84 L 60 96 A 4 4 0 0 1 56 100 L 44 100 A 4 4 0 0 1 40 96 L 40 84 A 4 4 0 0 0 36 80 L 24 80 A 4 4 0 0 1 20 76 L 20 64 A 4 4 0 0 0 16 60 L 4 60 A 4 4 0 0 1 0 56 L 0 44 A 4 4 0 0 1 4 40 L 16 40 A 4 4 0 0 0 20 36 L 20 24 A 4 4 0 0 1 24 20 L 36 20 A 4 4 0 0 0 40 16 Z"
-              fill="currentColor"
-              fillOpacity={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "0.10" : "0.05"}
+              fill="none"
               stroke="currentColor"
               strokeWidth={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "1.9" : "1.5"}
               strokeDasharray={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "none" : "4 2"}
-              style={{ opacity: 0.9 }}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ opacity: isAreaFocused(cell.r, cell.c, 'manhattan2') ? 0.95 : 0.85 }}
             />
           </svg>
 
@@ -729,19 +784,21 @@ const GridCell: React.FC<GridCellProps> = ({
                 top: '-200%',
                 bottom: '-200%',
                 color: factoryColor,
-              filter: 'drop-shadow(0 0 1px currentColor)',
-              opacity: isAreaFocused(cell.r, cell.c, 'manhattan2') ? 0.68 : 0.30,
+                filter: 'drop-shadow(0 0 1px currentColor)',
+                opacity: isAreaFocused(cell.r, cell.c, 'manhattan2') ? 0.68 : 0.30,
                 transform: `scale(${isAreaFocused(cell.r, cell.c, 'manhattan2') ? '1.005' : '1'})`,
                 transition: 'all 0.1s ease-out' // Snappier
               }}
             >
               <path
                 d="M 40 4 A 4 4 0 0 1 44 0 L 56 0 A 4 4 0 0 1 60 4 L 60 16 A 4 4 0 0 0 64 20 L 76 20 A 4 4 0 0 1 80 24 L 80 36 A 4 4 0 0 0 84 40 L 96 40 A 4 4 0 0 1 100 44 L 100 56 A 4 4 0 0 1 96 60 L 84 60 A 4 4 0 0 0 80 64 L 80 76 A 4 4 0 0 1 76 80 L 64 80 A 4 4 0 0 0 60 84 L 60 96 A 4 4 0 0 1 56 100 L 44 100 A 4 4 0 0 1 40 96 L 40 84 A 4 4 0 0 0 36 80 L 24 80 A 4 4 0 0 1 20 76 L 20 64 A 4 4 0 0 0 16 60 L 4 60 A 4 4 0 0 1 0 56 L 0 44 A 4 4 0 0 1 4 40 L 16 40 A 4 4 0 0 0 20 36 L 20 24 A 4 4 0 0 1 24 20 L 36 20 A 4 4 0 0 0 40 16 Z"
-                fill="currentColor"
-                fillOpacity={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "0.10" : "0.05"}
+                fill="none"
                 stroke="currentColor"
                 strokeWidth={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "1.9" : "1.5"}
                 strokeDasharray={isAreaFocused(cell.r, cell.c, 'manhattan2') ? "none" : "4 2"}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ opacity: isAreaFocused(cell.r, cell.c, 'manhattan2') ? 0.95 : 0.85 }}
               />
             </svg>
           ) : (
@@ -843,15 +900,15 @@ const GridCell: React.FC<GridCellProps> = ({
         ${!cell.isObstacle ? 'hover:bg-opacity-90 hover:scale-[1.02]' : ''}
         ${(() => {
           // Priority Hierarchy (Highest to Lowest):
-          // 1. Units with Evolution (Accessories must be at the very top)
+          // 1. Building / Domain source cells:
+          // keep their extended range borders above any occupying units.
+          if (building || isP1FlagHere || isP2FlagHere || isThisCellFocusedCenter) return 'z-[160]';
+          // 2. Units with Evolution (accessories remain above regular units)
           if (unit && (evolutionLevelA >= 1 || evolutionLevelB >= 1)) return 'z-[150]';
-          // 2. Regular Units or Flag Presence
-          if (unit || isP1FlagHere || isP2FlagHere) return 'z-[140]';
-          // 3. Move/Action Highlights (should cover range indicators of other buildings)
-          if (isValidMove || isAttackTarget || isInActionRange) return 'z-[130]';
-          // 4. Building/Domain Centers (always elevated so extended range borders
-          // are not partially dimmed by neighboring cells rendered later in the grid)
-          if (building || isThisCellFocusedCenter) return 'z-[100]';
+          // 3. Regular Units
+          if (unit) return 'z-[140]';
+          // 4. Move/Action Highlights
+          if (isValidMove || isAttackTarget || isInActionRange || isInActionScope) return 'z-[130]';
           // 5. Mines (below action highlights and pulses)
           if (mine) return 'z-[50]';
           // 6. Default
@@ -1043,10 +1100,10 @@ const GridCell: React.FC<GridCellProps> = ({
                     : 'none',
               boxShadow: unit?.owner === PlayerID.P1 ? '0 0 12px rgba(34, 211, 238, 0.6)' : '0 0 12px rgba(239, 68, 68, 0.6)'
             }}
-	          >
+          >
 
-	            {flagBurstParticles.length > 0 && unit && !unit.isDead && (
-	              <>
+            {flagBurstParticles.length > 0 && unit && !unit.isDead && (
+              <>
                 <div
                   className="absolute pointer-events-none rounded-full z-[170]"
                   style={{
@@ -1086,11 +1143,11 @@ const GridCell: React.FC<GridCellProps> = ({
                     animationDelay: '0.06s'
                   }}
                 />
-	                {flagBurstParticles.map(p => (
-	                  <div
-	                    key={p.id}
-	                    className="absolute rounded-full pointer-events-none"
-	                    style={{
+                {flagBurstParticles.map(p => (
+                  <div
+                    key={p.id}
+                    className="absolute rounded-full pointer-events-none"
+                    style={{
                       left: '50%',
                       top: '50%',
                       width: `${p.size}px`,
@@ -1099,18 +1156,18 @@ const GridCell: React.FC<GridCellProps> = ({
                       boxShadow: `0 0 12px ${burstPalette.glowA}`,
                       '--tx': `${p.x}px`,
                       '--ty': `${p.y}px`,
-	                      animation: `flagBurst ${p.duration}s cubic-bezier(0.15,0.8,0.35,1) forwards`,
-	                      animationDelay: `${p.delay}s`,
-	                      zIndex: 170
-	                    } as React.CSSProperties}
-	                  />
-	                ))}
-	              </>
-	            )}
-	
-	            <div className={`unit-body absolute inset-0 rounded-full -z-10 ${unit.hasActedThisRound
-	              ? (unit.owner === PlayerID.P1 ? 'bg-blue-50/20' : 'bg-red-50/20')
-	              : (unit?.owner === PlayerID.P1 ? 'bg-gradient-to-br from-cyan-600 to-blue-700' : 'bg-gradient-to-br from-red-600 to-pink-700')
+                      animation: `flagBurst ${p.duration}s cubic-bezier(0.15,0.8,0.35,1) forwards`,
+                      animationDelay: `${p.delay}s`,
+                      zIndex: 170
+                    } as React.CSSProperties}
+                  />
+                ))}
+              </>
+            )}
+
+            <div className={`unit-body absolute inset-0 rounded-full -z-10 ${unit.hasActedThisRound
+              ? (unit.owner === PlayerID.P1 ? 'bg-blue-50/20' : 'bg-red-50/20')
+              : (unit?.owner === PlayerID.P1 ? 'bg-gradient-to-br from-cyan-600 to-blue-700' : 'bg-gradient-to-br from-red-600 to-pink-700')
               }`} />
 
             <div className="unit-icon relative z-20">
@@ -1566,6 +1623,10 @@ const GridCell: React.FC<GridCellProps> = ({
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent" />
         </div>
       )}
+
+      {foregroundHighlightClass && (
+        <div className={`absolute inset-0 rounded-sm pointer-events-none z-[165] ${foregroundHighlightClass}`} />
+      )}
     </div >
   );
 };
@@ -1611,8 +1672,8 @@ export default React.memo(GridCell, (prevProps, nextProps) => {
   if (prevProps.smokeOwner !== nextProps.smokeOwner) return false;
   if (prevProps.forceShowMines !== nextProps.forceShowMines) return false;
   if (prevProps.isUnitStealthed !== nextProps.isUnitStealthed) return false;
+  if (prevProps.evolutionFxNonce !== nextProps.evolutionFxNonce) return false;
+  if (prevProps.evolutionFxBranch !== nextProps.evolutionFxBranch) return false;
   if (prevProps.currentPlayer !== nextProps.currentPlayer) return false;
   return true;
 });
-
-
