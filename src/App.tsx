@@ -363,6 +363,8 @@ const mergePlacementMines = (localMines: Mine[], syncedMines: Mine[]): Mine[] =>
     return merged;
 };
 
+const getSetupMines = (mines: Mine[]): Mine[] => mines.filter(m => m.id.startsWith('pm-'));
+
 export default function App() {
     const [view, setView] = useState<'lobby' | 'game'>('lobby');
     const [gameState, setGameState] = useState<GameState>(createInitialState('pvp'));
@@ -407,6 +409,7 @@ export default function App() {
     const applyingRemoteActionRef = useRef(false);
     const lastHandledPacketSeqRef = useRef<number | null>(null);
     const lastLogEmitRef = useRef<Map<string, number>>(new Map());
+    const setupMineHistoryRef = useRef<Mine[]>([]);
     const logScrollRef = useRef<HTMLDivElement>(null);
     const {
         isConnected: isNetworkConnected,
@@ -605,6 +608,14 @@ export default function App() {
     useEffect(() => {
         gameStateRef.current = gameState;
     }, [gameState]);
+
+    useEffect(() => {
+        if (gameState.gameMode === 'pvp' && gameState.phase === 'placement') {
+            setupMineHistoryRef.current = mergePlacementMines(setupMineHistoryRef.current, getSetupMines(gameState.mines));
+            return;
+        }
+        setupMineHistoryRef.current = [];
+    }, [gameState.gameMode, gameState.phase, gameState.mines]);
 
     const emitEvolutionFx = useCallback((owner: PlayerID, unitType: UnitType, branch: 'a' | 'b') => {
         const ownerUnits = gameStateRef.current.players[owner].units;
@@ -861,6 +872,9 @@ export default function App() {
         setPvpPerspectivePlayer(mode === 'pvp' ? (isHost ? PlayerID.P1 : PlayerID.P2) : null);
 
         const initialState = externalInitialState || createInitialState(mode);
+        setupMineHistoryRef.current = mode === 'pvp' && initialState.phase === 'placement'
+            ? getSetupMines(initialState.mines)
+            : [];
         setGameState(initialState);
         setView('game');
 
@@ -1042,10 +1056,15 @@ export default function App() {
 
                 if (bothReady) {
                     // Both confirmed -> transition to thinking phase
+                    const stabilizedSetupMines = mergePlacementMines(
+                        prev.mines,
+                        setupMineHistoryRef.current
+                    );
                     return {
                         ...prev,
                         phase: 'thinking',
                         timeLeft: THINKING_TIMER,
+                        mines: stabilizedSetupMines,
                         selectedUnitId: null,
                         targetMode: null,
                         pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
@@ -3265,7 +3284,11 @@ export default function App() {
                     let nextSyncedState = syncedState;
                     if (syncedState.gameMode === 'pvp' && syncedState.phase === 'placement') {
                         // Placement mines are monotonic in setup phase; never let an older sync remove local mines.
-                        const mergedPlacementMines = mergePlacementMines(prev.mines, syncedState.mines);
+                        const mergedPlacementMines = mergePlacementMines(
+                            mergePlacementMines(getSetupMines(prev.mines), setupMineHistoryRef.current),
+                            getSetupMines(syncedState.mines)
+                        );
+                        setupMineHistoryRef.current = mergedPlacementMines;
                         const p1MineCount = mergedPlacementMines.filter(m => m.owner === PlayerID.P1).length;
                         const p2MineCount = mergedPlacementMines.filter(m => m.owner === PlayerID.P2).length;
                         const mergedReadyState = {
@@ -3275,7 +3298,7 @@ export default function App() {
 
                         nextSyncedState = {
                             ...syncedState,
-                            mines: mergedPlacementMines,
+                            mines: [...syncedState.mines.filter(m => !m.id.startsWith('pm-')), ...mergedPlacementMines],
                             pvpReadyState: mergedReadyState,
                             players: {
                                 ...syncedState.players,
@@ -3350,10 +3373,15 @@ export default function App() {
                     // Check if phase transition is needed
                     if (bothReady) {
                         if (payload.phase === 'placement') {
+                            const stabilizedSetupMines = mergePlacementMines(
+                                prev.mines,
+                                setupMineHistoryRef.current
+                            );
                             return {
                                 ...prev,
                                 phase: 'thinking',
                                 timeLeft: THINKING_TIMER,
+                                mines: stabilizedSetupMines,
                                 selectedUnitId: null,
                                 activeUnitId: null,
                                 pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
