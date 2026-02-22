@@ -1401,6 +1401,7 @@ export default function App() {
     const handlePlaceTowerAction = (unit: Unit, r: number, c: number) => {
         const swpLevelA = gameState.players[unit.owner].evolutionLevels[UnitType.MINESWEEPER].a;
         const variantA = gameState.players[unit.owner].evolutionLevels[UnitType.MINESWEEPER].aVariant;
+        const hasMineAtCell = gameState.mines.some(m => m.r === r && m.c === c);
 
         const baseCost = (swpLevelA === 3 && variantA === 1) ? 5 : 6;
         const cost = getEnemyTerritoryEnergyCost(unit, baseCost);
@@ -1413,10 +1414,15 @@ export default function App() {
             addLog('log_maker_range', 'info');
             return;
         }
+        if (hasMineAtCell) {
+            addLog('log_space_has_mine', 'error');
+            return;
+        }
 
         if (!checkEnergyCap(unit, gameState.players[unit.owner], cost)) return;
 
         setGameState(prev => {
+            if (prev.mines.some(m => m.r === r && m.c === c)) return prev;
             const p = prev.players[unit.owner];
             const towerLimit = (swpLevelA === 3 && variantA === 1) ? 2 : 1;
             const existingTowers = prev.buildings.filter(b => b.owner === unit.owner && b.type === 'tower');
@@ -1800,6 +1806,7 @@ export default function App() {
     const handlePlaceHubAction = (unit: Unit, r: number, c: number) => {
         const baseCost = 4;
         const cost = getDisplayCost(unit, baseCost, gameState, 'place_hub');
+        const hasMineAtCell = gameState.mines.some(m => m.r === r && m.c === c);
         if (gameState.players[unit.owner].energy < cost) {
             addLog('log_low_energy', 'info', { cost });
             return;
@@ -1809,10 +1816,15 @@ export default function App() {
             addLog('log_maker_range', 'info');
             return;
         }
+        if (hasMineAtCell) {
+            addLog('log_space_has_mine', 'error');
+            return;
+        }
 
         if (!checkEnergyCap(unit, gameState.players[unit.owner], cost)) return;
 
         setGameState(prev => {
+            if (prev.mines.some(m => m.r === r && m.c === c)) return prev;
             const p = prev.players[unit.owner];
             const filteredBuildings = prev.buildings.filter(b => !(b.owner === unit.owner && b.type === 'hub'));
             const hubLevelA = p.evolutionLevels[UnitType.RANGER].a;
@@ -2040,6 +2052,7 @@ export default function App() {
     const handlePlaceFactoryAction = (unit: Unit, r: number, c: number) => {
         const baseCost = 6;
         const cost = getEnemyTerritoryEnergyCost(unit, baseCost);
+        const hasMineAtCell = gameState.mines.some(m => m.r === r && m.c === c);
         if (gameState.players[unit.owner].energy < cost) {
             addLog('log_low_energy', 'info', { cost });
             return;
@@ -2049,10 +2062,15 @@ export default function App() {
             addLog('log_maker_range', 'info');
             return;
         }
+        if (hasMineAtCell) {
+            addLog('log_space_has_mine', 'error');
+            return;
+        }
 
         if (!checkEnergyCap(unit, gameState.players[unit.owner], cost)) return;
 
         setGameState(prev => {
+            if (prev.mines.some(m => m.r === r && m.c === c)) return prev;
             const p = prev.players[unit.owner];
             const mkrLevelB = p.evolutionLevels[UnitType.MAKER].b;
             const mkrVariantB = p.evolutionLevels[UnitType.MAKER].bVariant;

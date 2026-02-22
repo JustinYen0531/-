@@ -1279,12 +1279,17 @@ export const usePlayerActions = ({
             m.owner !== unit.owner &&
             m.revealedTo.includes(unit.owner)
         );
+        const buildingInCell = state.buildings.find(b => b.r === targetR && b.c === targetC);
 
         const isSelfCell = unit.r === targetR && unit.c === targetC;
         const blockedByObstacle = cell.isObstacle && !isSelfCell;
         const blockedByOtherUnit = !!unitInCell && unitInCell.id !== unit.id;
 
         if (blockedByObstacle || blockedByOtherUnit) {
+            addLog('log_obstacle', 'error');
+            return;
+        }
+        if (buildingInCell) {
             addLog('log_obstacle', 'error');
             return;
         }
@@ -1372,6 +1377,7 @@ export const usePlayerActions = ({
 
         setGameState(prev => {
             const p = prev.players[unit.owner];
+            if (prev.mines.some(m => m.r === r && m.c === c)) return prev;
             const swpLevelA = p.evolutionLevels[UnitType.MINESWEEPER].a;
             const variantA = p.evolutionLevels[UnitType.MINESWEEPER].aVariant;
             const towerLimit = (swpLevelA === 3 && variantA === 1) ? 2 : 1;
@@ -1405,6 +1411,7 @@ export const usePlayerActions = ({
 
         setGameState(prev => {
             const p = prev.players[unit.owner];
+            if (prev.mines.some(m => m.r === r && m.c === c)) return prev;
             const mkrLevelB = p.evolutionLevels[UnitType.MAKER].b;
             const existing = prev.buildings.filter(b => b.owner === unit.owner && b.type === 'factory');
             if (existing.length >= 1) { addLog('log_max_buildings', 'error'); return prev; }
@@ -1434,6 +1441,7 @@ export const usePlayerActions = ({
 
         setGameState(prev => {
             const p = prev.players[unit.owner];
+            if (prev.mines.some(m => m.r === r && m.c === c)) return prev;
             const rngLevelA = p.evolutionLevels[UnitType.RANGER].a;
             const existing = prev.buildings.filter(b => b.owner === unit.owner && b.type === 'hub');
             if (existing.length >= 1) { addLog('log_max_buildings', 'error'); return prev; }
