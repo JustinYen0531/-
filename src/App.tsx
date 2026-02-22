@@ -407,7 +407,6 @@ export default function App() {
     const applyingRemoteActionRef = useRef(false);
     const lastHandledPacketSeqRef = useRef<number | null>(null);
     const lastLogEmitRef = useRef<Map<string, number>>(new Map());
-    const placementMineHistoryRef = useRef<Mine[]>([]);
     const logScrollRef = useRef<HTMLDivElement>(null);
     const {
         isConnected: isNetworkConnected,
@@ -606,14 +605,6 @@ export default function App() {
     useEffect(() => {
         gameStateRef.current = gameState;
     }, [gameState]);
-
-    useEffect(() => {
-        if (gameState.gameMode === 'pvp' && gameState.phase === 'placement') {
-            placementMineHistoryRef.current = mergePlacementMines(placementMineHistoryRef.current, gameState.mines);
-            return;
-        }
-        placementMineHistoryRef.current = [];
-    }, [gameState.gameMode, gameState.phase, gameState.mines]);
 
     const emitEvolutionFx = useCallback((owner: PlayerID, unitType: UnitType, branch: 'a' | 'b') => {
         const ownerUnits = gameStateRef.current.players[owner].units;
@@ -870,9 +861,6 @@ export default function App() {
         setPvpPerspectivePlayer(mode === 'pvp' ? (isHost ? PlayerID.P1 : PlayerID.P2) : null);
 
         const initialState = externalInitialState || createInitialState(mode);
-        placementMineHistoryRef.current = mode === 'pvp' && initialState.phase === 'placement'
-            ? [...initialState.mines]
-            : [];
         setGameState(initialState);
         setView('game');
 
@@ -3277,10 +3265,7 @@ export default function App() {
                     let nextSyncedState = syncedState;
                     if (syncedState.gameMode === 'pvp' && syncedState.phase === 'placement') {
                         // Placement mines are monotonic in setup phase; never let an older sync remove local mines.
-                        const historicPlacementMines = placementMineHistoryRef.current;
-                        const mergedLocalPlacementMines = mergePlacementMines(historicPlacementMines, prev.mines);
-                        const mergedPlacementMines = mergePlacementMines(mergedLocalPlacementMines, syncedState.mines);
-                        placementMineHistoryRef.current = mergedPlacementMines;
+                        const mergedPlacementMines = mergePlacementMines(prev.mines, syncedState.mines);
                         const p1MineCount = mergedPlacementMines.filter(m => m.owner === PlayerID.P1).length;
                         const p2MineCount = mergedPlacementMines.filter(m => m.owner === PlayerID.P2).length;
                         const mergedReadyState = {
