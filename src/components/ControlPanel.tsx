@@ -242,7 +242,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     />
 
                     {/* Action Buttons & End Turn */}
-                    <div className="flex-[4] flex flex-col border-l-2 border-white/30 px-4 items-center justify-between h-full py-1 bg-slate-800/30">
+                    <div className="relative flex-[4] flex flex-col border-l-2 border-white/30 px-4 items-center justify-between h-full py-1 bg-slate-800/30 overflow-visible">
                         {isPlacement ? (
                             isWaitingForOpponent ? (
                                 <div className="w-full h-full flex flex-col items-center justify-center gap-4 px-4">
@@ -319,7 +319,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                     </span>
                                                 </div>
                                             ) : (
-                                                <div className="relative flex flex-col items-center gap-2 w-full pb-2">
+                                                <div className="relative flex flex-col items-center gap-2 w-full pb-2 overflow-visible">
                                                     <span className="text-white font-black animate-pulse uppercase tracking-widest text-xs drop-shadow-lg">{t('planning_phase')}</span>
                                                     <button
                                                         disabled={isInteractionDisabled}
@@ -334,8 +334,27 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                     </button>
                                                     {gameState.gameMode === 'pvp' && (
                                                         <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowBidPopup(prev => !prev)}
+                                                                className="absolute top-1/2 -translate-y-1/2 -right-9 h-20 w-8 bg-slate-900 border-2 border-yellow-500/60 border-l-0 rounded-r-xl text-yellow-200 hover:text-yellow-100 hover:bg-slate-800 transition-all shadow-[0_0_12px_rgba(234,179,8,0.25)] flex flex-col items-center justify-center gap-1"
+                                                                title={showBidPopup
+                                                                    ? (language === 'en' ? 'Hide Bid' : (language === 'zh_cn' ? '收起竞价' : '收起競價'))
+                                                                    : (language === 'en' ? 'Show Bid' : (language === 'zh_cn' ? '展开竞价' : '展開競價'))}
+                                                            >
+                                                                <ArrowRight
+                                                                    size={14}
+                                                                    className={`transition-transform ${showBidPopup ? 'rotate-180' : ''}`}
+                                                                />
+                                                                <span
+                                                                    className="text-[9px] font-black uppercase tracking-wider leading-none"
+                                                                    style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+                                                                >
+                                                                    {language === 'en' ? 'BID' : '競標'}
+                                                                </span>
+                                                            </button>
                                                             {showBidPopup ? (
-                                                                <div className="w-full mt-2 p-2 bg-slate-950/95 border border-yellow-500/40 rounded-lg shadow-lg shadow-yellow-500/10">
+                                                                <div className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full w-[92%] p-2 bg-slate-950/95 border border-yellow-500/40 rounded-lg shadow-lg shadow-yellow-500/20 z-20">
                                                                     <div className="flex items-start justify-between gap-2 mb-1">
                                                                         <div className="flex items-center gap-1">
                                                                             <Zap size={11} className="text-yellow-400 shrink-0" />
@@ -373,15 +392,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            ) : (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setShowBidPopup(true)}
-                                                                    className="mt-2 px-3 py-1 bg-yellow-900/40 hover:bg-yellow-800/60 border border-yellow-500/40 rounded text-[10px] font-black text-yellow-200 uppercase tracking-wide"
-                                                                >
-                                                                    {language === 'en' ? 'Show Initiative Bid' : (language === 'zh_cn' ? '显示先手竞价' : '顯示先手競價')}
-                                                                </button>
-                                                            )}
+                                                            ) : null}
                                                         </>
                                                     )}
                                                 </div>
