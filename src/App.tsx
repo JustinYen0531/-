@@ -644,11 +644,13 @@ export default function App() {
         if (evolutionFxClearTimerRef.current) {
             clearTimeout(evolutionFxClearTimerRef.current);
         }
-        // Keep event alive briefly for one render/animation trigger, then clear
-        // so future movement into another cell cannot replay the same upgrade effect.
+        // Keep event alive long enough for React to finish re-rendering the full
+        // component tree (GameField → GridCell useEffect). 120ms was too short on
+        // busy frames and caused the effect to be cleared before GridCell could
+        // read the new nonce, resulting in the upgrade animation being skipped.
         evolutionFxClearTimerRef.current = setTimeout(() => {
             setEvolutionFxEvent(prev => (prev && prev.nonce === nonce ? null : prev));
-        }, 120);
+        }, 600);
     }, []);
 
     useEffect(() => () => {
@@ -659,7 +661,16 @@ export default function App() {
 
     useEffect(() => {
         const latestLog = gameState.logs[0];
-        if (!latestLog || latestLog.messageKey !== 'log_evolved' || !latestLog.owner) return;
+        if (!latestLog || !latestLog.owner) return;
+
+        // When a sandbox downgrade happens, reset the dedup ref so the next
+        // upgrade on the same unit/branch/level will correctly fire the effect.
+        if (latestLog.messageKey === 'log_devolved') {
+            lastEvolutionFxFromLogRef.current = '';
+            return;
+        }
+
+        if (latestLog.messageKey !== 'log_evolved') return;
         const unitTypeRaw = latestLog.params?.unitType;
         if (!isUnitTypeValue(unitTypeRaw)) return;
         const branchRaw = String(latestLog.params?.branch ?? '').trim().toLowerCase();
