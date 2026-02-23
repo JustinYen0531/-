@@ -149,17 +149,17 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <button
                 type="button"
                 onClick={() => setShowBidPopup(prev => !prev)}
-                className="absolute bottom-1 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-slate-900 border border-yellow-500/60 rounded-md text-yellow-200 hover:text-yellow-100 hover:bg-slate-800 transition-all shadow-[0_0_12px_rgba(234,179,8,0.25)] flex items-center justify-center gap-1 z-20"
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-24 h-8 bg-slate-900 border-2 border-yellow-500/70 rounded-lg text-yellow-200 hover:text-yellow-100 hover:bg-slate-800 transition-all shadow-[0_0_14px_rgba(234,179,8,0.28)] flex items-center justify-center gap-1 z-20"
                 title={showBidPopup
                     ? (language === 'en' ? 'Hide Bid' : (language === 'zh_cn' ? '收起竞价' : '收起競價'))
                     : (language === 'en' ? 'Show Bid' : (language === 'zh_cn' ? '展开竞价' : '展開競價'))}
             >
                 <ArrowRight
-                    size={11}
+                    size={13}
                     className={`transition-transform ${showBidPopup ? 'rotate-180' : ''}`}
                 />
                 <span
-                    className="text-[9px] font-black uppercase tracking-wider leading-none"
+                    className="text-[10px] font-black uppercase tracking-wider leading-none"
                 >
                     {language === 'en' ? 'BID' : '競標'}
                 </span>
