@@ -152,10 +152,7 @@ const GridCell: React.FC<GridCellProps> = ({
 
   // Generate particles ONLY when the app emits a real evolution event.
   React.useEffect(() => {
-    if (evolutionFxNonce <= 0 || consumedParticleNonces.current.has(evolutionFxNonce)) {
-      setParticles([]);
-      return;
-    }
+    if (evolutionFxNonce <= 0 || consumedParticleNonces.current.has(evolutionFxNonce)) return;
     if (!unit || unit.isDead) return;
     consumedParticleNonces.current.add(evolutionFxNonce);
 
@@ -181,7 +178,10 @@ const GridCell: React.FC<GridCellProps> = ({
     setParticles(newParticles);
     const timer = setTimeout(() => setParticles([]), 1200);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      setParticles([]);
+    };
   }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead]);
 
   // Action highlighting:
@@ -321,10 +321,7 @@ const GridCell: React.FC<GridCellProps> = ({
 
   // One-shot "small fireworks" when any unit upgrades (A=blue, B=orange).
   React.useEffect(() => {
-    if (evolutionFxNonce <= 0 || consumedBurstNonces.current.has(evolutionFxNonce)) {
-      setFlagBurstParticles([]);
-      return;
-    }
+    if (evolutionFxNonce <= 0 || consumedBurstNonces.current.has(evolutionFxNonce)) return;
     if (!unit || unit.isDead) return;
     consumedBurstNonces.current.add(evolutionFxNonce);
 
@@ -347,7 +344,10 @@ const GridCell: React.FC<GridCellProps> = ({
     setFlagBurstParticles(burst);
     const timer = setTimeout(() => setFlagBurstParticles([]), 980);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      setFlagBurstParticles([]);
+    };
   }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead]);
 
   // Determine if THIS cell is a center of a focused building or domain
