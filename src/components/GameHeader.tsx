@@ -1,12 +1,13 @@
 import React from 'react';
 import { GameState, PlayerID } from '../types';
-import { LogOut, Settings } from '../icons';
+import { LogOut, Settings, Sparkles } from '../icons';
 
 interface GameHeaderProps {
     gameState: GameState;
     onPauseToggle: () => void;
     onExitGame: () => void;
     onOpenSettings: () => void;
+    onClearPetals?: () => void;
     t: (key: string, params?: Record<string, any>) => string;
 }
 
@@ -15,6 +16,7 @@ const GameHeader: React.FC<GameHeaderProps> = ({
     onPauseToggle,
     onExitGame,
     onOpenSettings,
+    onClearPetals,
     t
 }) => {
     const modeLabel = gameState.gameMode === 'pvp'
@@ -61,6 +63,13 @@ const GameHeader: React.FC<GameHeaderProps> = ({
                 >
                     <Settings size={14} />
                     {t('settings')}
+                </button>
+                <button
+                    onClick={onClearPetals}
+                    className="p-2 bg-cyan-500/10 hover:bg-cyan-500/20 rounded border border-cyan-500/50 transition-colors text-xs font-bold flex items-center gap-1 text-white hover:text-white"
+                >
+                    <Sparkles size={14} />
+                    {t('clear_petals')}
                 </button>
             </div>
         </div>

@@ -97,6 +97,7 @@ interface GridCellProps {
   selectedUnitLevelB?: number;
   evolutionFxNonce?: number;
   evolutionFxBranch?: 'a' | 'b' | null;
+  clearPetalsNonce?: number;
   hoveredPos?: { r: number, c: number } | null;
   onHover?: (r: number, c: number) => void;
 }
@@ -135,6 +136,7 @@ const GridCell: React.FC<GridCellProps> = ({
   selectedUnitLevelB = 0,
   evolutionFxNonce = 0,
   evolutionFxBranch = null,
+  clearPetalsNonce = 0,
   hoveredPos = null,
   onHover,
 }) => {
@@ -146,6 +148,7 @@ const GridCell: React.FC<GridCellProps> = ({
   const prevParticleFxNonce = React.useRef(evolutionFxNonce);
   const prevBurstFxNonce = React.useRef(evolutionFxNonce);
   const prevPetalFxNonce = React.useRef(evolutionFxNonce);
+  const prevClearPetalsNonce = React.useRef(clearPetalsNonce);
 
   // When the actual prop updates (e.g. cleared by game state or re-scanned), reset local state
   React.useEffect(() => {
@@ -251,6 +254,13 @@ const GridCell: React.FC<GridCellProps> = ({
 
     if (evolutionFxNonce > 0) prevPetalFxNonce.current = evolutionFxNonce;
   }, [evolutionFxBranch, evolutionFxNonce]);
+
+  React.useEffect(() => {
+    if (clearPetalsNonce > 0 && clearPetalsNonce !== prevClearPetalsNonce.current) {
+      setFloorPetals([]);
+      prevClearPetalsNonce.current = clearPetalsNonce;
+    }
+  }, [clearPetalsNonce]);
   // - isInActionScope: within skill range (faint frame)
   // - isInActionRange: executable target (strong highlight)
   let isInActionScope = false;

@@ -119,6 +119,7 @@ export default function App() {
     const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('normal');
     const [aiTuningProfile, setAiTuningProfile] = useState<AITuningProfile>('balanced');
     const [hoveredPos, setHoveredPos] = useState<{ r: number, c: number } | null>(null);
+    const [clearPetalsNonce, setClearPetalsNonce] = useState(0);
     const [aiDebug] = useState(false);
     const [aiDecision, setAiDecision] = useState<AIDecisionInfo | null>(null);
     const [evolutionFxEvent, setEvolutionFxEvent] = useState<{
@@ -4049,6 +4050,7 @@ export default function App() {
                         onPauseToggle={handlePause}
                         onExitGame={handleExitGame}
                         onOpenSettings={() => setShowCommonSettings(true)}
+                        onClearPetals={() => setClearPetalsNonce(Date.now())}
                         t={t}
                     />
 
@@ -4207,6 +4209,7 @@ export default function App() {
                                     onHoverCell={handleHoverCell}
                                     disableBoardShake={disableBoardShake}
                                     evolutionFxEvent={evolutionFxEvent}
+                                    clearPetalsNonce={clearPetalsNonce}
                                 />
 
                                 {/* Timer Bar Below Board */}

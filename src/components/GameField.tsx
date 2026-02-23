@@ -23,6 +23,7 @@ interface GameFieldProps {
         branch: 'a' | 'b';
         nonce: number;
     } | null;
+    clearPetalsNonce?: number;
 }
 
 const GameField: React.FC<GameFieldProps> = ({
@@ -37,7 +38,8 @@ const GameField: React.FC<GameFieldProps> = ({
     hoveredPos,
     onHoverCell,
     disableBoardShake = false,
-    evolutionFxEvent = null
+    evolutionFxEvent = null,
+    clearPetalsNonce = 0
 }) => {
     const boardRef = useRef<HTMLDivElement>(null);
     const viewerPlayer = viewerPlayerId ?? gameState.currentPlayer;
@@ -275,6 +277,7 @@ const GameField: React.FC<GameFieldProps> = ({
                                     forceShowMines={gameState.sandboxShowAllMines}
                                     evolutionFxNonce={cellEvolutionFxNonce}
                                     evolutionFxBranch={cellEvolutionFxBranch}
+                                    clearPetalsNonce={clearPetalsNonce}
                                     onDismissMiss={markResult?.success === false && onDismissMiss ? () => onDismissMiss(r, c, viewerPlayer) : undefined}
                                     hoveredPos={hoveredPos}
                                 />
