@@ -184,9 +184,8 @@ const GridCell: React.FC<GridCellProps> = ({
 
     return () => {
       if (timer) clearTimeout(timer);
-      setParticles([]);
     };
-  }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead]);
+  }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead, evolutionLevelA, evolutionLevelB]);
 
   // Action highlighting:
   // - isInActionScope: within skill range (faint frame)
@@ -354,9 +353,8 @@ const GridCell: React.FC<GridCellProps> = ({
 
     return () => {
       if (timer) clearTimeout(timer);
-      setFlagBurstParticles([]);
     };
-  }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead]);
+  }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead, evolutionLevelA, evolutionLevelB]);
 
   // Determine if THIS cell is a center of a focused building or domain
   // We need this to lift the center cell's Z-Index so its child range indicator overlays neighbors
