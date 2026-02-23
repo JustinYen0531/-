@@ -107,7 +107,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     const [endTurnConfirm, setEndTurnConfirm] = React.useState(false);
 
     // Energy bid for first-mover initiative during ready (thinking) phase
-    const [energyBidInput, setEnergyBidInput] = React.useState<string>("");
+    const [energyBidInput, setEnergyBidInput] = React.useState<string>("0");
     const [showBidPopup, setShowBidPopup] = React.useState(false);
 
     // Factory button highlight state for visual feedback
@@ -123,6 +123,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         // Keep initiative bid drawer collapsed by default each thinking round.
         if (gameState.gameMode === 'pvp' && isThinking) {
             setShowBidPopup(false);
+            setEnergyBidInput('0');
         } else {
             setShowBidPopup(false);
         }
@@ -410,7 +411,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                         disabled={isInteractionDisabled}
                                                         onClick={() => {
                                                             if (isInteractionDisabled) return;
-                                                            const bid = parseInt(energyBidInput) || 0;
+                                                            const rawBid = energyBidInput.trim();
+                                                            const parsedBid = parseInt(rawBid);
+                                                            const bid = Number.isNaN(parsedBid)
+                                                                ? 0
+                                                                : Math.max(0, Math.min(parsedBid, player.energy));
+                                                            if (rawBid === '') setEnergyBidInput('0');
                                                             phases.startActionPhase(bid, panelPlayerId);
                                                         }}
                                                         className={`px-6 py-2 rounded font-black shadow-lg flex items-center gap-2 border-2 transition-all ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-700 bg-slate-800' : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-cyan-400 shadow-cyan-500/50'}`}
