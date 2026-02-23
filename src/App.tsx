@@ -875,9 +875,9 @@ export default function App() {
         return newMines;
     };
 
-    const startActionPhase = (energyBid: number = 0) => {
+    const startActionPhase = (energyBid: number = 0, playerIdOverride?: PlayerID) => {
         const state = gameStateRef.current;
-        const localPlayer = resolveLocalPlayer(state);
+        const localPlayer = playerIdOverride ?? resolveLocalPlayer(state);
         const localBid = Math.max(0, Math.min(energyBid, state.players[localPlayer].energy));
 
         // Prevent repeated calls in PvP if already ready
@@ -3814,6 +3814,9 @@ export default function App() {
     const localPerspectivePlayer = (gameState.gameMode === 'pvp')
         ? (pvpPerspectivePlayer ?? (isHost ? PlayerID.P1 : PlayerID.P2))
         : null;
+    const localControlPlayer = gameState.gameMode === 'pvp'
+        ? (getLocalNetworkPlayer() ?? localPerspectivePlayer ?? (isHost ? PlayerID.P1 : PlayerID.P2))
+        : PlayerID.P1;
     const localLogOwnerPlayerId = gameState.gameMode === 'pvp'
         ? (isHost ? PlayerID.P1 : PlayerID.P2)
         : PlayerID.P1;
@@ -4310,7 +4313,7 @@ export default function App() {
                         setShowEvolutionTree={setShowEvolutionTree}
                         language={language}
                         isLocalPlayerTurn={isLocalPlayerTurn}
-                        localPlayerId={localPerspectivePlayer ?? PlayerID.P1}
+                        localPlayerId={localControlPlayer}
                         t={t}
                         aiDecision={aiDecision}
                         actions={{
@@ -4381,7 +4384,7 @@ export default function App() {
                             onSandboxDragStart={onSandboxDragStart}
                             targetMode={targetMode}
                             setTargetMode={setTargetMode}
-                            localPlayerId={localPerspectivePlayer ?? PlayerID.P1}
+                            localPlayerId={localControlPlayer}
                             onStateMutated={(reason: string) => sendGameStateDeferred(`sandbox_${reason}`)}
                         />
                     )}

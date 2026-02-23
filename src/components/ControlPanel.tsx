@@ -54,7 +54,7 @@ interface ControlPanelProps {
     };
     phases: {
         finishPlacementPhase: () => void;
-        startActionPhase: (energyBid: number) => void;
+        startActionPhase: (energyBid: number, playerId?: PlayerID) => void;
     };
     handleUnitClick: (unit: Unit) => void;
     handleDisarmAction: (unit: Unit, r: number, c: number) => void;
@@ -326,7 +326,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                         onClick={() => {
                                                             if (isInteractionDisabled) return;
                                                             const bid = parseInt(energyBidInput) || 0;
-                                                            phases.startActionPhase(bid);
+                                                            phases.startActionPhase(bid, panelPlayerId);
                                                         }}
                                                         className={`px-6 py-2 rounded font-black shadow-lg flex items-center gap-2 border-2 transition-all ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-700 bg-slate-800' : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-cyan-400 shadow-cyan-500/50'}`}
                                                     >
