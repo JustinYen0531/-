@@ -157,7 +157,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <ArrowUp
                     size={16}
                     strokeWidth={3}
-                    className="drop-shadow-sm"
+                    className={`drop-shadow-sm transition-transform ${showBidPopup ? 'rotate-180' : ''}`}
                 />
                 <span
                     className="text-sm font-black uppercase tracking-wide leading-none"
