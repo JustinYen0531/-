@@ -791,7 +791,7 @@ export default function App() {
 
 
 
-    const finishPlacementPhase = (energyBid: number = 0) => {
+    const finishPlacementPhase = () => {
         const state = gameStateRef.current;
         const localPlayer = resolveLocalPlayer(state);
 
@@ -807,7 +807,7 @@ export default function App() {
                 type: 'PLAYER_READY',
                 matchId: roomId,
                 turn: state.turnCount,
-                payload: { playerId: localPlayer, phase: 'placement', setupMines, energyBid }
+                payload: { playerId: localPlayer, phase: 'placement', setupMines }
             });
         }
 
@@ -824,17 +824,6 @@ export default function App() {
                 const bothReady = newReadyState[PlayerID.P1] && newReadyState[PlayerID.P2];
 
                 if (bothReady) {
-                    // Both confirmed -> compare bids to decide first mover
-                    const p1Bid = prev.pvpEnergyBids?.[PlayerID.P1] ?? 0;
-                    const p2Bid = prev.pvpEnergyBids?.[PlayerID.P2] ?? 0;
-                    const { firstMover: newFirstMover, isTie } = resolveFirstMoverFromBids(p1Bid, p2Bid, prev.turnCount);
-                    const firstMoverLog: import('./types').GameLog = isTie
-                        ? { turn: 1, messageKey: 'log_first_mover_tie', params: {}, type: 'info' as const }
-                        : { turn: 1, messageKey: 'log_first_mover', params: { player: newFirstMover === PlayerID.P1 ? 'P1' : 'P2' }, type: 'info' as const };
-                    // Deduct bids from energy
-                    const p1AfterBid = Math.max(0, prev.players[PlayerID.P1].energy - p1Bid);
-                    const p2AfterBid = Math.max(0, prev.players[PlayerID.P2].energy - p2Bid);
-
                     const stabilizedSetupMines = unionPlacementMines(
                         getSetupMines(prev.mines),
                         placementMinesRef.current
@@ -843,29 +832,18 @@ export default function App() {
                         ...prev,
                         phase: 'thinking',
                         timeLeft: THINKING_TIMER,
-                        currentPlayer: newFirstMover,
                         mines: [...prev.mines.filter(m => !m.id.startsWith('pm-')), ...stabilizedSetupMines],
                         selectedUnitId: null,
                         targetMode: null,
                         pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
                         pvpEnergyBids: { [PlayerID.P1]: 0, [PlayerID.P2]: 0 },
-                        players: {
-                            ...prev.players,
-                            [PlayerID.P1]: { ...prev.players[PlayerID.P1], energy: p1AfterBid },
-                            [PlayerID.P2]: { ...prev.players[PlayerID.P2], energy: p2AfterBid },
-                        },
-                        logs: [firstMoverLog, { turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...newLogs]
+                        logs: [{ turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...newLogs]
                     };
                 } else {
-                    // Only this player confirmed -> stay in placement, mark ready + store bid
+                    // Only this player confirmed -> stay in placement, mark ready
                     return {
                         ...prev,
                         pvpReadyState: newReadyState,
-                        pvpEnergyBids: {
-                            [PlayerID.P1]: prev.pvpEnergyBids?.[PlayerID.P1] ?? 0,
-                            [PlayerID.P2]: prev.pvpEnergyBids?.[PlayerID.P2] ?? 0,
-                            [localPlayer]: energyBid,
-                        },
                         logs: newLogs,
                     };
                 }
@@ -897,9 +875,10 @@ export default function App() {
         return newMines;
     };
 
-    const startActionPhase = () => {
+    const startActionPhase = (energyBid: number = 0) => {
         const state = gameStateRef.current;
         const localPlayer = resolveLocalPlayer(state);
+        const localBid = Math.max(0, Math.min(energyBid, state.players[localPlayer].energy));
 
         // Prevent repeated calls in PvP if already ready
         if (state.gameMode === 'pvp' && state.pvpReadyState?.[localPlayer]) {
@@ -912,7 +891,7 @@ export default function App() {
                 type: 'PLAYER_READY',
                 matchId: roomId,
                 turn: state.turnCount,
-                payload: { playerId: localPlayer, phase: 'thinking' }
+                payload: { playerId: localPlayer, phase: 'thinking', energyBid: localBid }
             });
         }
 
@@ -927,36 +906,62 @@ export default function App() {
                 const bothReady = newReadyState[PlayerID.P1] && newReadyState[PlayerID.P2];
 
                 if (bothReady) {
-                    // Both confirmed -> transition to action phase
+                    // Both confirmed -> resolve initiative bid, then transition to action phase
+                    const p1Bid = localPlayer === PlayerID.P1
+                        ? localBid
+                        : (prev.pvpEnergyBids?.[PlayerID.P1] ?? 0);
+                    const p2Bid = localPlayer === PlayerID.P2
+                        ? localBid
+                        : (prev.pvpEnergyBids?.[PlayerID.P2] ?? 0);
+                    const { firstMover, isTie } = resolveFirstMoverFromBids(p1Bid, p2Bid, prev.turnCount);
+                    const firstMoverLog: import('./types').GameLog = isTie
+                        ? { turn: prev.turnCount, messageKey: 'log_first_mover_tie', params: {}, type: 'info' as const }
+                        : {
+                            turn: prev.turnCount,
+                            messageKey: 'log_first_mover',
+                            params: { player: firstMover === PlayerID.P1 ? 'P1' : 'P2' },
+                            type: 'info' as const
+                        };
+                    const p1AfterBid = Math.max(0, prev.players[PlayerID.P1].energy - p1Bid);
+                    const p2AfterBid = Math.max(0, prev.players[PlayerID.P2].energy - p2Bid);
                     const updatedMines = applyRadarScans(prev);
                     return {
                         ...prev,
                         phase: 'action',
                         timeLeft: TURN_TIMER,
+                        currentPlayer: firstMover,
                         selectedUnitId: null,
                         activeUnitId: null,
                         mines: updatedMines,
                         pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
+                        pvpEnergyBids: { [PlayerID.P1]: 0, [PlayerID.P2]: 0 },
                         players: {
                             ...prev.players,
                             [PlayerID.P1]: {
                                 ...prev.players[PlayerID.P1],
-                                startOfActionEnergy: prev.players[PlayerID.P1].energy,
-                                units: prev.players[PlayerID.P1].units.map(u => ({ ...u, startOfActionEnergy: prev.players[PlayerID.P1].energy }))
+                                energy: p1AfterBid,
+                                startOfActionEnergy: p1AfterBid,
+                                units: prev.players[PlayerID.P1].units.map(u => ({ ...u, startOfActionEnergy: p1AfterBid }))
                             },
                             [PlayerID.P2]: {
                                 ...prev.players[PlayerID.P2],
-                                startOfActionEnergy: prev.players[PlayerID.P2].energy,
-                                units: prev.players[PlayerID.P2].units.map(u => ({ ...u, startOfActionEnergy: prev.players[PlayerID.P2].energy }))
+                                energy: p2AfterBid,
+                                startOfActionEnergy: p2AfterBid,
+                                units: prev.players[PlayerID.P2].units.map(u => ({ ...u, startOfActionEnergy: p2AfterBid }))
                             }
                         },
-                        logs: [{ turn: prev.turnCount, messageKey: 'log_action_phase', type: 'info' as const }, ...prev.logs]
+                        logs: [firstMoverLog, { turn: prev.turnCount, messageKey: 'log_action_phase', type: 'info' as const }, ...prev.logs]
                     };
                 } else {
-                    // Only this player confirmed -> stay in thinking, mark ready
+                    // Only this player confirmed -> stay in thinking, mark ready + store bid
                     return {
                         ...prev,
                         pvpReadyState: newReadyState,
+                        pvpEnergyBids: {
+                            [PlayerID.P1]: prev.pvpEnergyBids?.[PlayerID.P1] ?? 0,
+                            [PlayerID.P2]: prev.pvpEnergyBids?.[PlayerID.P2] ?? 0,
+                            [localPlayer]: localBid,
+                        },
                     };
                 }
             }
@@ -3193,20 +3198,7 @@ export default function App() {
                     // Check if phase transition is needed
                     if (bothReady) {
                         if (payload.phase === 'placement') {
-                            // Compare bids to decide first mover
-                            const remoteBid = payload.energyBid ?? 0;
-                            const localPlayerId = isHost ? PlayerID.P1 : PlayerID.P2;
-                            const localBidStored = prev.pvpEnergyBids?.[localPlayerId] ?? 0;
-                            const remotePlayerId = payload.playerId;
-                            const p1Bid = remotePlayerId === PlayerID.P1 ? remoteBid : localBidStored;
-                            const p2Bid = remotePlayerId === PlayerID.P2 ? remoteBid : localBidStored;
-                            const { firstMover: newFirstMover, isTie } = resolveFirstMoverFromBids(p1Bid, p2Bid, prev.turnCount);
-                            const firstMoverLog = isTie
-                                ? { turn: 1, messageKey: 'log_first_mover_tie', params: {}, type: 'info' as const }
-                                : { turn: 1, messageKey: 'log_first_mover', params: { player: newFirstMover === PlayerID.P1 ? 'P1' : 'P2' }, type: 'info' as const };
-                            const p1AfterBid = Math.max(0, prev.players[PlayerID.P1].energy - p1Bid);
-                            const p2AfterBid = Math.max(0, prev.players[PlayerID.P2].energy - p2Bid);
-
+                            // Both confirmed setup -> transition to ready (thinking) phase.
                             const stabilizedSetupMines = unionPlacementMines(
                                 mergedSetupMines,
                                 placementMinesRef.current
@@ -3215,49 +3207,63 @@ export default function App() {
                                 ...prev,
                                 phase: 'thinking',
                                 timeLeft: THINKING_TIMER,
-                                currentPlayer: newFirstMover,
                                 mines: [...prev.mines.filter(m => !m.id.startsWith('pm-')), ...stabilizedSetupMines],
                                 selectedUnitId: null,
                                 activeUnitId: null,
                                 pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
                                 pvpEnergyBids: { [PlayerID.P1]: 0, [PlayerID.P2]: 0 },
-                                players: {
-                                    ...prev.players,
-                                    [PlayerID.P1]: { ...prev.players[PlayerID.P1], energy: p1AfterBid },
-                                    [PlayerID.P2]: { ...prev.players[PlayerID.P2], energy: p2AfterBid },
-                                },
-                                logs: [firstMoverLog, { turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
+                                logs: [{ turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
                             };
                         } else {
+                            const remoteBid = Math.max(0, payload.energyBid ?? 0);
+                            const localPlayerId = isHost ? PlayerID.P1 : PlayerID.P2;
+                            const localBidStored = prev.pvpEnergyBids?.[localPlayerId] ?? 0;
+                            const p1Bid = payload.playerId === PlayerID.P1 ? remoteBid : localBidStored;
+                            const p2Bid = payload.playerId === PlayerID.P2 ? remoteBid : localBidStored;
+                            const { firstMover, isTie } = resolveFirstMoverFromBids(p1Bid, p2Bid, prev.turnCount);
+                            const firstMoverLog: import('./types').GameLog = isTie
+                                ? { turn: prev.turnCount, messageKey: 'log_first_mover_tie', params: {}, type: 'info' as const }
+                                : {
+                                    turn: prev.turnCount,
+                                    messageKey: 'log_first_mover',
+                                    params: { player: firstMover === PlayerID.P1 ? 'P1' : 'P2' },
+                                    type: 'info' as const
+                                };
+                            const p1AfterBid = Math.max(0, prev.players[PlayerID.P1].energy - p1Bid);
+                            const p2AfterBid = Math.max(0, prev.players[PlayerID.P2].energy - p2Bid);
                             const updatedMines = applyRadarScans(prev);
                             return {
                                 ...prev,
                                 phase: 'action',
                                 timeLeft: TURN_TIMER,
+                                currentPlayer: firstMover,
                                 selectedUnitId: null,
                                 activeUnitId: null,
                                 mines: updatedMines,
                                 pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false }, // Reset but won't be used in action phase
+                                pvpEnergyBids: { [PlayerID.P1]: 0, [PlayerID.P2]: 0 },
                                 players: {
                                     ...prev.players,
                                     [PlayerID.P1]: {
                                         ...prev.players[PlayerID.P1],
-                                        startOfActionEnergy: prev.players[PlayerID.P1].energy,
-                                        units: prev.players[PlayerID.P1].units.map(u => ({ ...u, startOfActionEnergy: prev.players[PlayerID.P1].energy }))
+                                        energy: p1AfterBid,
+                                        startOfActionEnergy: p1AfterBid,
+                                        units: prev.players[PlayerID.P1].units.map(u => ({ ...u, startOfActionEnergy: p1AfterBid }))
                                     },
                                     [PlayerID.P2]: {
                                         ...prev.players[PlayerID.P2],
-                                        startOfActionEnergy: prev.players[PlayerID.P2].energy,
-                                        units: prev.players[PlayerID.P2].units.map(u => ({ ...u, startOfActionEnergy: prev.players[PlayerID.P2].energy }))
+                                        energy: p2AfterBid,
+                                        startOfActionEnergy: p2AfterBid,
+                                        units: prev.players[PlayerID.P2].units.map(u => ({ ...u, startOfActionEnergy: p2AfterBid }))
                                     }
                                 },
-                                logs: [{ turn: prev.turnCount, messageKey: 'log_action_phase', type: 'info' as const }, ...logsWithRemotePlacement]
+                                logs: [firstMoverLog, { turn: prev.turnCount, messageKey: 'log_action_phase', type: 'info' as const }, ...logsWithRemotePlacement]
                             }
                         }
                     }
 
                     // Store the remote player's bid if not both ready yet
-                    const updatedBids = payload.phase === 'placement' ? {
+                    const updatedBids = payload.phase === 'thinking' ? {
                         [PlayerID.P1]: prev.pvpEnergyBids?.[PlayerID.P1] ?? 0,
                         [PlayerID.P2]: prev.pvpEnergyBids?.[PlayerID.P2] ?? 0,
                         [payload.playerId]: payload.energyBid ?? 0,

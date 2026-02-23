@@ -140,10 +140,12 @@ const GridCell: React.FC<GridCellProps> = ({
 }) => {
   const [particles, setParticles] = React.useState<Array<{ id: string, x: number, y: number, color: string, delay: number }>>([]);
   const [flagBurstParticles, setFlagBurstParticles] = React.useState<Array<{ id: string, x: number, y: number, delay: number, size: number, duration: number }>>([]);
+  const [floorPetals, setFloorPetals] = React.useState<Array<{ id: string, x: number, y: number, rotation: number, scale: number, driftX: number, driftY: number, delay: number, duration: number, color: 'blue' | 'orange' }>>([]);
   const [flagBurstTheme, setFlagBurstTheme] = React.useState<'a' | 'b'>('a');
   const [isLocallyDismissed, setIsLocallyDismissed] = React.useState(false);
   const prevParticleFxNonce = React.useRef(evolutionFxNonce);
   const prevBurstFxNonce = React.useRef(evolutionFxNonce);
+  const prevPetalFxNonce = React.useRef(evolutionFxNonce);
 
   // When the actual prop updates (e.g. cleared by game state or re-scanned), reset local state
   React.useEffect(() => {
@@ -186,6 +188,37 @@ const GridCell: React.FC<GridCellProps> = ({
       if (timer) clearTimeout(timer);
     };
   }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead]);
+
+  // Decorative floor petals on each evolution trigger.
+  React.useEffect(() => {
+    const hasNewFxSignal = evolutionFxNonce > 0 && evolutionFxNonce !== prevPetalFxNonce.current;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    if (hasNewFxSignal) {
+      const count = 4 + Math.floor(Math.random() * 4);
+      const color: 'blue' | 'orange' = evolutionFxBranch === 'b' ? 'orange' : 'blue';
+      const petals = Array.from({ length: count }, (_, index) => ({
+        id: `petal-${Date.now()}-${index}`,
+        x: 16 + Math.random() * 68,
+        y: 14 + Math.random() * 72,
+        rotation: Math.random() * 360,
+        scale: 0.72 + Math.random() * 0.7,
+        driftX: (Math.random() - 0.5) * 12,
+        driftY: 6 + Math.random() * 8,
+        delay: Math.random() * 0.18,
+        duration: 1.4 + Math.random() * 0.8,
+        color,
+      }));
+      setFloorPetals(petals);
+      timer = setTimeout(() => setFloorPetals([]), 2200);
+    }
+
+    if (evolutionFxNonce > 0) prevPetalFxNonce.current = evolutionFxNonce;
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [evolutionFxBranch, evolutionFxNonce]);
   // - isInActionScope: within skill range (faint frame)
   // - isInActionRange: executable target (strong highlight)
   let isInActionScope = false;
@@ -937,6 +970,27 @@ const GridCell: React.FC<GridCellProps> = ({
           </div>
         )
       }
+
+      {floorPetals.length > 0 && (
+        <div className="absolute inset-0 pointer-events-none z-[68]">
+          {floorPetals.map((petal) => (
+            <div
+              key={petal.id}
+              className={`evolution-floor-petal ${petal.color === 'blue' ? 'evolution-floor-petal-blue' : 'evolution-floor-petal-orange'}`}
+              style={{
+                left: `${petal.x}%`,
+                top: `${petal.y}%`,
+                '--petal-rot': `${petal.rotation}deg`,
+                '--petal-scale': `${petal.scale}`,
+                '--petal-dx': `${petal.driftX}px`,
+                '--petal-dy': `${petal.driftY}px`,
+                animationDuration: `${petal.duration}s`,
+                animationDelay: `${petal.delay}s`,
+              } as React.CSSProperties}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Mine (Underneath unit) */}
       {

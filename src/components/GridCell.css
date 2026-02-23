@@ -396,6 +396,44 @@
   box-shadow: 0 0 4px rgba(251, 146, 60, 0.8);
 }
 
+@keyframes floorPetalDrift {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--petal-rot, 0deg)) scale(var(--petal-scale, 1));
+  }
+  15% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--petal-dx, 3px)), calc(-50% + var(--petal-dy, 9px))) rotate(calc(var(--petal-rot, 0deg) + 12deg)) scale(calc(var(--petal-scale, 1) * 0.86));
+  }
+}
+
+.evolution-floor-petal {
+  position: absolute;
+  pointer-events: none;
+  width: 8px;
+  height: 5px;
+  border-radius: 70% 50% 70% 50%;
+  transform-origin: center;
+  animation-name: floorPetalDrift;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+  --petal-dx: 4px;
+  --petal-dy: 8px;
+}
+
+.evolution-floor-petal-blue {
+  background: linear-gradient(145deg, rgba(191, 219, 254, 0.95), rgba(59, 130, 246, 0.85));
+  box-shadow: 0 0 5px rgba(96, 165, 250, 0.5);
+}
+
+.evolution-floor-petal-orange {
+  background: linear-gradient(145deg, rgba(254, 215, 170, 0.95), rgba(249, 115, 22, 0.85));
+  box-shadow: 0 0 5px rgba(251, 146, 60, 0.5);
+}
+
 /* Evolution Level Aura Classes */
 .evolution-aura-a-lv1 {
   animation: auraBlueGlow 2s ease-in-out infinite !important;
