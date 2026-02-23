@@ -686,23 +686,6 @@ export default function App() {
         emitEvolutionFx(latestLog.owner, unitTypeRaw, branch);
     }, [emitEvolutionFx, gameState.logs]);
 
-    // Clear evolution effect when the unit moves away from the upgrade location.
-    // This prevents the effect from replaying when the unit moves back to the same cell.
-    useEffect(() => {
-        if (!evolutionFxEvent) return;
-        const unit = gameState.players[evolutionFxEvent.owner]?.units.find(u => u.id === evolutionFxEvent.unitId);
-        if (!unit) return;
-        
-        // If unit has moved away from the effect location, clear the event
-        if (unit.r !== evolutionFxEvent.r || unit.c !== evolutionFxEvent.c) {
-            setEvolutionFxEvent(null);
-            if (evolutionFxClearTimerRef.current) {
-                clearTimeout(evolutionFxClearTimerRef.current);
-                evolutionFxClearTimerRef.current = null;
-            }
-        }
-    }, [gameState.players, evolutionFxEvent]);
-
     // Reset selected mine type on mount to prevent persistence
     useEffect(() => {
         setSelectedMineType(MineType.NORMAL);
