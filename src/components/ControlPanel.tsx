@@ -108,7 +108,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
     // Energy bid for first-mover initiative during ready (thinking) phase
     const [energyBidInput, setEnergyBidInput] = React.useState<string>("");
-    const [showBidPopup, setShowBidPopup] = React.useState(true);
+    const [showBidPopup, setShowBidPopup] = React.useState(false);
 
     // Factory button highlight state for visual feedback
     const [factoryButtonFlash, setFactoryButtonFlash] = React.useState(false);
@@ -120,8 +120,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }, [gameState.selectedUnitId]);
 
     React.useEffect(() => {
+        // Keep initiative bid drawer collapsed by default each thinking round.
         if (gameState.gameMode === 'pvp' && isThinking) {
-            setShowBidPopup(true);
+            setShowBidPopup(false);
         } else {
             setShowBidPopup(false);
         }
