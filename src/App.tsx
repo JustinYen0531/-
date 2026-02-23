@@ -1397,6 +1397,9 @@ export default function App() {
 
         addLog('log_evol_swp_detonate', 'mine', { r: unit.r + 1, c: unit.c + 1 }, unit.owner);
         setTargetMode(null);
+        if (!applyingRemoteActionRef.current && roomId && isNetworkConnected) {
+            sendGameStateDeferred('detonate_tower');
+        }
     };
 
 
