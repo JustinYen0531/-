@@ -123,6 +123,18 @@ const GameField: React.FC<GameFieldProps> = ({
                     0% { transform: scale(0.2); opacity: 0.95; }
                     100% { transform: scale(1.4); opacity: 0; }
                 }
+                @keyframes boardScanPinFloat {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(-2px); }
+                }
+                @keyframes boardScanPinPulse {
+                    0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.65; }
+                    100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0; }
+                }
+                @keyframes boardScanPinDigitBreathe {
+                    0%, 100% { transform: translateY(0) scale(1); }
+                    50% { transform: translateY(-0.5px) scale(1.05); }
+                }
             `}</style>
             <div ref={boardRef} className="grid gap-0 border-4 border-white bg-slate-900 rounded-lg overflow-hidden relative z-10 shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                 style={{
@@ -211,6 +223,8 @@ const GameField: React.FC<GameFieldProps> = ({
                         const pinCloseClass = isBlueCountOwner
                             ? 'bg-slate-900/85 border-cyan-200/80 text-cyan-100 hover:bg-slate-800'
                             : 'bg-slate-900/85 border-red-200/80 text-red-100 hover:bg-slate-800';
+                        const pinPulseColor = isBlueCountOwner ? 'rgba(34, 211, 238, 0.6)' : 'rgba(248, 113, 113, 0.6)';
+                        const pinAuraColor = isBlueCountOwner ? 'rgba(34,211,238,0.35)' : 'rgba(248,113,113,0.35)';
 
                         let cellIsValidMove = false;
                         if (selectedUnit && targetMode === 'move') {
@@ -351,14 +365,32 @@ const GameField: React.FC<GameFieldProps> = ({
                                     })}
                                 {countResult && (
                                     <div className="absolute inset-0 z-[260] flex flex-col items-center justify-center">
-                                        <div className="group/scanpin relative mb-6 animate-float-pin flex flex-col items-center opacity-100 p-2 -m-2">
-                                            <div className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] pointer-events-none">
+                                        <div className="group/scanpin relative mb-6 flex flex-col items-center opacity-100 p-2 -m-2">
+                                            <div
+                                                className="relative drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)] pointer-events-none"
+                                                style={{ animation: 'boardScanPinFloat 1.9s ease-in-out infinite' }}
+                                            >
+                                                <div
+                                                    className="absolute rounded-full"
+                                                    style={{
+                                                        left: '50%',
+                                                        top: '36%',
+                                                        width: '22px',
+                                                        height: '22px',
+                                                        border: `1.5px solid ${pinPulseColor}`,
+                                                        boxShadow: `0 0 10px ${pinAuraColor}`,
+                                                        animation: 'boardScanPinPulse 1.5s ease-out infinite'
+                                                    }}
+                                                />
                                                 <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                     <path d="M32 16C32 24.8366 16 42 16 42C16 42 0 24.8366 0 16C0 7.16344 7.16344 0 16 0C24.8366 0 32 7.16344 32 16Z" fill="#000000" />
                                                     <path d="M31 16C31 23.5 16 39.5 16 39.5C16 39.5 1 23.5 1 16C1 7.71573 7.71573 1 16 1C24.2843 1 31 7.71573 31 16Z" stroke={pinStroke} strokeWidth="2.2" />
                                                 </svg>
                                                 <div className="absolute top-0 left-0 w-[32px] h-[42px] flex items-center justify-center">
-                                                    <span className={`${pinTextClass} font-black text-[18px] leading-none -mt-2 ${pinTextGlow}`}>
+                                                    <span
+                                                        className={`${pinTextClass} font-black text-[18px] leading-none -mt-2 ${pinTextGlow}`}
+                                                        style={{ animation: 'boardScanPinDigitBreathe 1.9s ease-in-out infinite' }}
+                                                    >
                                                         {countResult.count}
                                                     </span>
                                                 </div>
