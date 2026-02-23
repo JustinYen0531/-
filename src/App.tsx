@@ -653,24 +653,6 @@ export default function App() {
         }, 600);
     }, []);
 
-    // Clear evolution effect when the unit moves away from the upgrade location.
-    // This prevents the effect from replaying when the unit moves back to the same cell.
-    useEffect(() => {
-        if (!evolutionFxEvent) return;
-        
-        const unit = gameStateRef.current.players[evolutionFxEvent.owner]?.units.find(u => u.id === evolutionFxEvent.unitId);
-        if (!unit) return;
-        
-        // If unit has moved away from the effect location, clear the event immediately
-        if (unit.r !== evolutionFxEvent.r || unit.c !== evolutionFxEvent.c) {
-            setEvolutionFxEvent(null);
-            if (evolutionFxClearTimerRef.current) {
-                clearTimeout(evolutionFxClearTimerRef.current);
-                evolutionFxClearTimerRef.current = null;
-            }
-        }
-    }, [gameState.players, evolutionFxEvent]);
-
     useEffect(() => () => {
         if (evolutionFxClearTimerRef.current) {
             clearTimeout(evolutionFxClearTimerRef.current);
