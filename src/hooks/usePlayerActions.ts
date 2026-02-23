@@ -318,9 +318,6 @@ export const usePlayerActions = ({
             updatedP1Units = updatedP1Units.map(u => {
                 if (!u.isDead && u.c <= p1FlagPos.c) {
                     const newHp = Math.min(u.maxHp, u.hp + 1);
-                    if (newHp > u.hp) {
-                        newLogs.unshift({ turn: nextTurn, messageKey: 'log_evol_gen_b_heal', type: 'evolution', owner: PlayerID.P1 });
-                    }
                     return { ...u, hp: newHp };
                 }
                 return u;
@@ -333,9 +330,6 @@ export const usePlayerActions = ({
             updatedP2Units = updatedP2Units.map(u => {
                 if (!u.isDead && u.c >= p2FlagPos.c) {
                     const newHp = Math.min(u.maxHp, u.hp + 1);
-                    if (newHp > u.hp) {
-                        newLogs.unshift({ turn: nextTurn, messageKey: 'log_evol_gen_b_heal', type: 'evolution', owner: PlayerID.P2 });
-                    }
                     return { ...u, hp: newHp };
                 }
                 return u;
@@ -992,7 +986,7 @@ export const usePlayerActions = ({
                 movements: [...prev.movements, { unitId: unit.id, from: { r: unit.r, c: unit.c }, to: { r, c }, energy: totalCost }],
                 players: { [PlayerID.P1]: finalP1, [PlayerID.P2]: finalP2 },
                 lastActionTime: Date.now(),
-                isTimeFrozen: prev.isTimeFrozen || true,  // Maintain freeze if already frozen
+                isTimeFrozen: true,
                 gameOver: generalDied || prev.gameOver,
                 winner: generalDied ? winnerFromGeneralDeath : prev.winner
             };
@@ -1115,6 +1109,12 @@ export const usePlayerActions = ({
         });
 
         addLog('log_attack_hit', 'combat', { attacker: getLocalizedUnitName(attacker.type), target: getLocalizedUnitName(targetUnit.type), dmg }, attacker.owner);
+        if (isFlagA31Attack) {
+            addLog('log_evol_gen_a_heal', 'evolution', undefined, attacker.owner);
+        }
+        if (genLevelA === 3 && genVariantA === 2) {
+            addLog('log_evol_gen_a_knockback', 'evolution', undefined, attacker.owner);
+        }
         if (genLevelA >= 1 && mineVulnerabilityIncreased) {
             addLog('log_evol_gen_a_mine_vuln', 'evolution', {
                 unit: getLocalizedUnitName(targetUnit.type),
