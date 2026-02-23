@@ -644,11 +644,17 @@ export default function App() {
         if (evolutionFxClearTimerRef.current) {
             clearTimeout(evolutionFxClearTimerRef.current);
         }
-        // Keep event alive briefly for one render/animation trigger, then clear
-        // so future movement into another cell cannot replay the same upgrade effect.
+        // Clear after two animation frames so GridCell has exactly one render to consume the nonce.
+        // Using double-rAF ensures React has flushed the render before we clear.
+        const rafId = requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                setEvolutionFxEvent(prev => (prev && prev.nonce === nonce ? null : prev));
+            });
+        });
         evolutionFxClearTimerRef.current = setTimeout(() => {
+            cancelAnimationFrame(rafId);
             setEvolutionFxEvent(prev => (prev && prev.nonce === nonce ? null : prev));
-        }, 120);
+        }, 200) as unknown as ReturnType<typeof setTimeout>;
     }, []);
 
     useEffect(() => () => {
