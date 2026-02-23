@@ -94,6 +94,11 @@ export const TRANSLATIONS = {
     update_log: "Update Log",
     show_log: "Show Log",
     hide_log: "Hide Log",
+    energy_bid_label: "Initiative Bid",
+    energy_bid_hint: "Spend energy to gain first turn. Tie = random.",
+    energy_bid_placeholder: "0",
+    log_first_mover: "{{player}} won the initiative bid! First to move.",
+    log_first_mover_tie: "Initiative bid tied! First mover decided randomly.",
 
     // Developer Logs - Article 1: GDD
     dev_log_1_id: "1",
@@ -333,6 +338,7 @@ export const TRANSLATIONS = {
     log_swap: "Swapped unit positions.",
     log_low_energy_evolve: "Not enough energy to evolve!",
     log_evolved: "Evolved {{unit}} Branch {{branch}} to Lv{{level}}!",
+    log_devolved: "Devolved {{unit}} Branch {{branch}} to Lv{{level}}.",
     log_evol_gen_b_heal: "Flag Aura healed allies for 1 HP.",
     log_evol_gen_a_heal: "General healed 2 HP from flag attack.",
     log_evol_debuff: "Target debuffed: Mine Vuln & Heavy Steps.",
@@ -471,6 +477,11 @@ export const TRANSLATIONS = {
     update_log: "更新日誌",
     show_log: "展開日誌",
     hide_log: "收起日誌",
+    energy_bid_label: "先手競標",
+    energy_bid_hint: "支付能量以爭取回合先手，平局則隨機決定。",
+    energy_bid_placeholder: "0",
+    log_first_mover: "{{player}} 的競標勝出！獲得先手權。",
+    log_first_mover_tie: "競標平局！先手由隨機決定。",
 
     // Evolution Descriptions & Rewards
     evol_gen_a_desc: "武器進化",
@@ -670,6 +681,7 @@ export const TRANSLATIONS = {
     log_swap: "已交換單位位置。",
     log_low_energy_evolve: "能量不足無法進化！",
     log_evolved: "進化{{unit}}分支 {{branch}} 至等級 {{level}}！",
+    log_devolved: "退化{{unit}}分支 {{branch}} 至等級 {{level}}。",
     log_evol_gen_b_heal: "旗幟靈氣治癒了友軍 1 點生命。",
     log_evol_gen_a_heal: "將軍藉由旗幟攻擊回復了 2 點生命。",
     log_evol_debuff: "目標被弱化：地雷易傷 & 移動沉重。",
@@ -807,6 +819,11 @@ export const TRANSLATIONS = {
     update_log: "更新日志",
     show_log: "展开日志",
     hide_log: "收起日志",
+    energy_bid_label: "先手竞价",
+    energy_bid_hint: "支付能量争取先手。平局则随机决定。",
+    energy_bid_placeholder: "0",
+    log_first_mover: "{{player}} 的竞价胜出！获得先手权。",
+    log_first_mover_tie: "竞价平局！先手随机决定。",
 
     // Evolution Descriptions & Rewards
     evol_gen_a_desc: "武器伤害",
@@ -966,6 +983,7 @@ export const TRANSLATIONS = {
     log_swap: "已交换单位位置。",
     log_low_energy_evolve: "能量不足无法进化！",
     log_evolved: "进化{{unit}}分支 {{branch}} 至等级 {{level}}！",
+    log_devolved: "退化{{unit}}分支 {{branch}} 至等级 {{level}}。",
     log_evol_gen_b_heal: "旗帜灵气治愈了友军 1 点生命。",
     log_evol_gen_a_heal: "将军藉由旗帜攻击回复了 2 点生命。",
     log_evol_debuff: "目标被弱化：地雷易伤 & 移动沉重。",

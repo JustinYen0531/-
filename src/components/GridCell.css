@@ -399,14 +399,18 @@
 @keyframes floorPetalDrift {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) rotate(var(--petal-rot, 0deg)) scale(var(--petal-scale, 1));
+    transform: translate(-50%, calc(-50% + var(--petal-fall-y, -28px))) rotate(calc(var(--petal-rot, 0deg) - 24deg)) scale(calc(var(--petal-scale, 1) * 0.92));
   }
-  15% {
+  35% {
     opacity: 0.95;
   }
+  82% {
+    opacity: 0.96;
+    transform: translate(calc(-50% + calc(var(--petal-dx, 3px) * 0.65)), calc(-50% + var(--petal-dy, 3px))) rotate(calc(var(--petal-rot, 0deg) + 6deg)) scale(var(--petal-scale, 1));
+  }
   100% {
-    opacity: 0;
-    transform: translate(calc(-50% + var(--petal-dx, 3px)), calc(-50% + var(--petal-dy, 9px))) rotate(calc(var(--petal-rot, 0deg) + 12deg)) scale(calc(var(--petal-scale, 1) * 0.86));
+    opacity: 0.94;
+    transform: translate(calc(-50% + var(--petal-dx, 3px)), calc(-50% + calc(var(--petal-dy, 3px) + 1px))) rotate(calc(var(--petal-rot, 0deg) + 8deg)) scale(var(--petal-scale, 1));
   }
 }
 
@@ -421,7 +425,8 @@
   animation-timing-function: ease-out;
   animation-fill-mode: forwards;
   --petal-dx: 4px;
-  --petal-dy: 8px;
+  --petal-dy: 2px;
+  --petal-fall-y: -28px;
 }
 
 .evolution-floor-petal-blue {

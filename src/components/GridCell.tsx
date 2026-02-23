@@ -140,7 +140,7 @@ const GridCell: React.FC<GridCellProps> = ({
 }) => {
   const [particles, setParticles] = React.useState<Array<{ id: string, x: number, y: number, color: string, delay: number }>>([]);
   const [flagBurstParticles, setFlagBurstParticles] = React.useState<Array<{ id: string, x: number, y: number, delay: number, size: number, duration: number }>>([]);
-  const [floorPetals, setFloorPetals] = React.useState<Array<{ id: string, x: number, y: number, rotation: number, scale: number, driftX: number, driftY: number, delay: number, duration: number, color: 'blue' | 'orange' }>>([]);
+  const [floorPetals, setFloorPetals] = React.useState<Array<{ id: string, x: number, y: number, rotation: number, scale: number, driftX: number, driftY: number, fallY: number, delay: number, duration: number, color: 'blue' | 'orange' }>>([]);
   const [flagBurstTheme, setFlagBurstTheme] = React.useState<'a' | 'b'>('a');
   const [isLocallyDismissed, setIsLocallyDismissed] = React.useState(false);
   const prevParticleFxNonce = React.useRef(evolutionFxNonce);
@@ -192,32 +192,64 @@ const GridCell: React.FC<GridCellProps> = ({
   // Decorative floor petals on each evolution trigger.
   React.useEffect(() => {
     const hasNewFxSignal = evolutionFxNonce > 0 && evolutionFxNonce !== prevPetalFxNonce.current;
-    let timer: ReturnType<typeof setTimeout> | null = null;
 
     if (hasNewFxSignal) {
-      const count = 4 + Math.floor(Math.random() * 4);
+      const count = 6 + Math.floor(Math.random() * 4);
       const color: 'blue' | 'orange' = evolutionFxBranch === 'b' ? 'orange' : 'blue';
-      const petals = Array.from({ length: count }, (_, index) => ({
-        id: `petal-${Date.now()}-${index}`,
-        x: 16 + Math.random() * 68,
-        y: 14 + Math.random() * 72,
-        rotation: Math.random() * 360,
-        scale: 0.72 + Math.random() * 0.7,
-        driftX: (Math.random() - 0.5) * 12,
-        driftY: 6 + Math.random() * 8,
-        delay: Math.random() * 0.18,
-        duration: 1.4 + Math.random() * 0.8,
-        color,
-      }));
-      setFloorPetals(petals);
-      timer = setTimeout(() => setFloorPetals([]), 2200);
+      const sideOrder = Array.from({ length: count }, (_, i) => i % 4);
+      for (let i = sideOrder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [sideOrder[i], sideOrder[j]] = [sideOrder[j], sideOrder[i]];
+      }
+      const petals = Array.from({ length: count }, (_, index) => {
+        const side = sideOrder[index]; // 0=top, 1=right, 2=bottom, 3=left
+        const along = 16 + Math.random() * 68;
+        const edgeJitter = (Math.random() - 0.5) * 5;
+        let x = 50;
+        let y = 50;
+        let driftX = (Math.random() - 0.5) * 4;
+        let driftY = (Math.random() - 0.5) * 4;
+
+        if (side === 0) {
+          x = along;
+          y = 8 + edgeJitter;
+          driftY -= 1.2;
+        } else if (side === 1) {
+          x = 92 + edgeJitter;
+          y = along;
+          driftX += 1.2;
+        } else if (side === 2) {
+          x = along;
+          y = 92 + edgeJitter;
+          driftY += 1.2;
+        } else {
+          x = 8 + edgeJitter;
+          y = along;
+          driftX -= 1.2;
+        }
+
+        return {
+          id: `petal-${Date.now()}-${index}`,
+          x,
+          y,
+          rotation: Math.random() * 360,
+          scale: 0.72 + Math.random() * 0.7,
+          driftX,
+          driftY,
+          fallY: -24 - Math.random() * 22,
+          delay: index * 0.02 + Math.random() * 0.12,
+          duration: 1 + Math.random() * 0.5,
+          color,
+        };
+      });
+      const MAX_PERSISTENT_PETALS = 48;
+      setFloorPetals((prev) => {
+        const merged = [...prev, ...petals];
+        return merged.length > MAX_PERSISTENT_PETALS ? merged.slice(-MAX_PERSISTENT_PETALS) : merged;
+      });
     }
 
     if (evolutionFxNonce > 0) prevPetalFxNonce.current = evolutionFxNonce;
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
   }, [evolutionFxBranch, evolutionFxNonce]);
   // - isInActionScope: within skill range (faint frame)
   // - isInActionRange: executable target (strong highlight)
@@ -984,6 +1016,7 @@ const GridCell: React.FC<GridCellProps> = ({
                 '--petal-scale': `${petal.scale}`,
                 '--petal-dx': `${petal.driftX}px`,
                 '--petal-dy': `${petal.driftY}px`,
+                '--petal-fall-y': `${petal.fallY}px`,
                 animationDuration: `${petal.duration}s`,
                 animationDelay: `${petal.delay}s`,
               } as React.CSSProperties}
@@ -1242,15 +1275,18 @@ const GridCell: React.FC<GridCellProps> = ({
                     <div className="evolution-accessory" style={{
                       position: 'absolute',
                       top: '-12px',
-                      left: '50%',
-                      transform: 'translateX(-50%) rotate(45deg)',
+                      left: 'calc(50% - 4px)',
+                      transform: 'rotate(45deg)',
                       width: '8px',
                       height: '8px',
                       backgroundColor: 'rgb(96, 165, 250)',
                       borderRadius: '2px',
                       boxShadow: '0 0 4px rgba(96, 165, 250, 0.8)',
+                      animation: 'accessoryBreathe 2s ease-in-out infinite',
+                      '--breathe-x': '0px',
+                      '--breathe-y': '-5px',
                       zIndex: 10
-                    }} />
+                    } as React.CSSProperties} />
                     {/* Circle outline for LV1 */}
                     <div style={{
                       position: 'absolute',

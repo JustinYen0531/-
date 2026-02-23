@@ -130,7 +130,12 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 logs: [{
                     turn: prev.turnCount,
                     messageKey: 'log_devolved',
-                    params: { unitType: unit.type, branch },
+                    params: {
+                        unit: getUnitNameKey(unit.type),
+                        unitType: unit.type,
+                        branch: branch.toUpperCase(),
+                        level: newLevel
+                    },
                     type: 'info' as const,
                     owner: unit.owner
                 }, ...prev.logs]
