@@ -4286,7 +4286,26 @@ export default function App() {
                                                             : (log.owner === localLogOwnerPlayerId ? '[我方] ' : '[敵方] ')
                                                 )
                                                 : '';
-                                            const translatedLogText = t(log.messageKey, log.params);
+                                            let resolvedLogParams = log.params;
+                                            if (log.messageKey === 'log_devolved') {
+                                                const p: Record<string, any> = { ...(resolvedLogParams || {}) };
+                                                const unitTypeRaw = p.unitType;
+                                                const unitType = isUnitTypeValue(unitTypeRaw) ? unitTypeRaw : null;
+                                                const branchRaw = typeof p.branch === 'string' ? p.branch.toLowerCase() : '';
+                                                const branch = branchRaw === 'a' || branchRaw === 'b' ? branchRaw : null;
+
+                                                if (!p.unit && unitType) {
+                                                    p.unit = getUnitNameKey(unitType);
+                                                }
+                                                if (typeof p.branch === 'string') {
+                                                    p.branch = p.branch.toUpperCase();
+                                                }
+                                                if ((p.level === undefined || p.level === null || p.level === '') && log.owner && unitType && branch) {
+                                                    p.level = gameState.players[log.owner].evolutionLevels[unitType][branch];
+                                                }
+                                                resolvedLogParams = p;
+                                            }
+                                            const translatedLogText = t(log.messageKey, resolvedLogParams);
                                             const firstMoverPlayerLabel = (() => {
                                                 const player = String(log.params?.player ?? '');
                                                 if (player === 'P1') {
