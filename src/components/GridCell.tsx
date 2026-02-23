@@ -181,7 +181,6 @@ const GridCell: React.FC<GridCellProps> = ({
     }
 
     if (evolutionFxNonce > 0) prevParticleFxNonce.current = evolutionFxNonce;
-    else if (evolutionFxNonce === 0 && prevParticleFxNonce.current > 0) prevParticleFxNonce.current = 0;
 
     return () => {
       if (timer) clearTimeout(timer);
@@ -349,7 +348,6 @@ const GridCell: React.FC<GridCellProps> = ({
     }
 
     if (evolutionFxNonce > 0) prevBurstFxNonce.current = evolutionFxNonce;
-    else if (evolutionFxNonce === 0 && prevBurstFxNonce.current > 0) prevBurstFxNonce.current = 0;
 
     return () => {
       if (timer) clearTimeout(timer);
