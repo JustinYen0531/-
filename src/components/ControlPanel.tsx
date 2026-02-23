@@ -54,7 +54,7 @@ interface ControlPanelProps {
     };
     phases: {
         finishPlacementPhase: () => void;
-        startActionPhase: () => void;
+        startActionPhase: (energyBid: number) => void;
     };
     handleUnitClick: (unit: Unit) => void;
     handleDisarmAction: (unit: Unit, r: number, c: number) => void;
@@ -93,8 +93,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         !gameState.gameOver &&
         !gameState.isPaused;
 
-    // During placement both sides can interact; lock only in thinking/action when it's not your turn.
-    const isInteractionDisabled = isPlacement ? false : (isAiTurnLocked || !isLocalPlayerTurn);
+    // PvP planning is a simultaneous ready/bid step; both sides must be able to interact.
+    const isPvpThinking = gameState.gameMode === 'pvp' && isThinking;
+    // During placement and PvP thinking both sides can interact; lock turn order only in action phase.
+    const isInteractionDisabled = (isPlacement || isPvpThinking) ? false : (isAiTurnLocked || !isLocalPlayerTurn);
 
     // PvP: local player already confirmed; waiting for opponent confirmation.
     const isWaitingForOpponent = gameState.gameMode === 'pvp'
@@ -103,6 +105,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
     // End Turn confirmation state
     const [endTurnConfirm, setEndTurnConfirm] = React.useState(false);
+
+    // Energy bid for first-mover initiative during ready (thinking) phase
+    const [energyBidInput, setEnergyBidInput] = React.useState<string>("");
 
     // Factory button highlight state for visual feedback
     const [factoryButtonFlash, setFactoryButtonFlash] = React.useState(false);
@@ -313,12 +318,44 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                         disabled={isInteractionDisabled}
                                                         onClick={() => {
                                                             if (isInteractionDisabled) return;
-                                                            phases.startActionPhase();
+                                                            const bid = parseInt(energyBidInput) || 0;
+                                                            phases.startActionPhase(bid);
                                                         }}
                                                         className={`px-6 py-2 rounded font-black shadow-lg flex items-center gap-2 border-2 transition-all ${isInteractionDisabled ? 'opacity-50 grayscale cursor-not-allowed border-slate-700 bg-slate-800' : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 border-cyan-400 shadow-cyan-500/50'}`}
                                                     >
                                                         <Play size={20} fill="currentColor" /> {t('ready')}
                                                     </button>
+                                                    {gameState.gameMode === 'pvp' && (
+                                                        <div className="w-full mt-1 p-2 bg-slate-900/70 border border-yellow-500/30 rounded-lg">
+                                                            <div className="flex items-center gap-1 mb-1">
+                                                                <Zap size={11} className="text-yellow-400 shrink-0" />
+                                                                <span className="text-[10px] font-black text-yellow-300 uppercase tracking-wider">{t('energy_bid_label')}</span>
+                                                            </div>
+                                                            <div className="text-[9px] text-slate-400 mb-1.5 leading-tight">{t('energy_bid_hint')}</div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max={player.energy}
+                                                                    value={energyBidInput}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value;
+                                                                        const num = parseInt(val);
+                                                                        if (val === '' || (!isNaN(num) && num >= 0 && num <= player.energy)) {
+                                                                            setEnergyBidInput(val);
+                                                                        }
+                                                                    }}
+                                                                    placeholder="0"
+                                                                    disabled={isInteractionDisabled}
+                                                                    className="flex-1 bg-slate-800 border border-yellow-500/40 rounded px-2 py-1 text-xs font-black text-yellow-300 text-center outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/30 disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                                />
+                                                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold shrink-0">
+                                                                    <Zap size={10} className="text-yellow-500" />
+                                                                    <span>{player.energy}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )
                                         ) : gameState.selectedUnitId ? (
