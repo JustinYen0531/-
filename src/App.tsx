@@ -3151,12 +3151,46 @@ export default function App() {
                 if (lastIncomingPacket.turn !== state.turnCount) {
                     if (isHost) {
                         sendGameStateDeferred('ready_turn_mismatch');
+                    } else if (roomId && isNetworkConnected) {
+                        const localPlayer = resolveLocalPlayer(state);
+                        sendActionPacket({
+                            type: 'PLAYER_READY',
+                            matchId: roomId,
+                            turn: state.turnCount,
+                            payload: {
+                                playerId: localPlayer,
+                                phase: state.phase,
+                                setupMines: state.phase === 'placement'
+                                    ? buildPlacementReadySnapshot(state, localPlayer)
+                                    : undefined,
+                                energyBid: state.phase === 'thinking'
+                                    ? (state.pvpEnergyBids?.[localPlayer] ?? 0)
+                                    : undefined
+                            }
+                        });
                     }
                     return;
                 }
                 if (state.phase !== payload.phase) {
                     if (isHost) {
                         sendGameStateDeferred('ready_phase_mismatch');
+                    } else if (roomId && isNetworkConnected) {
+                        const localPlayer = resolveLocalPlayer(state);
+                        sendActionPacket({
+                            type: 'PLAYER_READY',
+                            matchId: roomId,
+                            turn: state.turnCount,
+                            payload: {
+                                playerId: localPlayer,
+                                phase: state.phase,
+                                setupMines: state.phase === 'placement'
+                                    ? buildPlacementReadySnapshot(state, localPlayer)
+                                    : undefined,
+                                energyBid: state.phase === 'thinking'
+                                    ? (state.pvpEnergyBids?.[localPlayer] ?? 0)
+                                    : undefined
+                            }
+                        });
                     }
                     return;
                 }
@@ -3462,6 +3496,7 @@ export default function App() {
             applyingRemoteActionRef.current = false;
         }
     }, [
+        buildPlacementReadySnapshot,
         executeAttackAction,
         executeDropFlagAction,
         executeEndTurnAction,
@@ -3475,9 +3510,12 @@ export default function App() {
         getUnit,
         handleStartGame,
         isHost,
+        isNetworkConnected,
         lastIncomingPacket,
+        resolveLocalPlayer,
         resolveFirstMoverFromBids,
         roomId,
+        sendActionPacket,
         sendGameStateDeferred,
         setGameState,
         view
