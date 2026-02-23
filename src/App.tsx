@@ -3935,7 +3935,7 @@ export default function App() {
         ? (
             gameState.phase === 'placement' ||
             gameState.phase === 'thinking' ||
-            localPerspectivePlayer === gameState.currentPlayer
+            localControlPlayer === gameState.currentPlayer
         )
         : gameState.gameMode === 'sandbox'
             ? true
