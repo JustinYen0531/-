@@ -149,17 +149,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <button
                 type="button"
                 onClick={() => setShowBidPopup(prev => !prev)}
-                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-24 h-8 rounded-lg border-2 border-yellow-400 bg-gradient-to-r from-yellow-700/85 to-amber-600/85 text-yellow-100 shadow-lg shadow-yellow-500/35 hover:from-yellow-600 hover:to-amber-500 hover:shadow-yellow-400/50 transition-all flex items-center justify-center gap-1 z-20"
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-24 h-8 rounded-lg border-2 border-yellow-400 bg-gradient-to-r from-yellow-700/85 to-amber-600/85 text-yellow-100 shadow-lg shadow-yellow-500/35 hover:from-yellow-600 hover:to-amber-500 hover:shadow-yellow-400/50 transition-all flex items-center justify-center gap-1 z-20 font-black"
                 title={showBidPopup
                     ? (language === 'en' ? 'Hide Bid' : (language === 'zh_cn' ? '收起竞价' : '收起競價'))
                     : (language === 'en' ? 'Show Bid' : (language === 'zh_cn' ? '展开竞价' : '展開競價'))}
             >
                 <ArrowUp
-                    size={13}
-                    className="drop-shadow"
+                    size={16}
+                    strokeWidth={3}
+                    className="drop-shadow-sm"
                 />
                 <span
-                    className="text-[10px] font-black uppercase tracking-wider leading-none"
+                    className="text-sm font-black uppercase tracking-wide leading-none"
                 >
                     {language === 'en' ? 'BID' : '競標'}
                 </span>
