@@ -14,7 +14,7 @@ interface SandboxPanelProps {
     sandboxPos: { x: number, y: number };
     onSandboxDragStart: (e: React.MouseEvent) => void;
     targetMode: string | null;
-    setTargetMode: any; // Using any to avoid duplicating the huge union type from App.tsx
+    setTargetMode: (mode: string | null) => void;
     onStateMutated?: (reason: string) => void;
 }
 
