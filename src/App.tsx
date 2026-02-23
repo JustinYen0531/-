@@ -8,8 +8,7 @@ import {
 import {
     UNIT_STATS, ENERGY_CAP_RATIO, MINE_DAMAGE,
     TURN_TIMER, THINKING_TIMER,
-    PLACEMENT_MINE_LIMIT,
-    GRID_ROWS, GRID_COLS
+    PLACEMENT_MINE_LIMIT
 } from './constants';
 
 import {
@@ -39,202 +38,35 @@ import CommonSettingsModal from './components/CommonSettingsModal';
 import { VisualDetailMode } from './visualDetail';
 import { useConnection } from './network/ConnectionProvider';
 import {
-    AttackPayload,
-    EndTurnPayload,
-    EvolvePayload,
-    FlagActionPayload,
-    MovePayload,
-    PlaceMinePayload,
-    ScanPayload,
-    SensorScanPayload,
     StartGamePayload,
-    StateSyncPayload,
-    ReadyPayload,
     ReadySetupMine
 } from './network/protocol';
+import {
+    isReadyPayload,
+    isMovePayload,
+    isAttackPayload,
+    isScanPayload,
+    isSensorScanPayload,
+    isPlaceMinePayload,
+    isFlagActionPayload,
+    isEvolvePayload,
+    isEndTurnPayload,
+    isStateSyncPayload,
+    isUnitTypeValue,
+    serializeLogParams,
+    dedupeLogsBySignature,
+    ENEMY_MINE_LOG_KEYS,
+    PRIVATE_HINT_LOG_KEYS,
+    ONCE_PER_TURN_HINT_LOG_KEYS,
+    toSerializableGameState,
+    fromSerializableGameState,
+    mergePlacementMines,
+    getSetupMines,
+    unionPlacementMines,
+    upsertPlacementLogs,
+} from './appHelpers';
 
-const isPlayerId = (value: unknown): value is PlayerID => (
-    value === PlayerID.P1 || value === PlayerID.P2
-);
-
-const isReadyPayload = (payload: unknown): payload is ReadyPayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<ReadyPayload>;
-    const hasValidSetupMines = candidate.setupMines === undefined || (
-        Array.isArray(candidate.setupMines) &&
-        candidate.setupMines.every(m => isBoardCoordinate(m?.r, m?.c))
-    );
-    return (
-        isPlayerId(candidate.playerId) &&
-        (candidate.phase === 'placement' || candidate.phase === 'thinking') &&
-        hasValidSetupMines
-    );
-};
-
-const UNIT_TYPES = Object.values(UnitType) as UnitType[];
-const MINE_TYPES = Object.values(MineType) as MineType[];
-
-const isUnitTypeValue = (value: unknown): value is UnitType => (
-    typeof value === 'string' && UNIT_TYPES.includes(value as UnitType)
-);
-
-const isMineTypeValue = (value: unknown): value is MineType => (
-    typeof value === 'string' && MINE_TYPES.includes(value as MineType)
-);
-
-const isInteger = (value: unknown): value is number => (
-    typeof value === 'number' && Number.isInteger(value)
-);
-
-const isBoardCoordinate = (r: unknown, c: unknown): boolean => (
-    isInteger(r) &&
-    isInteger(c) &&
-    r >= 0 &&
-    r < GRID_ROWS &&
-    c >= 0 &&
-    c < GRID_COLS
-);
-
-const isMovePayload = (payload: unknown): payload is MovePayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<MovePayload>;
-    return (
-        typeof candidate.unitId === 'string' &&
-        isBoardCoordinate(candidate.r, candidate.c) &&
-        isInteger(candidate.cost) &&
-        candidate.cost >= 0
-    );
-};
-
-const isAttackPayload = (payload: unknown): payload is AttackPayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<AttackPayload>;
-    return (
-        typeof candidate.attackerId === 'string' &&
-        typeof candidate.targetId === 'string'
-    );
-};
-
-const isScanPayload = (payload: unknown): payload is ScanPayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<ScanPayload>;
-    return (
-        typeof candidate.unitId === 'string' &&
-        isBoardCoordinate(candidate.r, candidate.c)
-    );
-};
-
-const isSensorScanPayload = (payload: unknown): payload is SensorScanPayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<SensorScanPayload>;
-    return (
-        typeof candidate.unitId === 'string' &&
-        isBoardCoordinate(candidate.r, candidate.c)
-    );
-};
-
-const isPlaceMinePayload = (payload: unknown): payload is PlaceMinePayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<PlaceMinePayload>;
-    return (
-        typeof candidate.unitId === 'string' &&
-        isBoardCoordinate(candidate.r, candidate.c) &&
-        isMineTypeValue(candidate.mineType)
-    );
-};
-
-const isFlagActionPayload = (payload: unknown): payload is FlagActionPayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<FlagActionPayload>;
-    return typeof candidate.unitId === 'string';
-};
-
-const isEvolvePayload = (payload: unknown): payload is EvolvePayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<EvolvePayload>;
-    return (
-        isUnitTypeValue(candidate.unitType) &&
-        (candidate.branch === 'a' || candidate.branch === 'b')
-    );
-};
-
-const isEndTurnPayload = (payload: unknown): payload is EndTurnPayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<EndTurnPayload>;
-    return candidate.actedUnitId === null || typeof candidate.actedUnitId === 'string';
-};
-
-const isStateSyncPayload = (payload: unknown): payload is StateSyncPayload => {
-    if (!payload || typeof payload !== 'object') return false;
-    const candidate = payload as Partial<StateSyncPayload>;
-    return typeof candidate.reason === 'string' && candidate.state !== undefined;
-};
-
-const serializeSet = (value: unknown): string[] => {
-    if (value instanceof Set) {
-        return Array.from(value).filter((item): item is string => typeof item === 'string');
-    }
-    if (Array.isArray(value)) {
-        return value.filter((item): item is string => typeof item === 'string');
-    }
-    return [];
-};
-
-const ENEMY_MINE_LOG_KEYS = new Set([
-    'log_placement_mines', // Initial placement mine coordinates
-    'log_place_mine',      // Ranger active placement (with coords)
-    'log_pickup_mine',     // Ranger pickup (with coords)
-    'log_mine_placed',     // Maker mine placement (with coords)
-    'log_mine_limit',      // Limit reached (implies enemy placing)
-    'log_mine_zone'        // Placement zone violation reveals intent
-]);
-
-const PRIVATE_HINT_LOG_KEYS = new Set([
-    'log_energy_cap',
-    'log_low_energy',
-    'log_low_energy_attack',
-    'log_low_energy_evolve',
-    'log_out_of_range',
-    'log_unit_acted',
-    'log_committed',
-    'log_scan_range',
-    'log_disarm_range',
-    'log_no_mine',
-    'log_space_has_mine',
-    'log_obstacle',
-    'log_maker_range',
-    'log_mine_limit',
-    'log_mine_zone',
-    'log_own_mine',
-    'log_mine_not_revealed',
-    'log_general_flag_move_limit',
-    'log_flag_move_limit',
-    'log_hidden_mine',
-    'log_max_mines',
-    'log_max_buildings',
-    'log_unit_on_hub',
-    'log_scan_smoke_blocked'
-]);
-
-const ONCE_PER_TURN_HINT_LOG_KEYS = new Set([
-    'log_energy_cap',
-    'log_unit_acted',
-    'log_general_flag_move_limit',
-    'log_flag_move_limit'
-]);
 const PRIVATE_HINT_LOG_TTL_TURNS = 1;
-
-const dedupeLogsBySignature = (logs: GameLog[]): GameLog[] => {
-    const seen = new Set<string>();
-    const deduped: GameLog[] = [];
-    for (const log of logs) {
-        const signature = `${log.turn}|${log.messageKey}|${log.owner ?? 'global'}|${serializeLogParams(log.params)}|${log.type}`;
-        if (seen.has(signature)) continue;
-        seen.add(signature);
-        deduped.push(log);
-    }
-    return deduped;
-};
 
 type SfxName = 'click' | 'place_mine' | 'attack' | 'mine_hit' | 'error' | 'victory' | 'defeat';
 
@@ -264,114 +96,6 @@ const LOG_SFX_MAP: Partial<Record<string, { sound: SfxName; cooldownMs?: number;
     log_evol_nuke_blast_hit: { sound: 'mine_hit', cooldownMs: 220, volume: 1 }
 };
 
-const serializeLogParams = (params?: Record<string, any>) => JSON.stringify(params ?? {});
-
-const upsertPlacementLogs = (logs: GameLog[], state: GameState, playerId: PlayerID): GameLog[] => {
-    const playerState = state.players[playerId];
-    const unitPositions = playerState.units
-        .map(u => `${getUnitNameKey(u.type)}(${u.r + 1},${u.c + 1})`)
-        .join(', ');
-    const playerMines = state.mines.filter(m => m.owner === playerId);
-    const minePositions = playerMines.map(m => `(${m.r + 1},${m.c + 1})`).join(', ');
-
-    // Replace stale placement logs for this player with the latest snapshot.
-    const filteredLogs = logs.filter(log =>
-        !(
-            log.owner === playerId &&
-            (log.messageKey === 'log_placement_units' || log.messageKey === 'log_placement_mines')
-        )
-    );
-
-    const newPlacementLogs: GameLog[] = [];
-    if (unitPositions) {
-        newPlacementLogs.push({
-            turn: 1,
-            messageKey: 'log_placement_units',
-            params: { units: unitPositions },
-            type: 'move',
-            owner: playerId
-        });
-    }
-    if (minePositions) {
-        newPlacementLogs.push({
-            turn: 1,
-            messageKey: 'log_placement_mines',
-            params: { mines: minePositions },
-            type: 'move',
-            owner: playerId
-        });
-    }
-
-    return [...newPlacementLogs, ...filteredLogs];
-};
-
-const toSerializableGameState = (state: GameState): unknown => {
-    const serializePlayer = (player: GameState['players'][PlayerID]) => ({
-        ...player,
-        questStats: {
-            ...player.questStats,
-            rangerMinesMovedThisRound: serializeSet(player.questStats.rangerMinesMovedThisRound),
-            flagSpiritDamageTakenThisTurn: serializeSet(player.questStats.flagSpiritDamageTakenThisTurn)
-        }
-    });
-
-    return {
-        ...state,
-        players: {
-            [PlayerID.P1]: serializePlayer(state.players[PlayerID.P1]),
-            [PlayerID.P2]: serializePlayer(state.players[PlayerID.P2])
-        }
-    };
-};
-
-const fromSerializableGameState = (input: unknown): GameState | null => {
-    if (!input || typeof input !== 'object') {
-        return null;
-    }
-
-    const candidate = input as Partial<GameState> & {
-        players?: Record<string, any>;
-    };
-
-    if (!candidate.players?.[PlayerID.P1] || !candidate.players?.[PlayerID.P2]) {
-        return null;
-    }
-
-    const hydratePlayer = (player: any) => ({
-        ...player,
-        questStats: {
-            ...player.questStats,
-            rangerMinesMovedThisRound: new Set(serializeSet(player.questStats?.rangerMinesMovedThisRound)),
-            flagSpiritDamageTakenThisTurn: new Set(serializeSet(player.questStats?.flagSpiritDamageTakenThisTurn))
-        }
-    });
-
-    return {
-        ...(candidate as GameState),
-        players: {
-            [PlayerID.P1]: hydratePlayer(candidate.players[PlayerID.P1]),
-            [PlayerID.P2]: hydratePlayer(candidate.players[PlayerID.P2])
-        }
-    };
-};
-
-const mergePlacementMines = (localMines: Mine[], syncedMines: Mine[]): Mine[] => {
-    const merged = [...syncedMines];
-    const seenIds = new Set(merged.map(m => m.id));
-    const seenCells = new Set(merged.map(m => `${m.owner}:${m.r},${m.c}`));
-    for (const mine of localMines) {
-        const cellKey = `${mine.owner}:${mine.r},${mine.c}`;
-        if (seenIds.has(mine.id) || seenCells.has(cellKey)) continue;
-        merged.push(mine);
-        seenIds.add(mine.id);
-        seenCells.add(cellKey);
-    }
-    return merged;
-};
-
-const getSetupMines = (mines: Mine[]): Mine[] => mines.filter(m => m.id.startsWith('pm-'));
-
-const unionPlacementMines = (a: Mine[], b: Mine[]): Mine[] => mergePlacementMines(a, b);
 
 export default function App() {
     const [view, setView] = useState<'lobby' | 'game'>('lobby');
@@ -1037,6 +761,28 @@ export default function App() {
         return state.currentPlayer;
     };
 
+    const resolveFirstMoverFromBids = useCallback((
+        p1Bid: number,
+        p2Bid: number,
+        turnCount: number
+    ): { firstMover: PlayerID; isTie: boolean } => {
+        if (p1Bid > p2Bid) {
+            return { firstMover: PlayerID.P1, isTie: false };
+        }
+        if (p2Bid > p1Bid) {
+            return { firstMover: PlayerID.P2, isTie: false };
+        }
+
+        // Deterministic tie-breaker so host/guest never diverge on currentPlayer.
+        const seed = `${roomId ?? 'pvp'}:${turnCount}`;
+        let hash = 0;
+        for (let i = 0; i < seed.length; i += 1) {
+            hash = ((hash * 31) + seed.charCodeAt(i)) >>> 0;
+        }
+        const firstMover = (hash % 2 === 0) ? PlayerID.P1 : PlayerID.P2;
+        return { firstMover, isTie: true };
+    }, [roomId]);
+
     const buildPlacementReadySnapshot = (state: GameState, playerId: PlayerID): ReadySetupMine[] => {
         return getSetupMines(state.mines)
             .filter(m => m.owner === playerId)
@@ -1045,7 +791,7 @@ export default function App() {
 
 
 
-    const finishPlacementPhase = () => {
+    const finishPlacementPhase = (energyBid: number = 0) => {
         const state = gameStateRef.current;
         const localPlayer = resolveLocalPlayer(state);
 
@@ -1061,7 +807,7 @@ export default function App() {
                 type: 'PLAYER_READY',
                 matchId: roomId,
                 turn: state.turnCount,
-                payload: { playerId: localPlayer, phase: 'placement', setupMines }
+                payload: { playerId: localPlayer, phase: 'placement', setupMines, energyBid }
             });
         }
 
@@ -1078,7 +824,17 @@ export default function App() {
                 const bothReady = newReadyState[PlayerID.P1] && newReadyState[PlayerID.P2];
 
                 if (bothReady) {
-                    // Both confirmed -> transition to thinking phase
+                    // Both confirmed -> compare bids to decide first mover
+                    const p1Bid = prev.pvpEnergyBids?.[PlayerID.P1] ?? 0;
+                    const p2Bid = prev.pvpEnergyBids?.[PlayerID.P2] ?? 0;
+                    const { firstMover: newFirstMover, isTie } = resolveFirstMoverFromBids(p1Bid, p2Bid, prev.turnCount);
+                    const firstMoverLog: import('./types').GameLog = isTie
+                        ? { turn: 1, messageKey: 'log_first_mover_tie', params: {}, type: 'info' as const }
+                        : { turn: 1, messageKey: 'log_first_mover', params: { player: newFirstMover === PlayerID.P1 ? 'P1' : 'P2' }, type: 'info' as const };
+                    // Deduct bids from energy
+                    const p1AfterBid = Math.max(0, prev.players[PlayerID.P1].energy - p1Bid);
+                    const p2AfterBid = Math.max(0, prev.players[PlayerID.P2].energy - p2Bid);
+
                     const stabilizedSetupMines = unionPlacementMines(
                         getSetupMines(prev.mines),
                         placementMinesRef.current
@@ -1087,17 +843,29 @@ export default function App() {
                         ...prev,
                         phase: 'thinking',
                         timeLeft: THINKING_TIMER,
+                        currentPlayer: newFirstMover,
                         mines: [...prev.mines.filter(m => !m.id.startsWith('pm-')), ...stabilizedSetupMines],
                         selectedUnitId: null,
                         targetMode: null,
                         pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
-                        logs: [{ turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...newLogs]
+                        pvpEnergyBids: { [PlayerID.P1]: 0, [PlayerID.P2]: 0 },
+                        players: {
+                            ...prev.players,
+                            [PlayerID.P1]: { ...prev.players[PlayerID.P1], energy: p1AfterBid },
+                            [PlayerID.P2]: { ...prev.players[PlayerID.P2], energy: p2AfterBid },
+                        },
+                        logs: [firstMoverLog, { turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...newLogs]
                     };
                 } else {
-                    // Only this player confirmed -> stay in placement, mark ready
+                    // Only this player confirmed -> stay in placement, mark ready + store bid
                     return {
                         ...prev,
                         pvpReadyState: newReadyState,
+                        pvpEnergyBids: {
+                            [PlayerID.P1]: prev.pvpEnergyBids?.[PlayerID.P1] ?? 0,
+                            [PlayerID.P2]: prev.pvpEnergyBids?.[PlayerID.P2] ?? 0,
+                            [localPlayer]: energyBid,
+                        },
                         logs: newLogs,
                     };
                 }
@@ -3372,6 +3140,12 @@ export default function App() {
                 if (payload.playerId !== expectedRemoteOwner) {
                     return;
                 }
+                if (lastIncomingPacket.turn !== state.turnCount) {
+                    if (isHost) {
+                        sendGameStateDeferred('ready_turn_mismatch');
+                    }
+                    return;
+                }
                 if (state.phase !== payload.phase) {
                     if (isHost) {
                         sendGameStateDeferred('ready_phase_mismatch');
@@ -3419,6 +3193,20 @@ export default function App() {
                     // Check if phase transition is needed
                     if (bothReady) {
                         if (payload.phase === 'placement') {
+                            // Compare bids to decide first mover
+                            const remoteBid = payload.energyBid ?? 0;
+                            const localPlayerId = isHost ? PlayerID.P1 : PlayerID.P2;
+                            const localBidStored = prev.pvpEnergyBids?.[localPlayerId] ?? 0;
+                            const remotePlayerId = payload.playerId;
+                            const p1Bid = remotePlayerId === PlayerID.P1 ? remoteBid : localBidStored;
+                            const p2Bid = remotePlayerId === PlayerID.P2 ? remoteBid : localBidStored;
+                            const { firstMover: newFirstMover, isTie } = resolveFirstMoverFromBids(p1Bid, p2Bid, prev.turnCount);
+                            const firstMoverLog = isTie
+                                ? { turn: 1, messageKey: 'log_first_mover_tie', params: {}, type: 'info' as const }
+                                : { turn: 1, messageKey: 'log_first_mover', params: { player: newFirstMover === PlayerID.P1 ? 'P1' : 'P2' }, type: 'info' as const };
+                            const p1AfterBid = Math.max(0, prev.players[PlayerID.P1].energy - p1Bid);
+                            const p2AfterBid = Math.max(0, prev.players[PlayerID.P2].energy - p2Bid);
+
                             const stabilizedSetupMines = unionPlacementMines(
                                 mergedSetupMines,
                                 placementMinesRef.current
@@ -3427,11 +3215,18 @@ export default function App() {
                                 ...prev,
                                 phase: 'thinking',
                                 timeLeft: THINKING_TIMER,
+                                currentPlayer: newFirstMover,
                                 mines: [...prev.mines.filter(m => !m.id.startsWith('pm-')), ...stabilizedSetupMines],
                                 selectedUnitId: null,
                                 activeUnitId: null,
                                 pvpReadyState: { [PlayerID.P1]: false, [PlayerID.P2]: false },
-                                logs: [{ turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
+                                pvpEnergyBids: { [PlayerID.P1]: 0, [PlayerID.P2]: 0 },
+                                players: {
+                                    ...prev.players,
+                                    [PlayerID.P1]: { ...prev.players[PlayerID.P1], energy: p1AfterBid },
+                                    [PlayerID.P2]: { ...prev.players[PlayerID.P2], energy: p2AfterBid },
+                                },
+                                logs: [firstMoverLog, { turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
                             };
                         } else {
                             const updatedMines = applyRadarScans(prev);
@@ -3461,13 +3256,24 @@ export default function App() {
                         }
                     }
 
+                    // Store the remote player's bid if not both ready yet
+                    const updatedBids = payload.phase === 'placement' ? {
+                        [PlayerID.P1]: prev.pvpEnergyBids?.[PlayerID.P1] ?? 0,
+                        [PlayerID.P2]: prev.pvpEnergyBids?.[PlayerID.P2] ?? 0,
+                        [payload.playerId]: payload.energyBid ?? 0,
+                    } : prev.pvpEnergyBids;
+
                     return {
                         ...prev,
                         mines: nextMines,
                         pvpReadyState: newReadyState,
+                        pvpEnergyBids: updatedBids,
                         logs: logsWithRemotePlacement
                     };
                 });
+                if (isHost) {
+                    sendGameStateDeferred('remote_ready_applied');
+                }
                 return;
             }
 
@@ -3660,6 +3466,7 @@ export default function App() {
         handleStartGame,
         isHost,
         lastIncomingPacket,
+        resolveFirstMoverFromBids,
         roomId,
         sendGameStateDeferred,
         setGameState,
