@@ -644,17 +644,11 @@ export default function App() {
         if (evolutionFxClearTimerRef.current) {
             clearTimeout(evolutionFxClearTimerRef.current);
         }
-        // Clear after two animation frames so GridCell has exactly one render to consume the nonce.
-        // Using double-rAF ensures React has flushed the render before we clear.
-        const rafId = requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                setEvolutionFxEvent(prev => (prev && prev.nonce === nonce ? null : prev));
-            });
-        });
+        // Keep event alive briefly for one render/animation trigger, then clear
+        // so future movement into another cell cannot replay the same upgrade effect.
         evolutionFxClearTimerRef.current = setTimeout(() => {
-            cancelAnimationFrame(rafId);
             setEvolutionFxEvent(prev => (prev && prev.nonce === nonce ? null : prev));
-        }, 200) as unknown as ReturnType<typeof setTimeout>;
+        }, 120);
     }, []);
 
     useEffect(() => () => {
@@ -671,16 +665,12 @@ export default function App() {
         const branchRaw = String(latestLog.params?.branch ?? '').trim().toLowerCase();
         const branch: 'a' | 'b' = branchRaw.startsWith('b') ? 'b' : 'a';
         const signature = `${latestLog.turn}|${latestLog.owner}|${unitTypeRaw}|${branch}|${String(latestLog.params?.level ?? '')}`;
-        if (signature === lastEvolutionFxFromLogRef.current) {
-            return;
-        }
+        if (signature === lastEvolutionFxFromLogRef.current) return;
         lastEvolutionFxFromLogRef.current = signature;
 
         const directSig = `${latestLog.owner}|${unitTypeRaw}|${branch}`;
         const recent = lastEvolutionFxEmitRef.current;
-        if (recent && recent.signature === directSig && Date.now() - recent.ts < 700) {
-            return;
-        }
+        if (recent && recent.signature === directSig && Date.now() - recent.ts < 700) return;
 
         emitEvolutionFx(latestLog.owner, unitTypeRaw, branch);
     }, [emitEvolutionFx, gameState.logs]);

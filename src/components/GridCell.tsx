@@ -142,8 +142,8 @@ const GridCell: React.FC<GridCellProps> = ({
   const [flagBurstParticles, setFlagBurstParticles] = React.useState<Array<{ id: string, x: number, y: number, delay: number, size: number, duration: number }>>([]);
   const [flagBurstTheme, setFlagBurstTheme] = React.useState<'a' | 'b'>('a');
   const [isLocallyDismissed, setIsLocallyDismissed] = React.useState(false);
-  const consumedParticleNonces = React.useRef<Set<number>>(new Set());
-  const consumedBurstNonces = React.useRef<Set<number>>(new Set());
+  const prevParticleFxNonce = React.useRef(evolutionFxNonce);
+  const prevBurstFxNonce = React.useRef(evolutionFxNonce);
 
   // When the actual prop updates (e.g. cleared by game state or re-scanned), reset local state
   React.useEffect(() => {
@@ -152,34 +152,38 @@ const GridCell: React.FC<GridCellProps> = ({
 
   // Generate particles ONLY when the app emits a real evolution event.
   React.useEffect(() => {
-    if (evolutionFxNonce <= 0 || consumedParticleNonces.current.has(evolutionFxNonce)) return;
-    if (!unit || unit.isDead) return;
-    consumedParticleNonces.current.add(evolutionFxNonce);
+    const hasNewFxSignal = evolutionFxNonce > 0 && evolutionFxNonce !== prevParticleFxNonce.current;
+    const shouldPlay = hasNewFxSignal && !!unit && !unit.isDead;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const newParticles = [];
-    const particleCount = 12;
-    const color = evolutionFxBranch === 'b' ? 'orange' : 'blue';
+    if (shouldPlay) {
+      const newParticles = [];
+      const particleCount = 12;
+      const color = evolutionFxBranch === 'b' ? 'orange' : 'blue';
 
-    for (let i = 0; i < particleCount; i++) {
-      const angle = (i / particleCount) * Math.PI * 2;
-      const distance = 30 + Math.random() * 20;
-      const x = Math.cos(angle) * distance;
-      const y = Math.sin(angle) * distance;
+      for (let i = 0; i < particleCount; i++) {
+        const angle = (i / particleCount) * Math.PI * 2;
+        const distance = 30 + Math.random() * 20;
+        const x = Math.cos(angle) * distance;
+        const y = Math.sin(angle) * distance;
 
-      newParticles.push({
-        id: `${Date.now()}-${i}`,
-        x,
-        y,
-        color,
-        delay: i * 0.06
-      });
+        newParticles.push({
+          id: `${Date.now()}-${i}`,
+          x,
+          y,
+          color,
+          delay: i * 0.06
+        });
+      }
+
+      setParticles(newParticles);
+      timer = setTimeout(() => setParticles([]), 1200);
     }
 
-    setParticles(newParticles);
-    const timer = setTimeout(() => setParticles([]), 1200);
+    if (evolutionFxNonce > 0) prevParticleFxNonce.current = evolutionFxNonce;
 
     return () => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       setParticles([]);
     };
   }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead]);
@@ -321,31 +325,35 @@ const GridCell: React.FC<GridCellProps> = ({
 
   // One-shot "small fireworks" when any unit upgrades (A=blue, B=orange).
   React.useEffect(() => {
-    if (evolutionFxNonce <= 0 || consumedBurstNonces.current.has(evolutionFxNonce)) return;
-    if (!unit || unit.isDead) return;
-    consumedBurstNonces.current.add(evolutionFxNonce);
+    const hasNewFxSignal = evolutionFxNonce > 0 && evolutionFxNonce !== prevBurstFxNonce.current;
+    const shouldBurst = hasNewFxSignal && !!unit && !unit.isDead;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    setFlagBurstTheme(evolutionFxBranch === 'b' ? 'b' : 'a');
-    const count = 30;
-    const burst = [];
-    for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = 28 + Math.random() * 40;
-      const jitter = (Math.random() - 0.5) * 8;
-      burst.push({
-        id: `flag-burst-${Date.now()}-${i}`,
-        x: Math.cos(angle) * distance + jitter,
-        y: Math.sin(angle) * distance + jitter,
-        delay: Math.random() * 0.05,
-        size: 5 + Math.random() * 5,
-        duration: 0.66 + Math.random() * 0.25
-      });
+    if (shouldBurst) {
+      setFlagBurstTheme(evolutionFxBranch === 'b' ? 'b' : 'a');
+      const count = 30;
+      const burst = [];
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 28 + Math.random() * 40;
+        const jitter = (Math.random() - 0.5) * 8;
+        burst.push({
+          id: `flag-burst-${Date.now()}-${i}`,
+          x: Math.cos(angle) * distance + jitter,
+          y: Math.sin(angle) * distance + jitter,
+          delay: Math.random() * 0.05,
+          size: 5 + Math.random() * 5,
+          duration: 0.66 + Math.random() * 0.25
+        });
+      }
+      setFlagBurstParticles(burst);
+      timer = setTimeout(() => setFlagBurstParticles([]), 980);
     }
-    setFlagBurstParticles(burst);
-    const timer = setTimeout(() => setFlagBurstParticles([]), 980);
+
+    if (evolutionFxNonce > 0) prevBurstFxNonce.current = evolutionFxNonce;
 
     return () => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       setFlagBurstParticles([]);
     };
   }, [evolutionFxBranch, evolutionFxNonce, unit?.id, unit?.isDead]);
