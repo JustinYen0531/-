@@ -44,7 +44,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
 
     const addEnergy = () => {
         setGameState(prev => {
-            const currentPlayer = prev.currentTurn;
+            const currentPlayer = prev.currentPlayer;
             return {
                 ...prev,
                 players: {
