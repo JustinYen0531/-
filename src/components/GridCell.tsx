@@ -152,7 +152,10 @@ const GridCell: React.FC<GridCellProps> = ({
 
   // Generate particles ONLY when the app emits a real evolution event.
   React.useEffect(() => {
-    if (evolutionFxNonce <= 0 || consumedParticleNonces.current.has(evolutionFxNonce)) return;
+    if (evolutionFxNonce <= 0 || consumedParticleNonces.current.has(evolutionFxNonce)) {
+      setParticles([]);
+      return;
+    }
     if (!unit || unit.isDead) return;
     consumedParticleNonces.current.add(evolutionFxNonce);
 
@@ -318,7 +321,10 @@ const GridCell: React.FC<GridCellProps> = ({
 
   // One-shot "small fireworks" when any unit upgrades (A=blue, B=orange).
   React.useEffect(() => {
-    if (evolutionFxNonce <= 0 || consumedBurstNonces.current.has(evolutionFxNonce)) return;
+    if (evolutionFxNonce <= 0 || consumedBurstNonces.current.has(evolutionFxNonce)) {
+      setFlagBurstParticles([]);
+      return;
+    }
     if (!unit || unit.isDead) return;
     consumedBurstNonces.current.add(evolutionFxNonce);
 

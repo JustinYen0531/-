@@ -671,12 +671,16 @@ export default function App() {
         const branchRaw = String(latestLog.params?.branch ?? '').trim().toLowerCase();
         const branch: 'a' | 'b' = branchRaw.startsWith('b') ? 'b' : 'a';
         const signature = `${latestLog.turn}|${latestLog.owner}|${unitTypeRaw}|${branch}|${String(latestLog.params?.level ?? '')}`;
-        if (signature === lastEvolutionFxFromLogRef.current) return;
+        if (signature === lastEvolutionFxFromLogRef.current) {
+            return;
+        }
         lastEvolutionFxFromLogRef.current = signature;
 
         const directSig = `${latestLog.owner}|${unitTypeRaw}|${branch}`;
         const recent = lastEvolutionFxEmitRef.current;
-        if (recent && recent.signature === directSig && Date.now() - recent.ts < 700) return;
+        if (recent && recent.signature === directSig && Date.now() - recent.ts < 700) {
+            return;
+        }
 
         emitEvolutionFx(latestLog.owner, unitTypeRaw, branch);
     }, [emitEvolutionFx, gameState.logs]);
