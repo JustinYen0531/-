@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import {
-    Zap, Dna, Play, ArrowRight, CheckCircle, Bomb, Swords,
+    Zap, Dna, Play, ArrowRight, ArrowUp, CheckCircle, Bomb, Swords,
     ArrowDownToLine, Flag, Eye, Radio, FlaskConical, Unlock,
     Cpu, Cloud, Snowflake, Share2, Radiation, Ghost, Scan, Heart, Magnet, Brain
 } from 'lucide-react';
@@ -149,14 +149,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <button
                 type="button"
                 onClick={() => setShowBidPopup(prev => !prev)}
-                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-24 h-8 bg-slate-900 border-2 border-yellow-500/70 rounded-lg text-yellow-200 hover:text-yellow-100 hover:bg-slate-800 transition-all shadow-[0_0_14px_rgba(234,179,8,0.28)] flex items-center justify-center gap-1 z-20"
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-24 h-8 rounded-lg border-2 border-yellow-400 bg-gradient-to-r from-yellow-700/85 to-amber-600/85 text-yellow-100 shadow-lg shadow-yellow-500/35 hover:from-yellow-600 hover:to-amber-500 hover:shadow-yellow-400/50 transition-all flex items-center justify-center gap-1 z-20"
                 title={showBidPopup
                     ? (language === 'en' ? 'Hide Bid' : (language === 'zh_cn' ? '收起竞价' : '收起競價'))
                     : (language === 'en' ? 'Show Bid' : (language === 'zh_cn' ? '展开竞价' : '展開競價'))}
             >
-                <ArrowRight
+                <ArrowUp
                     size={13}
-                    className={`transition-transform ${showBidPopup ? 'rotate-180' : ''}`}
+                    className="drop-shadow"
                 />
                 <span
                     className="text-[10px] font-black uppercase tracking-wider leading-none"
@@ -1201,4 +1201,5 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 };
 
 export default ControlPanel;
+
 
