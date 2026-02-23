@@ -3253,9 +3253,11 @@ export default function App() {
                             };
                         } else {
                             const storedRemoteBid = prev.pvpEnergyBids?.[payload.playerId] ?? 0;
-                            const remoteBid = Math.max(0, payload.energyBid ?? storedRemoteBid);
-                            const localPlayerId = isHost ? PlayerID.P1 : PlayerID.P2;
-                            const localBidStored = prev.pvpEnergyBids?.[localPlayerId] ?? 0;
+                            const remotePlayerEnergy = prev.players[payload.playerId].energy;
+                            const remoteBid = Math.max(0, Math.min(payload.energyBid ?? storedRemoteBid, remotePlayerEnergy));
+                            const localPlayerId = resolveLocalPlayer(prev);
+                            const localPlayerEnergy = prev.players[localPlayerId].energy;
+                            const localBidStored = Math.max(0, Math.min(prev.pvpEnergyBids?.[localPlayerId] ?? 0, localPlayerEnergy));
                             const p1Bid = payload.playerId === PlayerID.P1 ? remoteBid : localBidStored;
                             const p2Bid = payload.playerId === PlayerID.P2 ? remoteBid : localBidStored;
                             const { firstMover, isTie } = resolveFirstMoverFromBids(p1Bid, p2Bid, prev.turnCount);

@@ -122,6 +122,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     React.useEffect(() => {
         if (gameState.gameMode === 'pvp' && isThinking) {
             setShowBidPopup(true);
+        } else {
+            setShowBidPopup(false);
         }
     }, [gameState.gameMode, gameState.turnCount, isThinking]);
 
@@ -130,6 +132,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             setShowBidPopup(false);
         }
     }, [gameState.gameMode, isThinking, isWaitingForOpponent]);
+
+    React.useEffect(() => {
+        const bid = parseInt(energyBidInput);
+        if (energyBidInput === '') return;
+        if (isNaN(bid) || bid < 0) {
+            setEnergyBidInput('0');
+            return;
+        }
+        if (bid > player.energy) {
+            setEnergyBidInput(String(player.energy));
+        }
+    }, [energyBidInput, player.energy]);
 
     // Helper function to set target mode and reset end turn confirmation
     const handleSetTargetMode = (mode: TargetMode) => {
