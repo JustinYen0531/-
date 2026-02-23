@@ -644,13 +644,11 @@ export default function App() {
         if (evolutionFxClearTimerRef.current) {
             clearTimeout(evolutionFxClearTimerRef.current);
         }
-        // Keep event alive long enough for React to finish re-rendering the full
-        // component tree (GameField → GridCell useEffect). 120ms was too short on
-        // busy frames and caused the effect to be cleared before GridCell could
-        // read the new nonce, resulting in the upgrade animation being skipped.
+        // Clear the event after a short delay to allow GridCell to consume it once.
+        // This prevents the effect from replaying when the unit moves back to the upgrade cell.
         evolutionFxClearTimerRef.current = setTimeout(() => {
-            setEvolutionFxEvent(prev => (prev && prev.nonce === nonce ? null : prev));
-        }, 600);
+            setEvolutionFxEvent(null);
+        }, 200);
     }, []);
 
     useEffect(() => () => {
