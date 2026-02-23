@@ -1,5 +1,5 @@
 import React from 'react';
-import { GameState, PlayerID } from '../types';
+import { GameState, PlayerID, TargetMode } from '../types';
 import { Language } from '../i18n';
 import { FlaskConical, X, Zap, Shield, ShieldAlert, RefreshCw, Play, Pause, Hand } from '../icons';
 import { getUnitNameKey } from '../gameHelpers';
@@ -13,8 +13,8 @@ interface SandboxPanelProps {
     setIsSandboxCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
     sandboxPos: { x: number, y: number };
     onSandboxDragStart: (e: React.MouseEvent) => void;
-    targetMode: string | null;
-    setTargetMode: (mode: string | null) => void;
+    targetMode: TargetMode;
+    setTargetMode: React.Dispatch<React.SetStateAction<TargetMode>>;
     localPlayerId?: PlayerID;
     onStateMutated?: (reason: string) => void;
 }
@@ -91,7 +91,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                     params: {
                         unit: getUnitNameKey(unit.type),
                         unitType: unit.type,
-                        branch: branch.toUpperCase() + (variant ? `-${variant}` : ''),
+                        branch: branch.toUpperCase() + (variant ? `- ${variant} ` : ''),
                         level: newLevels[unit.type][branch]
                     },
                     type: 'evolution' as const,
@@ -99,7 +99,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }, ...prev.logs]
             };
         });
-        notifyStateMutated(`evolve_${branch}`);
+        notifyStateMutated(`evolve_${branch} `);
     };
 
     const downgradeCurrentUnit = (branch: 'a' | 'b') => {
@@ -141,7 +141,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }, ...prev.logs]
             };
         });
-        notifyStateMutated(`downgrade_${branch}`);
+        notifyStateMutated(`downgrade_${branch} `);
     };
 
     const toggleGodMode = () => {
@@ -207,7 +207,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                 }
             };
         });
-        notifyStateMutated(`update_unit_${stat}`);
+        notifyStateMutated(`update_unit_${stat} `);
     };
 
     return (
@@ -311,7 +311,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                                         <span className="text-[9px] font-black w-4 text-blue-400">A</span>
                                         {levels.a < 2 ? (
                                             <button onClick={() => evolveCurrentUnit('a')} className="flex-1 px-1 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[10px] transition-all transform active:scale-95">
-                                                {language === 'zh_tw' ? `進化 A (LV${levels.a}→${levels.a + 1})` : `LV${levels.a} →${levels.a + 1}`}
+                                                {language === 'zh_tw' ? `進化 A(LV${levels.a}→${levels.a + 1})` : `LV${levels.a} →${levels.a + 1} `}
                                             </button>
                                         ) : levels.a === 2 ? (
                                             <div className="flex-1 flex gap-1">
@@ -338,7 +338,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
                                         <span className="text-[9px] font-black w-4 text-orange-400">B</span>
                                         {levels.b < 2 ? (
                                             <button onClick={() => evolveCurrentUnit('b')} className="flex-1 px-1 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-black text-[10px] transition-all transform active:scale-95">
-                                                {language === 'zh_tw' ? `進化 B (LV${levels.b}→${levels.b + 1})` : `LV${levels.b} →${levels.b + 1}`}
+                                                {language === 'zh_tw' ? `進化 B(LV${levels.b}→${levels.b + 1})` : `LV${levels.b} →${levels.b + 1} `}
                                             </button>
                                         ) : levels.b === 2 ? (
                                             <div className="flex-1 flex gap-1">
