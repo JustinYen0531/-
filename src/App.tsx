@@ -501,9 +501,6 @@ export default function App() {
     const isDevToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox'
         || (gameState.gameMode === 'pve' && allowDevToolsInAiChallenge)
         || (gameState.gameMode === 'pvp' && allowDevToolsInPvpRoom);
-    const isSandboxToolsAllowedInCurrentMatch = gameState.gameMode === 'sandbox'
-        || (gameState.gameMode === 'pve' && allowDevToolsInAiChallenge)
-        || (gameState.gameMode === 'pvp' && allowDevToolsInPvpRoom);
 
     useEffect(() => {
         if (!isDevToolsAllowedInCurrentMatch && showDevTools) {
@@ -644,11 +641,13 @@ export default function App() {
         if (evolutionFxClearTimerRef.current) {
             clearTimeout(evolutionFxClearTimerRef.current);
         }
-        // Clear the event after a short delay to allow GridCell to consume it once.
-        // This prevents the effect from replaying when the unit moves back to the upgrade cell.
+        // Keep event alive long enough for React to finish re-rendering the full
+        // component tree (GameField → GridCell useEffect). 120ms was too short on
+        // busy frames and caused the effect to be cleared before GridCell could
+        // read the new nonce, resulting in the upgrade animation being skipped.
         evolutionFxClearTimerRef.current = setTimeout(() => {
-            setEvolutionFxEvent(null);
-        }, 200);
+            setEvolutionFxEvent(prev => (prev && prev.nonce === nonce ? null : prev));
+        }, 600);
     }, []);
 
     useEffect(() => () => {
@@ -4530,7 +4529,7 @@ export default function App() {
                     {/* Sandbox Panel moved to global overlay */}
 
                     {/* Sandbox Panel - Only visible in Sandbox Mode */}
-                    {view === 'game' && isSandboxToolsAllowedInCurrentMatch && (
+                    {view === 'game' && isDevToolsAllowedInCurrentMatch && (
                         <SandboxPanel
                             gameState={gameState}
                             setGameState={setGameState}
