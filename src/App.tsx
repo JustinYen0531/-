@@ -3218,7 +3218,8 @@ export default function App() {
                                 logs: [{ turn: 1, messageKey: 'log_round_start', params: { round: 1 }, type: 'info' as const }, ...logsWithRemotePlacement]
                             };
                         } else {
-                            const remoteBid = Math.max(0, payload.energyBid ?? 0);
+                            const storedRemoteBid = prev.pvpEnergyBids?.[payload.playerId] ?? 0;
+                            const remoteBid = Math.max(0, payload.energyBid ?? storedRemoteBid);
                             const localPlayerId = isHost ? PlayerID.P1 : PlayerID.P2;
                             const localBidStored = prev.pvpEnergyBids?.[localPlayerId] ?? 0;
                             const p1Bid = payload.playerId === PlayerID.P1 ? remoteBid : localBidStored;
@@ -3269,7 +3270,7 @@ export default function App() {
                     const updatedBids = payload.phase === 'thinking' ? {
                         [PlayerID.P1]: prev.pvpEnergyBids?.[PlayerID.P1] ?? 0,
                         [PlayerID.P2]: prev.pvpEnergyBids?.[PlayerID.P2] ?? 0,
-                        [payload.playerId]: payload.energyBid ?? 0,
+                        [payload.playerId]: payload.energyBid ?? (prev.pvpEnergyBids?.[payload.playerId] ?? 0),
                     } : prev.pvpEnergyBids;
 
                     return {
