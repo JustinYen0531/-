@@ -2655,6 +2655,9 @@ export default function App() {
                     phase: state.phase,
                     setupMines: state.phase === 'placement'
                         ? buildPlacementReadySnapshot(state, localPlayer)
+                        : undefined,
+                    energyBid: state.phase === 'thinking'
+                        ? (state.pvpEnergyBids?.[localPlayer] ?? 0)
                         : undefined
                 }
             });
