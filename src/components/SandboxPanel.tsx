@@ -43,20 +43,19 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
     };
 
     const addEnergy = () => {
-        setGameState(prev => ({
-            ...prev,
-            players: {
-                ...prev.players,
-                [PlayerID.P1]: {
-                    ...prev.players[PlayerID.P1],
-                    energy: prev.players[PlayerID.P1].energy + 100
-                },
-                [PlayerID.P2]: {
-                    ...prev.players[PlayerID.P2],
-                    energy: prev.players[PlayerID.P2].energy + 100
+        setGameState(prev => {
+            const currentPlayer = prev.currentTurn;
+            return {
+                ...prev,
+                players: {
+                    ...prev.players,
+                    [currentPlayer]: {
+                        ...prev.players[currentPlayer],
+                        energy: prev.players[currentPlayer].energy + 100
+                    }
                 }
-            }
-        }));
+            };
+        });
         notifyStateMutated('add_energy');
     };
 
