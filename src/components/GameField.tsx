@@ -181,13 +181,17 @@ const GameField: React.FC<GameFieldProps> = ({
                         const cellEvolutionFxNonce =
                             unit &&
                                 evolutionFxEvent &&
-                                unit.id === evolutionFxEvent.unitId
+                                unit.id === evolutionFxEvent.unitId &&
+                                r === evolutionFxEvent.r &&
+                                c === evolutionFxEvent.c
                                 ? evolutionFxEvent.nonce
                                 : 0;
                         const cellEvolutionFxBranch: 'a' | 'b' | null =
                             unit &&
                                 evolutionFxEvent &&
-                                unit.id === evolutionFxEvent.unitId
+                                unit.id === evolutionFxEvent.unitId &&
+                                r === evolutionFxEvent.r &&
+                                c === evolutionFxEvent.c
                                 ? evolutionFxEvent.branch
                                 : null;
 
