@@ -142,8 +142,8 @@ const GridCell: React.FC<GridCellProps> = ({
   const [flagBurstParticles, setFlagBurstParticles] = React.useState<Array<{ id: string, x: number, y: number, delay: number, size: number, duration: number }>>([]);
   const [flagBurstTheme, setFlagBurstTheme] = React.useState<'a' | 'b'>('a');
   const [isLocallyDismissed, setIsLocallyDismissed] = React.useState(false);
-  const prevParticleFxNonce = React.useRef(0);
-  const prevBurstFxNonce = React.useRef(0);
+  const prevParticleFxNonce = React.useRef(evolutionFxNonce);
+  const prevBurstFxNonce = React.useRef(evolutionFxNonce);
 
   // When the actual prop updates (e.g. cleared by game state or re-scanned), reset local state
   React.useEffect(() => {
