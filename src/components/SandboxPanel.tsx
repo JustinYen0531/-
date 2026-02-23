@@ -42,20 +42,17 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
         return state.players[PlayerID.P2].units.find(u => u.id === id);
     };
 
-    const addEnergy = () => {
-        setGameState(prev => {
-            const currentPlayer = prev.currentPlayer;
-            return {
-                ...prev,
-                players: {
-                    ...prev.players,
-                    [currentPlayer]: {
-                        ...prev.players[currentPlayer],
-                        energy: prev.players[currentPlayer].energy + 100
-                    }
+    const addEnergy = (player: PlayerID) => {
+        setGameState(prev => ({
+            ...prev,
+            players: {
+                ...prev.players,
+                [player]: {
+                    ...prev.players[player],
+                    energy: prev.players[player].energy + 100
                 }
-            };
-        });
+            }
+        }));
         notifyStateMutated('add_energy');
     };
 
@@ -243,10 +240,16 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
 
             {!isSandboxCollapsed && (
                 <div className="grid grid-cols-1 gap-2">
-                    <button onClick={addEnergy} className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95">
-                        <Zap size={14} />
-                        {language === 'zh_tw' ? '增加 100 能量' : '+100 Energy'}
-                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => addEnergy(PlayerID.P1)} className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95">
+                            <Zap size={14} />
+                            {language === 'zh_tw' ? '藍方 +100' : 'P1 +100'}
+                        </button>
+                        <button onClick={() => addEnergy(PlayerID.P2)} className="flex items-center justify-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95">
+                            <Zap size={14} />
+                            {language === 'zh_tw' ? '紅方 +100' : 'P2 +100'}
+                        </button>
+                    </div>
 
                     <button onClick={healAll} className="flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-black text-xs transition-all transform active:scale-95">
                         <Shield size={14} />
