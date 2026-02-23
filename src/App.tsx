@@ -4354,6 +4354,7 @@ export default function App() {
                             onSandboxDragStart={onSandboxDragStart}
                             targetMode={targetMode}
                             setTargetMode={setTargetMode}
+                            localPlayerId={localPerspectivePlayer ?? PlayerID.P1}
                             onStateMutated={(reason: string) => sendGameStateDeferred(`sandbox_${reason}`)}
                         />
                     )}

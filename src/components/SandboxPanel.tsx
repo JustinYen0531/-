@@ -15,6 +15,7 @@ interface SandboxPanelProps {
     onSandboxDragStart: (e: React.MouseEvent) => void;
     targetMode: string | null;
     setTargetMode: (mode: string | null) => void;
+    localPlayerId?: PlayerID;
     onStateMutated?: (reason: string) => void;
 }
 
@@ -29,6 +30,7 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
     onSandboxDragStart,
     targetMode,
     setTargetMode,
+    localPlayerId,
     onStateMutated
 }) => {
     const notifyStateMutated = (reason: string) => {
@@ -47,13 +49,11 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
             ...prev,
             players: {
                 ...prev.players,
-                [PlayerID.P1]: {
-                    ...prev.players[PlayerID.P1],
-                    energy: prev.players[PlayerID.P1].energy + 100
-                },
-                [PlayerID.P2]: {
-                    ...prev.players[PlayerID.P2],
-                    energy: prev.players[PlayerID.P2].energy + 100
+                // Add energy only for the local sandbox player.
+                // Fallback to current player for existing callers/tests.
+                [localPlayerId ?? prev.currentPlayer]: {
+                    ...prev.players[localPlayerId ?? prev.currentPlayer],
+                    energy: prev.players[localPlayerId ?? prev.currentPlayer].energy + 100
                 }
             }
         }));
