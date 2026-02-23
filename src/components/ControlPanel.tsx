@@ -125,6 +125,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         }
     }, [gameState.gameMode, gameState.turnCount, isThinking]);
 
+    React.useEffect(() => {
+        if (gameState.gameMode === 'pvp' && isThinking && isWaitingForOpponent) {
+            setShowBidPopup(false);
+        }
+    }, [gameState.gameMode, isThinking, isWaitingForOpponent]);
+
     // Helper function to set target mode and reset end turn confirmation
     const handleSetTargetMode = (mode: TargetMode) => {
         // Reset end turn confirmation
@@ -381,7 +387,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                     <span className="text-xs text-slate-400 font-medium">
                                                         {t('wait_opponent_confirm')}
                                                     </span>
-                                                    {gameState.gameMode === 'pvp' && renderBidDrawer()}
                                                 </div>
                                             ) : (
                                                 <div className="relative flex flex-col items-center gap-2 w-full pb-2 overflow-visible">
