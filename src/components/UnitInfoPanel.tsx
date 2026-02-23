@@ -194,6 +194,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                                                 : !isWaiting && !isActed && !u.isDead && !isActive
                                                     ? 'bg-red-900/40 border-slate-600'
                                                     : ''}
+                                            ${isPlacement ? `${u.owner === PlayerID.P1 ? 'border-cyan-500/70' : 'border-rose-500/70'} border-dashed` : ''}
                                         `}
                                     >
                                         <div className="absolute top-0.5 left-1 text-[9px] font-black text-white/80">
@@ -374,6 +375,7 @@ const UnitInfoPanel: React.FC<UnitInfoPanelProps> = ({ gameState, localPlayerId,
                                                     ? 'bg-cyan-900/40 border-slate-600 hover:bg-cyan-900/60 hover:border-cyan-500'
                                                     : !isDragging && !isDragOver && !isWaiting && !isActed && !isActive ? 'bg-red-900/40 border-slate-600 hover:bg-red-900/60 hover:border-red-500' : ''
                                         }
+                                        ${isPlacement ? `${u.owner === PlayerID.P1 ? 'border-cyan-500/70' : 'border-rose-500/70'} border-dashed` : ''}
                                     `}
                                 >
                                     {/* Evolution Stars - Top Right */}
