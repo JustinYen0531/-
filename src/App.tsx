@@ -4239,7 +4239,31 @@ export default function App() {
                                                             : (log.owner === localLogOwnerPlayerId ? '[我方] ' : '[敵方] ')
                                                 )
                                                 : '';
-                                            const logText = `${evolutionPrefix}${t(log.messageKey, log.params)}`;
+                                            const translatedLogText = t(log.messageKey, log.params);
+                                            const firstMoverPlayerLabel = (() => {
+                                                const player = String(log.params?.player ?? '');
+                                                if (player === 'P1') {
+                                                    return language === 'en' ? 'Blue' : (language === 'zh_cn' ? '蓝方' : '藍方');
+                                                }
+                                                if (player === 'P2') {
+                                                    return language === 'en' ? 'Red' : (language === 'zh_cn' ? '红方' : '紅方');
+                                                }
+                                                return player;
+                                            })();
+                                            const fallbackFirstMoverText = (() => {
+                                                if (log.messageKey === 'log_first_mover') {
+                                                    if (language === 'en') return `${firstMoverPlayerLabel} won the initiative bid! First to move.`;
+                                                    if (language === 'zh_cn') return `${firstMoverPlayerLabel} 的竞价胜出！获得先手权。`;
+                                                    return `${firstMoverPlayerLabel} 的競標勝出！獲得先手權。`;
+                                                }
+                                                if (log.messageKey === 'log_first_mover_tie') {
+                                                    if (language === 'en') return 'Initiative bid tied! First mover decided randomly.';
+                                                    if (language === 'zh_cn') return '竞价平局！先手随机决定。';
+                                                    return '競標平局！先手由隨機決定。';
+                                                }
+                                                return null;
+                                            })();
+                                            const logText = `${evolutionPrefix}${translatedLogText === log.messageKey && fallbackFirstMoverText ? fallbackFirstMoverText : translatedLogText}`;
                                             // Determine color primarily by owner side.
                                             // Any owned log is side-colored so players can see who acted.
                                             let bgColor = 'bg-slate-800/50 border-white text-white';
