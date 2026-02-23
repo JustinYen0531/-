@@ -108,6 +108,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
     // Energy bid for first-mover initiative during ready (thinking) phase
     const [energyBidInput, setEnergyBidInput] = React.useState<string>("");
+    const [showBidPopup, setShowBidPopup] = React.useState(true);
 
     // Factory button highlight state for visual feedback
     const [factoryButtonFlash, setFactoryButtonFlash] = React.useState(false);
@@ -117,6 +118,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         setEndTurnConfirm(false);
         setFactoryButtonFlash(false);
     }, [gameState.selectedUnitId]);
+
+    React.useEffect(() => {
+        if (gameState.gameMode === 'pvp' && isThinking) {
+            setShowBidPopup(true);
+        }
+    }, [gameState.gameMode, gameState.turnCount, isThinking]);
 
     // Helper function to set target mode and reset end turn confirmation
     const handleSetTargetMode = (mode: TargetMode) => {
@@ -312,7 +319,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                     </span>
                                                 </div>
                                             ) : (
-                                                <div className="flex flex-col items-center gap-2">
+                                                <div className="relative flex flex-col items-center gap-2 w-full pb-2">
                                                     <span className="text-white font-black animate-pulse uppercase tracking-widest text-xs drop-shadow-lg">{t('planning_phase')}</span>
                                                     <button
                                                         disabled={isInteractionDisabled}
@@ -326,35 +333,56 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                         <Play size={20} fill="currentColor" /> {t('ready')}
                                                     </button>
                                                     {gameState.gameMode === 'pvp' && (
-                                                        <div className="w-full mt-1 p-2 bg-slate-900/70 border border-yellow-500/30 rounded-lg">
-                                                            <div className="flex items-center gap-1 mb-1">
-                                                                <Zap size={11} className="text-yellow-400 shrink-0" />
-                                                                <span className="text-[10px] font-black text-yellow-300 uppercase tracking-wider">{t('energy_bid_label')}</span>
-                                                            </div>
-                                                            <div className="text-[9px] text-slate-400 mb-1.5 leading-tight">{t('energy_bid_hint')}</div>
-                                                            <div className="flex items-center gap-2">
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    max={player.energy}
-                                                                    value={energyBidInput}
-                                                                    onChange={(e) => {
-                                                                        const val = e.target.value;
-                                                                        const num = parseInt(val);
-                                                                        if (val === '' || (!isNaN(num) && num >= 0 && num <= player.energy)) {
-                                                                            setEnergyBidInput(val);
-                                                                        }
-                                                                    }}
-                                                                    placeholder="0"
-                                                                    disabled={isInteractionDisabled}
-                                                                    className="flex-1 bg-slate-800 border border-yellow-500/40 rounded px-2 py-1 text-xs font-black text-yellow-300 text-center outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/30 disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                                                />
-                                                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold shrink-0">
-                                                                    <Zap size={10} className="text-yellow-500" />
-                                                                    <span>{player.energy}</span>
+                                                        <>
+                                                            {showBidPopup ? (
+                                                                <div className="w-full mt-2 p-2 bg-slate-950/95 border border-yellow-500/40 rounded-lg shadow-lg shadow-yellow-500/10">
+                                                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                                                        <div className="flex items-center gap-1">
+                                                                            <Zap size={11} className="text-yellow-400 shrink-0" />
+                                                                            <span className="text-[10px] font-black text-yellow-300 uppercase tracking-wider">{t('energy_bid_label')}</span>
+                                                                        </div>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setShowBidPopup(false)}
+                                                                            className="text-[10px] text-yellow-200/80 hover:text-yellow-100 font-black uppercase"
+                                                                        >
+                                                                            {language === 'en' ? 'Hide' : (language === 'zh_cn' ? '收起' : '收起')}
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="text-[9px] text-slate-400 mb-1.5 leading-tight">{t('energy_bid_hint')}</div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            max={player.energy}
+                                                                            value={energyBidInput}
+                                                                            onChange={(e) => {
+                                                                                const val = e.target.value;
+                                                                                const num = parseInt(val);
+                                                                                if (val === '' || (!isNaN(num) && num >= 0 && num <= player.energy)) {
+                                                                                    setEnergyBidInput(val);
+                                                                                }
+                                                                            }}
+                                                                            placeholder="0"
+                                                                            disabled={isInteractionDisabled}
+                                                                            className="flex-1 bg-slate-800 border border-yellow-500/40 rounded px-2 py-1 text-xs font-black text-yellow-300 text-center outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/30 disabled:opacity-50 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                                        />
+                                                                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold shrink-0">
+                                                                            <Zap size={10} className="text-yellow-500" />
+                                                                            <span>{player.energy}</span>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        </div>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowBidPopup(true)}
+                                                                    className="mt-2 px-3 py-1 bg-yellow-900/40 hover:bg-yellow-800/60 border border-yellow-500/40 rounded text-[10px] font-black text-yellow-200 uppercase tracking-wide"
+                                                                >
+                                                                    {language === 'en' ? 'Show Initiative Bid' : (language === 'zh_cn' ? '显示先手竞价' : '顯示先手競價')}
+                                                                </button>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </div>
                                             )
