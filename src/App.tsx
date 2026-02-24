@@ -1911,11 +1911,13 @@ export default function App() {
                 };
             } else if (thrownMine.type === MineType.SMOKE) {
                 const smokeIdBase = `throw-smoke-${Date.now()}`;
+                const boardRows = prev.cells.length;
+                const boardCols = prev.cells[0]?.length ?? 0;
                 for (let dr = -1; dr <= 1; dr++) {
                     for (let dc = -1; dc <= 1; dc++) {
                         const nr = r + dr;
                         const nc = c + dc;
-                        if (nr >= 0 && nr < GRID_ROWS && nc >= 0 && nc < GRID_COLS) {
+                        if (nr >= 0 && nr < boardRows && nc >= 0 && nc < boardCols) {
                             nextSmokes.push({
                                 id: `${smokeIdBase}-${dr}-${dc}`,
                                 r: nr,
