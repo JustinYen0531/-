@@ -2025,20 +2025,32 @@ export default function App() {
         }
         if (!checkEnergyCap(unit, state.players[unit.owner], cost)) return;
 
-        // 4. Action Execution
-        spendEnergy(unit.owner, cost);
-        lockUnit(unit.id);
+        // 4. Action Execution — BUG-1 修復：合併為單一 atomic setGameState
 
         if (actionType === 'mine') {
             setGameState(prev => {
+                const p = prev.players[unit.owner];
+                const newEnergy = p.energy - cost;
                 const newMines = prev.mines.filter((_, idx) => idx !== revealedMineIndex);
-                const qStats = { ...prev.players[unit.owner].questStats };
-                qStats.defuserMinesDisarmed += 1;
+                const qStats = { ...p.questStats, defuserMinesDisarmed: p.questStats.defuserMinesDisarmed + 1 };
                 return {
                     ...prev,
                     mines: newMines,
                     sensorResults: clearScanMarksAtCells(prev.sensorResults, [{ r, c }]),
-                    players: { ...prev.players, [unit.owner]: { ...prev.players[unit.owner], questStats: qStats, units: prev.players[unit.owner].units.map(u => u.id === unit.id ? { ...u, energyUsedThisTurn: u.energyUsedThisTurn + cost } : u) } },
+                    activeUnitId: unit.id,
+                    players: {
+                        ...prev.players,
+                        [unit.owner]: {
+                            ...p,
+                            energy: newEnergy,
+                            questStats: qStats,
+                            units: p.units.map(u => u.id === unit.id ? {
+                                ...u,
+                                energyUsedThisTurn: u.energyUsedThisTurn + cost,
+                                startOfActionEnergy: u.energyUsedThisTurn === 0 ? newEnergy : u.startOfActionEnergy,
+                            } : u)
+                        }
+                    },
                     lastActionTime: Date.now(),
                     isTimeFrozen: true
                 };
@@ -2046,11 +2058,25 @@ export default function App() {
             addLog('log_mine_disarmed', 'mine', { r: r + 1, c: c + 1 }, unit.owner);
         } else {
             setGameState(prev => {
+                const p = prev.players[unit.owner];
+                const newEnergy = p.energy - cost;
                 const newBuildings = prev.buildings.filter((_, idx) => idx !== buildingIndex);
                 return {
                     ...prev,
                     buildings: newBuildings,
-                    players: { ...prev.players, [unit.owner]: { ...prev.players[unit.owner], units: prev.players[unit.owner].units.map(u => u.id === unit.id ? { ...u, energyUsedThisTurn: u.energyUsedThisTurn + cost } : u) } },
+                    activeUnitId: unit.id,
+                    players: {
+                        ...prev.players,
+                        [unit.owner]: {
+                            ...p,
+                            energy: newEnergy,
+                            units: p.units.map(u => u.id === unit.id ? {
+                                ...u,
+                                energyUsedThisTurn: u.energyUsedThisTurn + cost,
+                                startOfActionEnergy: u.energyUsedThisTurn === 0 ? newEnergy : u.startOfActionEnergy,
+                            } : u)
+                        }
+                    },
                     lastActionTime: Date.now(),
                     isTimeFrozen: true
                 };

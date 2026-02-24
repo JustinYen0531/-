@@ -811,10 +811,19 @@ export const usePlayerActions = ({
                                     damageToApply = 6; // Friendly fire takes half damage
                                 }
                                 damageToApply = applyFlagAuraDamageReduction(damageToApply, targetUnit, state.players[targetUnit.owner]).damage;
-                                let targetNewHp = Math.max(0, targetUnit.hp - damageToApply);
-                                let targetIsDead = targetNewHp === 0;
-                                let targetRespawnTimer = (targetIsDead && targetUnit.type !== UnitType.GENERAL) ? (state.turnCount <= 10 ? 2 : 3) : 0;
-                                nukeAoeVictims.push({ unitId: targetUnit.id, owner: targetUnit.owner, newHp: targetNewHp, isDead: targetIsDead, respawnTimer: targetRespawnTimer });
+                                // BUG-3 修復：去重，避免同一單位被重複計傷
+                                const existingVictim = nukeAoeVictims.find(v => v.unitId === targetUnit.id);
+                                const baseHp = existingVictim ? existingVictim.newHp : targetUnit.hp;
+                                const targetNewHp = Math.max(0, baseHp - damageToApply);
+                                const targetIsDead = targetNewHp === 0;
+                                const targetRespawnTimer = (targetIsDead && targetUnit.type !== UnitType.GENERAL) ? (state.turnCount <= 10 ? 2 : 3) : 0;
+                                if (existingVictim) {
+                                    existingVictim.newHp = targetNewHp;
+                                    existingVictim.isDead = targetIsDead;
+                                    existingVictim.respawnTimer = targetRespawnTimer;
+                                } else {
+                                    nukeAoeVictims.push({ unitId: targetUnit.id, owner: targetUnit.owner, newHp: targetNewHp, isDead: targetIsDead, respawnTimer: targetRespawnTimer });
+                                }
                                 addLog('log_evol_nuke_blast_hit', 'combat', { unit: getLocalizedUnitName(targetUnit.type), dmg: damageToApply }, mine.owner);
                             }
                         });
@@ -973,13 +982,24 @@ export const usePlayerActions = ({
             }
 
             // 檢查 Nuke AOE 是否殺死了將軍
+            let nukeKilledP1General = false;
+            let nukeKilledP2General = false;
             nukeAoeVictims.forEach(v => {
                 const victimUnit = [...finalP1.units, ...finalP2.units].find((u: Unit) => u.id === v.unitId);
                 if (victimUnit && victimUnit.type === UnitType.GENERAL && v.isDead) {
                     generalDied = true;
-                    winnerFromGeneralDeath = v.owner === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
+                    if (v.owner === PlayerID.P1) nukeKilledP1General = true;
+                    else nukeKilledP2General = true;
                 }
             });
+            // BUG-4 修復：兩方將軍同時死於 Nuke → 平手
+            if (nukeKilledP1General && nukeKilledP2General) {
+                winnerFromGeneralDeath = null; // 平手
+            } else if (nukeKilledP1General) {
+                winnerFromGeneralDeath = PlayerID.P2;
+            } else if (nukeKilledP2General) {
+                winnerFromGeneralDeath = PlayerID.P1;
+            }
 
             return {
                 ...prev, activeUnitId: unit.id, mines: newMines, smokes: newSmokes, buildings: currentBuildings,
@@ -1132,6 +1152,7 @@ export const usePlayerActions = ({
         const unit = state.selectedUnitId ? getUnit(state.selectedUnitId) : null;
         if (!unit) return;
         if (unit.hasFlag) return;
+        if (unit.hasActedThisRound) return; // BUG-2 修復：已行動過的單位不得拿旗
         const player = state.players[unit.owner];
         const genLevelB = player.evolutionLevels[UnitType.GENERAL].b;
         const genVariantB = player.evolutionLevels[UnitType.GENERAL].bVariant;
@@ -1478,8 +1499,21 @@ export const usePlayerActions = ({
             const targetCellOccupied = prev.players[PlayerID.P1].units.concat(prev.players[PlayerID.P2].units).some(u => u.r === hub.r && u.c === hub.c && !u.isDead);
             if (targetCellOccupied) { addLog('log_obstacle', 'error'); return prev; }
 
+            // BUG-5 修復：傳送落點有敵方地雷時，觸發地雷傷害
+            const mineResult = calculateMineInteraction(unit, prev.mines, hub.r, hub.c, p, unit.r, unit.c);
+            let newMines = prev.mines;
+            let mineTriggeredDmg = 0;
+            if (mineResult.triggered || mineResult.isNukeTriggered) {
+                mineTriggeredDmg = mineResult.damage;
+                newMines = prev.mines.filter((_, idx) => idx !== prev.mines.findIndex(m => m.r === hub.r && m.c === hub.c && m.owner !== unit.owner));
+            }
+
+            const newHp = Math.max(0, unit.hp - mineTriggeredDmg);
+            const isDead = newHp <= 0;
+
             return {
                 ...prev,
+                mines: newMines,
                 players: {
                     ...prev.players,
                     [unit.owner]: {
@@ -1490,6 +1524,9 @@ export const usePlayerActions = ({
                                 ...u,
                                 r: hub.r,
                                 c: hub.c,
+                                hp: newHp,
+                                isDead,
+                                respawnTimer: (isDead && u.type !== UnitType.GENERAL) ? (prev.turnCount <= 10 ? 2 : 3) : 0,
                                 carriedMine: u.carriedMine ? { ...u.carriedMine, r: hub.r, c: hub.c } : u.carriedMine,
                                 energyUsedThisTurn: u.energyUsedThisTurn + cost
                             }
@@ -1499,6 +1536,14 @@ export const usePlayerActions = ({
                 lastActionTime: Date.now(), isTimeFrozen: true
             };
         });
+
+        // Log mine trigger if any
+        const freshState = gameStateRef.current;
+        const mineAtHub = freshState.mines.find(m => m.r === hub.r && m.c === hub.c && m.owner !== unit.owner);
+        if (mineAtHub) {
+            addLog('log_hit_mine', 'mine', { unit: getLocalizedUnitName(unit.type), dmg: '?' }, unit.owner);
+        }
+
         handleActionComplete(unit.id);
     }, [gameStateRef, addLog, setGameState, handleActionComplete]);
 
