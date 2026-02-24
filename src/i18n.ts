@@ -264,7 +264,7 @@ export const TRANSLATIONS = {
     evol_mkr_a_r3_1_detail: "Unlock Chain Mine: the triggered tile takes 6 damage (1x1). It then detonates normal mines in a 5x5 area, and those chain detonations deal 8 AoE damage within Manhattan distance 2. Costs 7 energy.",
     evol_mkr_a_r3_2_detail: "Maker gains Ultimate Mine (12 damage). It triggers when an enemy enters the surrounding 3x3, detonates a Manhattan-distance-2 blast (allies take half damage), and destroys enemy mines and buildings in the blast area. Costs 9 energy.",
     evol_mkr_b_r1_detail: "Unlock [Autonomous Workshop]. Mine cap becomes 5+1, and the extra 1 mine must be placed in the workshop's surrounding 3x3 area (outside workshop range remains capped at 5). Costs 6 energy. Enemies can stand on it and spend 2 energy to dismantle it.",
-    evol_mkr_b_r2_detail: "Workshop now supports special mine types and its range changes to Manhattan distance 2. Mine cap becomes 5+2, and the extra 2 mines must be placed within workshop range.",
+    evol_mkr_b_r2_detail: "Workshop range changes to Manhattan distance 2. Mine cap becomes 5+2, and the extra 2 mine slots can be filled by either normal or special mines within workshop range.",
     evol_mkr_b_r3_1_detail: "[Energy Conversion]: placing mines near the workshop costs 3 energy. Mine cap becomes 5+3 (the extra 3 mines must be within workshop range).",
     evol_mkr_b_r3_2_detail: "[Twin Matrix]: up to 2 workshops can exist at once. Mine cap becomes 5+2+2 (each workshop grants 2 in-range extra mine slots).",
 
@@ -287,7 +287,7 @@ export const TRANSLATIONS = {
     evol_rng_b_detail: "Tier 1: Ranger pickup range increases to Manhattan 2. Tier 2: Ranger unlocks active stealth movement (activation cost 3, movement cost 3 per tile, hidden unless mine-triggered). Tier 3-1: Active stealth button is removed; Ranger gains passive permanent stealth at 2 move energy and is not revealed by mine triggers. Tier 3-2: Ranger can throw carried mines only at enemy units within Manhattan 2 (not empty tiles), dealing 50% damage and applying the thrown mine's special effect (cost 5).",
 
     evol_mkr_a_detail: "Tier 1: Unlock Slow Mine (4 damage, +2 move energy cost this and next turn, cost 4). Tier 2: Unlock Smoke Mine (7 damage, 3x3 fog for 3 turns, cost 6). Tier 3-1: Unlock Chain Mine (6 single-tile trigger plus chain detonations dealing 8 AoE within Manhattan 2, cost 7). Tier 3-2: Unlock Ultimate Mine (12 damage, enemy-proximity 3x3 trigger, Manhattan-distance-2 blast with half friendly fire, destroys enemy mines/buildings, cost 9).",
-    evol_mkr_b_detail: "Tier 1: Unlock Autonomous Workshop; mine cap becomes 5+1 (extra mine must be in workshop 3x3), cost 6, dismantlable by enemies for 2 energy. Tier 2: Supports special mines and expands to Manhattan 2, cap becomes 5+2. Tier 3-1: Near-workshop mine placement costs 3 energy, cap becomes 5+3. Tier 3-2: Up to 2 workshops; mine cap becomes 5+2+2.",
+    evol_mkr_b_detail: "Tier 1: Unlock Autonomous Workshop; mine cap becomes 5+1 (extra slot is satisfied by an in-range normal mine), cost 6, dismantlable by enemies for 2 energy. Tier 2: Workshop range expands to Manhattan 2 and extra slots can also be special mines, cap becomes 5+2. Tier 3-1: Near-workshop mine placement costs 3 energy, cap becomes 5+3. Tier 3-2: Up to 2 workshops; mine cap becomes 5+2+2.",
 
     evol_def_a_detail: "Tier 1: Except Defuser, allies take 1 less mine damage (2 less below 50% HP). Tier 2: Except Defuser, ally mine triggers heal the team by 1 HP (2 below 50% HP). Tier 3-1: Ally mine triggers deal 2 damage to the enemy with lowest HP (3 if triggered by Defuser). Tier 3-2: Except Defuser, allies take 2 less mine damage (3 less below 50% HP), and Defuser mine damage reduction increases to 75%.",
     evol_def_b_detail: "Tier 1: Disarm range expands by one ring. Tier 2: Unlock enemy mine relocation within a 2-tile diamond without disarming (cost 2). Tier 3-1: Will Seizure upgrade changes mine cap to 5+1 with a required converted-mine slot and removes old conversion limits. Tier 3-2: Mine relocation can target enemy units in range to deal 40% of that mine's damage (cost 5).",
@@ -626,7 +626,7 @@ export const TRANSLATIONS = {
     evol_mkr_a_r3_1_detail: "解鎖連鎖雷：本身僅對踩中格造成 6 點傷害(1x1)，引爆周圍 5x5 範圍的普通地雷，使引爆造成曼哈頓距離 2 格的範圍傷害 8 點，能量消耗 7 點。",
     evol_mkr_a_r3_2_detail: "製雷者獲得新能力，終極地雷(傷害 12)，敵人進入周圍3x3即觸發，引爆曼哈頓距離 2 範圍(含我方，傷害減半)，毀滅範圍內敵方地雷與建築，能量消耗 9 點。",
     evol_mkr_b_r1_detail: "解鎖新建築【自律工坊】。地雷上限提升至 5+1 顆，其中額外的 1 顆必須在工坊周圍 3x3 範圍內製造(工坊外限 5 顆)。消耗 6 點能量，解除辦法為敵方任一腳色站在其上消耗2點能量。",
-    evol_mkr_b_r2_detail: "工坊支援特殊地雷且範圍改為曼哈頓距離 2。地雷上限提升至 5+2 顆，額外 2 顆需在工坊範圍內製造。",
+    evol_mkr_b_r2_detail: "工坊範圍改為曼哈頓距離 2。地雷上限提升至 5+2 顆，且額外 2 個欄位可由工坊範圍內的普通雷或特殊雷填入。",
     evol_mkr_b_r3_1_detail: "【能源轉化】：身處工坊附近製造地雷消耗 3 點能量。地雷上限大幅提升至 5+3 顆(額外 3 顆限工坊範圍)。",
     evol_mkr_b_r3_2_detail: "【雙子矩陣】：場上允許同時存在 2 座工坊。地雷上限為 5+2+2 顆(每座工坊限額 2 顆)。",
 
@@ -931,7 +931,7 @@ export const TRANSLATIONS = {
     evol_mkr_a_r3_1_detail: "解锁连锁雷：本身仅对踩中格造成 6 点伤害(1x1)，引爆周围 5x5 范围的普通地雷，使引爆造成曼哈顿距离 2 格的范围伤害 8 点，能量消耗 7 点。",
     evol_mkr_a_r3_2_detail: "解锁终极地雷：伤害 12，进入周围 3X3 即触发，引爆曼哈顿距离 2 范围(含我方)，毁灭范围内敌方地雷与建筑，能量消耗 9 点。",
     evol_mkr_b_r1_detail: "解锁新建筑【自律工坊】。地雷上限提升至 5+1 颗，但额出的那 1 颗必须在工坊周围 3x3 范围内制造。消耗 6 点能量，解除办法为敌方任一角色站在其上消耗2点能量。",
-    evol_mkr_b_r2_detail: "工坊支援特殊地雷且范围改为曼哈顿距离 2。地雷上限提升至 5+2 颗，额外 2 颗需在工坊范围内制造。",
+    evol_mkr_b_r2_detail: "工坊范围改为曼哈顿距离 2。地雷上限提升至 5+2 颗，且额外 2 个栏位可由工坊范围内的普通雷或特殊雷填入。",
     evol_mkr_b_r3_1_detail: "【能源转化】：身处工坊附近制造地雷消耗 3 点能量。地雷上限大幅提升至 5+3 颗(额外 3 颗限工坊范围)。",
     evol_mkr_b_r3_2_detail: "【双子矩阵】：场上允许同时存在 2 座工坊。地雷上限为 5+2+2 颗，每座工坊提供 2 颗限额于其范围内放置。",
 

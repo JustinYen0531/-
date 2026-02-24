@@ -1373,12 +1373,24 @@ export const usePlayerActions = ({
                 }
                 return Math.max(Math.abs(f.r - mr), Math.abs(f.c - mc)) <= 1;
             });
-            const placedMinesInFactoryRange = ownMines.filter(m => !m.isConverted && isMineInFactoryRange(m.r, m.c)).length;
-            const nextPlacedInFactoryRange = placedMinesInFactoryRange + (isInFactoryRange ? 1 : 0);
+            const placedMinesInFactoryRange = ownMines.filter(m => !m.isConverted && isMineInFactoryRange(m.r, m.c));
+            const nextPlacedInFactoryRange = placedMinesInFactoryRange.length + (isInFactoryRange ? 1 : 0);
             const overflowAfterPlacement = (placedMinesCount + 1) - MAX_MINES_ON_BOARD;
             if (nextPlacedInFactoryRange < overflowAfterPlacement) {
                 addLog('log_max_mines', 'error');
                 return;
+            }
+
+            // B1 rule: extra slot must be represented by NORMAL mine(s) in workshop range.
+            // This still allows special mines in range, as long as at least one in-range normal mine
+            // exists to satisfy the overflow slot requirement.
+            if (mkrLevelB === 1) {
+                const inRangeNormalCount = placedMinesInFactoryRange.filter(m => m.type === MineType.NORMAL).length
+                    + (isInFactoryRange && effectiveMineType === MineType.NORMAL ? 1 : 0);
+                if (inRangeNormalCount < overflowAfterPlacement) {
+                    addLog('log_max_mines', 'error');
+                    return;
+                }
             }
         }
 
