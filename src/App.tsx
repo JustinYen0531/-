@@ -2267,7 +2267,7 @@ export default function App() {
                 }
 
                 // Add Damage Log
-                addLog('log_evol_def_move_mine_dmg', 'combat', { unit: t(getUnitNameKey(enemyAtTarget.type)), dmg }, unit.owner);
+                addLog('log_evol_def_move_mine_skill_damage', 'combat', { unit: t(getUnitNameKey(enemyAtTarget.type)), dmg }, unit.owner);
 
                 return {
                     ...prev,

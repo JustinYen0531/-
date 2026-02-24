@@ -95,6 +95,7 @@ interface GridCellProps {
   forceShowMines?: boolean;
   isUnitStealthed?: boolean;
   selectedUnitLevelB?: number;
+  selectedUnitVariantB?: 1 | 2 | null;
   evolutionFxNonce?: number;
   evolutionFxBranch?: 'a' | 'b' | null;
   clearPetalsNonce?: number;
@@ -134,6 +135,7 @@ const GridCell: React.FC<GridCellProps> = ({
   forceShowMines = false,
   isUnitStealthed = false,
   selectedUnitLevelB = 0,
+  selectedUnitVariantB = null,
   evolutionFxNonce = 0,
   evolutionFxBranch = null,
   clearPetalsNonce = 0,
@@ -374,7 +376,16 @@ const GridCell: React.FC<GridCellProps> = ({
     } else if (targetMode === 'move_mine_end') {
       const dr = Math.abs(selectedUnit.r - cell.r);
       const dc = Math.abs(selectedUnit.c - cell.c);
-      if (dr + dc <= 2 && !cell.isObstacle && !building && !mine && !unit) {
+      const canDamageEnemyUnit =
+        selectedUnit.type === UnitType.DEFUSER &&
+        selectedUnitLevelB === 3 &&
+        selectedUnitVariantB === 2;
+      const isEnemyDamageTarget =
+        canDamageEnemyUnit &&
+        !!unit &&
+        unit.owner !== currentPlayer &&
+        !unit.isDead;
+      if (dr + dc <= 2 && !cell.isObstacle && !building && !mine && (!unit || isEnemyDamageTarget)) {
         isInActionRange = true;
         actionRangeColor = 'cell-range-rose';
       }

@@ -290,6 +290,7 @@ const GameField: React.FC<GameFieldProps> = ({
                                     p1GeneralVariantB={gameState.players[PlayerID.P1].evolutionLevels[UnitType.GENERAL].bVariant}
                                     p2GeneralVariantB={gameState.players[PlayerID.P2].evolutionLevels[UnitType.GENERAL].bVariant}
                                     selectedUnitLevelB={selectedUnit ? gameState.players[selectedUnit.owner].evolutionLevels[selectedUnit.type].b : 0}
+                                    selectedUnitVariantB={selectedUnit ? gameState.players[selectedUnit.owner].evolutionLevels[selectedUnit.type].bVariant : null}
                                     buildings={gameState.buildings}
                                     isSmoked={isSmoked}
                                     smokeOwner={smokesAtCell[0]?.owner}
