@@ -1373,10 +1373,47 @@ export const usePlayerActions = ({
                 }
                 return Math.max(Math.abs(f.r - mr), Math.abs(f.c - mc)) <= 1;
             });
-            const placedMinesInFactoryRange = ownMines.filter(m => !m.isConverted && isMineInFactoryRange(m.r, m.c));
-            const nextPlacedInFactoryRange = placedMinesInFactoryRange.length + (isInFactoryRange ? 1 : 0);
             const overflowAfterPlacement = (placedMinesCount + 1) - MAX_MINES_ON_BOARD;
-            if (nextPlacedInFactoryRange < overflowAfterPlacement) {
+
+            // Build non-converted mine list after this placement.
+            const nextPlacedMines = ownMines
+                .filter(m => !m.isConverted)
+                .map(m => ({ r: m.r, c: m.c, type: m.type }))
+                .concat([{ r: targetR, c: targetC, type: effectiveMineType }]);
+
+            const isInFactoryRangeByIndex = (factoryIndex: number, mr: number, mc: number) => {
+                const f = factories[factoryIndex];
+                if (!f) return false;
+                if (f.level >= 2) {
+                    return Math.abs(f.r - mr) + Math.abs(f.c - mc) <= 2;
+                }
+                return Math.max(Math.abs(f.r - mr), Math.abs(f.c - mc)) <= 1;
+            };
+
+            // A mine can support at most one overflow slot, assigned to one nearby factory.
+            // Each factory can support at most `extraSlotsPerFactory` overflow slots.
+            const mineCandidateFactories = nextPlacedMines.map(m =>
+                factories
+                    .map((_, idx) => idx)
+                    .filter(idx => isInFactoryRangeByIndex(idx, m.r, m.c))
+            );
+            const caps = factories.map(() => extraSlotsPerFactory);
+
+            const dfsMaxAssigned = (mineIdx: number, remainingCaps: number[]): number => {
+                if (mineIdx >= mineCandidateFactories.length) return 0;
+                let best = dfsMaxAssigned(mineIdx + 1, remainingCaps);
+                const candidates = mineCandidateFactories[mineIdx];
+                for (const fi of candidates) {
+                    if (remainingCaps[fi] <= 0) continue;
+                    const nextCaps = [...remainingCaps];
+                    nextCaps[fi] -= 1;
+                    best = Math.max(best, 1 + dfsMaxAssigned(mineIdx + 1, nextCaps));
+                }
+                return best;
+            };
+
+            const maxSupportedOverflow = dfsMaxAssigned(0, caps);
+            if (maxSupportedOverflow < overflowAfterPlacement) {
                 addLog('log_max_mines', 'error');
                 return;
             }
@@ -1385,8 +1422,9 @@ export const usePlayerActions = ({
             // This still allows special mines in range, as long as at least one in-range normal mine
             // exists to satisfy the overflow slot requirement.
             if (mkrLevelB === 1) {
-                const inRangeNormalCount = placedMinesInFactoryRange.filter(m => m.type === MineType.NORMAL).length
-                    + (isInFactoryRange && effectiveMineType === MineType.NORMAL ? 1 : 0);
+                const inRangeNormalCount = nextPlacedMines.filter(m =>
+                    m.type === MineType.NORMAL && isMineInFactoryRange(m.r, m.c)
+                ).length;
                 if (inRangeNormalCount < overflowAfterPlacement) {
                     addLog('log_max_mines', 'error');
                     return;
