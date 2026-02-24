@@ -1807,6 +1807,7 @@ export default function App() {
 
     const handleThrowMineAction = (unit: Unit, r: number, c: number) => {
         if (!unit.carriedMine) return;
+        const thrownMineType = unit.carriedMine.type;
         const baseCost = 5;
         const cost = getEnemyTerritoryEnergyCost(unit, baseCost);
         if (gameState.players[unit.owner].energy < cost) {
@@ -1827,6 +1828,7 @@ export default function App() {
             addLog('log_throw_requires_enemy', 'info');
             return;
         }
+        const targetUnitForLog = gameState.players[enemyId].units.find(u => !u.isDead && u.r === r && u.c === c);
 
         if (!checkEnergyCap(unit, gameState.players[unit.owner], cost)) return;
 
@@ -1838,6 +1840,9 @@ export default function App() {
             [MineType.NUKE]: 12
         };
 
+        const pendingLogs: Array<{ key: string; type: GameLog['type']; params?: Record<string, any>; owner?: PlayerID }> = [];
+        let didApplyThrow = false;
+
         setGameState(prev => {
             const ownerId = unit.owner;
             const enemyId = ownerId === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
@@ -1847,6 +1852,7 @@ export default function App() {
 
             const liveTarget = prev.players[enemyId].units.find(u => !u.isDead && u.r === r && u.c === c);
             if (!liveTarget) return prev;
+            didApplyThrow = true;
 
             const thrownMine = liveThrower.carriedMine;
             const newEnergy = ownerState.energy - cost;
@@ -1872,7 +1878,7 @@ export default function App() {
             const applyDamageToUnit = (pid: PlayerID, unitId: string, baseDmg: number, hitR: number, hitC: number) => {
                 const targetPlayer = nextPlayers[pid];
                 const targetUnit = targetPlayer.units.find(u => u.id === unitId);
-                if (!targetUnit || targetUnit.isDead) return;
+                if (!targetUnit || targetUnit.isDead) return 0;
                 const dmg = applyFlagAuraDamageReduction(baseDmg, targetUnit, targetPlayer, { r: hitR, c: hitC }).damage;
                 const newHp = Math.max(0, targetUnit.hp - dmg);
                 const isDead = newHp === 0;
@@ -1888,10 +1894,17 @@ export default function App() {
                         } : u)
                     }
                 };
+                return dmg;
             };
 
             const primaryBase = Math.floor((mineBaseDamageByType[thrownMine.type] ?? MINE_DAMAGE) * 0.5);
-            applyDamageToUnit(enemyId, liveTarget.id, primaryBase, r, c);
+            const primaryDmg = applyDamageToUnit(enemyId, liveTarget.id, primaryBase, r, c);
+            pendingLogs.push({
+                key: 'log_hit_mine',
+                type: 'mine',
+                params: { unit: t(getUnitNameKey(liveTarget.type)), dmg: primaryDmg },
+                owner: ownerId
+            });
 
             if (thrownMine.type === MineType.SLOW) {
                 const targetPlayer = nextPlayers[enemyId];
@@ -1909,6 +1922,7 @@ export default function App() {
                         } : u)
                     }
                 };
+                pendingLogs.push({ key: 'log_heavy_steps', type: 'evolution', owner: enemyId });
             } else if (thrownMine.type === MineType.SMOKE) {
                 const smokeIdBase = `throw-smoke-${Date.now()}`;
                 const boardRows = prev.cells.length;
@@ -1928,6 +1942,7 @@ export default function App() {
                         }
                     }
                 }
+                pendingLogs.push({ key: 'log_smoke_deployed', type: 'mine', params: { r: r + 1, c: c + 1 }, owner: ownerId });
             } else if (thrownMine.type === MineType.CHAIN) {
                 const normalMinesInRange = nextMines.filter(m =>
                     m.type === MineType.NORMAL &&
@@ -1938,11 +1953,20 @@ export default function App() {
                 normalMinesInRange.forEach(nm => {
                     enemyUnits.forEach(u => {
                         if (Math.abs(u.r - nm.r) + Math.abs(u.c - nm.c) <= 2) {
-                            applyDamageToUnit(enemyId, u.id, Math.floor(8 * 0.5), u.r, u.c);
+                            const aoeDmg = applyDamageToUnit(enemyId, u.id, Math.floor(8 * 0.5), u.r, u.c);
+                            pendingLogs.push({
+                                key: 'log_chain_aoe',
+                                type: 'mine',
+                                params: { unit: t(getUnitNameKey(u.type)), dmg: aoeDmg },
+                                owner: enemyId
+                            });
                         }
                     });
                 });
                 nextMines = nextMines.filter(m => !normalMinesInRange.some(nm => nm.id === m.id));
+                if (normalMinesInRange.length > 0) {
+                    pendingLogs.push({ key: 'log_evol_mkr_chain', type: 'mine', params: { r: r + 1, c: c + 1 }, owner: ownerId });
+                }
             } else if (thrownMine.type === MineType.NUKE) {
                 const inBlast = (rr: number, cc: number) => (Math.abs(rr - r) + Math.abs(cc - c)) <= 2;
                 nextMines = nextMines.filter(m => m.owner === ownerId || !inBlast(m.r, m.c));
@@ -1952,7 +1976,13 @@ export default function App() {
                         .filter(u => !u.isDead && u.id !== liveTarget.id && inBlast(u.r, u.c))
                         .forEach(u => {
                             const baseBlastDmg = pid === ownerId ? 3 : 6;
-                            applyDamageToUnit(pid, u.id, baseBlastDmg, u.r, u.c);
+                            const blastDmg = applyDamageToUnit(pid, u.id, baseBlastDmg, u.r, u.c);
+                            pendingLogs.push({
+                                key: 'log_evol_nuke_blast_hit',
+                                type: 'combat',
+                                params: { unit: t(getUnitNameKey(u.type)), dmg: blastDmg },
+                                owner: ownerId
+                            });
                         });
                 });
             }
@@ -1969,7 +1999,9 @@ export default function App() {
             };
         });
 
+        if (!didApplyThrow) return;
         addLog('log_throw_mine', 'move', { r: r + 1, c: c + 1 }, unit.owner);
+        pendingLogs.forEach((entry) => addLog(entry.key, entry.type, entry.params, entry.owner));
         setTargetMode(null);
         if (canBroadcastAction(unit.owner) && roomId) {
             sendGameStateDeferred('throw_mine');
