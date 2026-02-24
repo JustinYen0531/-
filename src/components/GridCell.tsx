@@ -551,7 +551,9 @@ const GridCell: React.FC<GridCellProps> = ({
   const shouldShowEye =
     mine && isMineVisible && !unit &&
     mine.owner === currentPlayer &&
-    mineIsKnownByEnemy;
+    mineIsKnownByEnemy &&
+    !isSmoked &&
+    !isHub31Smoke;
   const showCarriedMineIndicator = unit && unit.type === UnitType.RANGER && unit.carriedMine &&
     (unit.owner === currentPlayer || unit.carriedMineRevealed || friendlyTowerInRange);
   const showOreUnderUnitIndicator = !!unit && !!cell.hasEnergyOre;
