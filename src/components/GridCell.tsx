@@ -557,6 +557,7 @@ const GridCell: React.FC<GridCellProps> = ({
   const showCarriedMineIndicator = unit && unit.type === UnitType.RANGER && unit.carriedMine &&
     (unit.owner === currentPlayer || unit.carriedMineRevealed || friendlyTowerInRange);
   const showOreUnderUnitIndicator = !!unit && !!cell.hasEnergyOre;
+  const isStealthVisual = !!unit && isUnitStealthed;
 
   const getUnitIcon = (type: UnitType) => {
     // Color mapping for each unit type
@@ -1187,23 +1188,29 @@ const GridCell: React.FC<GridCellProps> = ({
             ${unit.hasActedThisRound ? 'opacity-80' : ''} 
             ${cell.hasEnergyOre ? 'ring-2 ring-purple-500' : ''}
             ${unit?.owner === PlayerID.P1 ? 'before:absolute before:inset-0 before:bg-cyan-400/20 before:rounded-full before:-z-10 before:blur-md' : 'before:absolute before:inset-0 before:bg-red-400/20 before:rounded-full before:-z-10 before:blur-md'}
-            ${evolutionLevelA > 0 && evolutionLevelB === 0 ? (evolutionLevelA === 1 ? 'evolution-aura-a-lv1' : evolutionLevelA === 2 ? 'evolution-aura-a-lv2' : 'evolution-aura-a-lv3') : ''}
-            ${evolutionLevelB > 0 && evolutionLevelA === 0 ? (evolutionLevelB === 1 ? 'evolution-aura-b-lv1' : evolutionLevelB === 2 ? 'evolution-aura-b-lv2' : 'evolution-aura-b-lv3') : ''}
-            ${evolutionLevelA > 0 && evolutionLevelB > 0 ? (Math.max(evolutionLevelA, evolutionLevelB) === 1 ? 'evolution-aura-gold-lv1' : Math.max(evolutionLevelA, evolutionLevelB) === 2 ? 'evolution-aura-gold-lv2' : 'evolution-aura-gold-lv3') : ''}
+            ${!isStealthVisual && evolutionLevelA > 0 && evolutionLevelB === 0 ? (evolutionLevelA === 1 ? 'evolution-aura-a-lv1' : evolutionLevelA === 2 ? 'evolution-aura-a-lv2' : 'evolution-aura-a-lv3') : ''}
+            ${!isStealthVisual && evolutionLevelB > 0 && evolutionLevelA === 0 ? (evolutionLevelB === 1 ? 'evolution-aura-b-lv1' : evolutionLevelB === 2 ? 'evolution-aura-b-lv2' : 'evolution-aura-b-lv3') : ''}
+            ${!isStealthVisual && evolutionLevelA > 0 && evolutionLevelB > 0 ? (Math.max(evolutionLevelA, evolutionLevelB) === 1 ? 'evolution-aura-gold-lv1' : Math.max(evolutionLevelA, evolutionLevelB) === 2 ? 'evolution-aura-gold-lv2' : 'evolution-aura-gold-lv3') : ''}
           `}
             style={{
-              animation: evolutionLevelA > 0 && evolutionLevelB > 0
+              animation: isStealthVisual
+                ? 'none'
+                : evolutionLevelA > 0 && evolutionLevelB > 0
                 ? `spin 2s linear infinite, spinReverse 2s linear infinite`
                 : evolutionLevelA > 0
                   ? 'spin 2s linear infinite'
                   : evolutionLevelB > 0
                     ? 'spinReverse 2s linear infinite'
                     : 'none',
-              boxShadow: unit?.owner === PlayerID.P1 ? '0 0 12px rgba(34, 211, 238, 0.6)' : '0 0 12px rgba(239, 68, 68, 0.6)'
+              boxShadow: isStealthVisual
+                ? '0 0 6px rgba(148, 163, 184, 0.25)'
+                : (unit?.owner === PlayerID.P1 ? '0 0 12px rgba(34, 211, 238, 0.6)' : '0 0 12px rgba(239, 68, 68, 0.6)'),
+              opacity: isStealthVisual ? 0.58 : 1,
+              filter: isStealthVisual ? 'saturate(0.55) brightness(0.9)' : 'none'
             }}
           >
 
-            {flagBurstParticles.length > 0 && unit && !unit.isDead && (
+            {!isStealthVisual && flagBurstParticles.length > 0 && unit && !unit.isDead && (
               <>
                 <div
                   className="absolute pointer-events-none rounded-full z-[170]"
@@ -1279,7 +1286,7 @@ const GridCell: React.FC<GridCellProps> = ({
             </div>
 
             {/* Evolution Accessories - Path A (Blue) */}
-            {evolutionLevelA > 0 && (
+            {!isStealthVisual && evolutionLevelA > 0 && (
               <div className="evolution-accessories-container absolute inset-0 z-[120] pointer-events-none overflow-visible">
                 {/* LV1: 1 accessory at top */}
                 {evolutionLevelA === 1 && (
@@ -1453,7 +1460,7 @@ const GridCell: React.FC<GridCellProps> = ({
             )}
 
             {/* Evolution Accessories - Path B (Orange) */}
-            {evolutionLevelB > 0 && (
+            {!isStealthVisual && evolutionLevelB > 0 && (
               <div className="evolution-accessories-container absolute inset-0 z-[120] pointer-events-none overflow-visible">
                 {/* LV1: 1 accessory at bottom */}
                 {evolutionLevelB === 1 && (
@@ -1639,7 +1646,7 @@ const GridCell: React.FC<GridCellProps> = ({
             )}
 
             {/* Particles */}
-            {particles.map(p => (
+            {!isStealthVisual && particles.map(p => (
               <div
                 key={p.id}
                 className={`evolution-particle ${p.color === 'blue' ? 'evolution-particle-blue' : 'evolution-particle-orange'}`}
