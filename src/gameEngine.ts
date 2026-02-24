@@ -92,20 +92,13 @@ export const calculateOreReward = (
 export const shouldTriggerMine = (
     unit: Unit,
     mine: Mine,
-    player: PlayerState
+    _player: PlayerState
 ): boolean => {
     // 1. Basic Owner Check (Friendly mines don't trigger by default)
     if (mine.owner === unit.owner) return false;
 
     // 2. Specific Immunity Check (e.g. newly placed mines?)
     if (mine.immuneUnitIds?.includes(unit.id)) return false;
-
-    // 3. Maker Flying Logic (Evolution A3-2)
-    const makerLevelA = player.evolutionLevels[UnitType.MAKER].a;
-    const makerVariantA = player.evolutionLevels[UnitType.MAKER].aVariant;
-    if (unit.type === UnitType.MAKER && makerLevelA >= 3 && makerVariantA === 2) {
-        return false;
-    }
 
     return true;
 };

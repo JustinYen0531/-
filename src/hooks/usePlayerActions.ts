@@ -711,6 +711,8 @@ export const usePlayerActions = ({
                 if (unit.type === UnitType.DEFUSER) {
                     chainHitDmg = Math.floor(chainHitDmg * 0.5);
                 }
+                // Keep vulnerability behavior consistent with other mine types.
+                chainHitDmg += (unit.status.mineVulnerability || 0);
                 chainHitDmg = applyFlagAuraDamageReduction(chainHitDmg, unit, state.players[unit.owner], { r, c }).damage;
                 dmg = chainHitDmg;
                 addLog('log_hit_mine', 'mine', { unit: getLocalizedUnitName(unit.type), dmg: chainHitDmg }, unit.owner);
@@ -800,7 +802,10 @@ export const usePlayerActions = ({
                         const inNukeBlastRange = (targetR: number, targetC: number) =>
                             (Math.abs(targetR - mine.r) + Math.abs(targetC - mine.c)) <= 2;
 
-                        newMines = newMines.filter(m => m.owner === mine.owner || !inNukeBlastRange(m.r, m.c));
+                        // Triggered nuke mine should always be consumed after detonation.
+                        newMines = newMines.filter(m =>
+                            m.id !== mine.id && (m.owner === mine.owner || !inNukeBlastRange(m.r, m.c))
+                        );
                         currentBuildings = currentBuildings.filter(b => b.owner === mine.owner || !inNukeBlastRange(b.r, b.c));
                         const allUnits = [...state.players[PlayerID.P1].units, ...state.players[PlayerID.P2].units];
                         allUnits.forEach(targetUnit => {
