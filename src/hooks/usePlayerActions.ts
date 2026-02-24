@@ -15,6 +15,7 @@ import {
 import {
     ENERGY_CAP_RATIO,
     P1_FLAG_POS, P2_FLAG_POS, TURN_TIMER, THINKING_TIMER,
+    MAX_MINES_ON_BOARD,
     EVOLUTION_COSTS, UNIT_STATS, GRID_ROWS, GRID_COLS
 } from '../constants';
 import {
@@ -1348,12 +1349,37 @@ export const usePlayerActions = ({
         const placedMinesCount = ownMines.filter(m => !m.isConverted).length;
         const totalMinesCount = ownMines.length;
 
-        const maxPlacedLimit = (mkrLevelB === 3) ? (mkrVariantB === 2 ? 5 + factories.length * 2 : 8) : 5 + mkrLevelB;
+        const extraSlotsPerFactory = (() => {
+            if (mkrLevelB <= 0) return 0;
+            if (mkrLevelB === 1) return 1;
+            if (mkrLevelB === 2) return 2;
+            if (mkrLevelB === 3 && mkrVariantB === 1) return 3;
+            return 2; // B3-2
+        })();
+        const maxPlacedLimit = MAX_MINES_ON_BOARD + factories.length * extraSlotsPerFactory;
         const maxTotalLimit = (defLevelB === 3 && defVariantB === 1) ? Math.max(maxPlacedLimit + 1, totalMinesCount) : maxPlacedLimit;
 
         if (placedMinesCount >= maxPlacedLimit || totalMinesCount >= (maxTotalLimit)) {
             addLog('log_max_mines', 'error');
             return;
+        }
+
+        // Extra mine slots are provided by workshop bodies.
+        // Once placed mines exceed base 5, there must be enough own mines inside workshop ranges.
+        if (placedMinesCount + 1 > MAX_MINES_ON_BOARD) {
+            const isMineInFactoryRange = (mr: number, mc: number) => factories.some(f => {
+                if (f.level >= 2) {
+                    return Math.abs(f.r - mr) + Math.abs(f.c - mc) <= 2;
+                }
+                return Math.max(Math.abs(f.r - mr), Math.abs(f.c - mc)) <= 1;
+            });
+            const placedMinesInFactoryRange = ownMines.filter(m => !m.isConverted && isMineInFactoryRange(m.r, m.c)).length;
+            const nextPlacedInFactoryRange = placedMinesInFactoryRange + (isInFactoryRange ? 1 : 0);
+            const overflowAfterPlacement = (placedMinesCount + 1) - MAX_MINES_ON_BOARD;
+            if (nextPlacedInFactoryRange < overflowAfterPlacement) {
+                addLog('log_max_mines', 'error');
+                return;
+            }
         }
 
         setGameState(prev => {
