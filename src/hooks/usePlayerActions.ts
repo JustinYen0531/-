@@ -1382,7 +1382,11 @@ export const usePlayerActions = ({
             const variantA = p.evolutionLevels[UnitType.MINESWEEPER].aVariant;
             const towerLimit = (swpLevelA === 3 && variantA === 1) ? 2 : 1;
             const existingTowers = prev.buildings.filter(b => b.owner === unit.owner && b.type === 'tower');
-            if (existingTowers.length >= towerLimit) { addLog('log_max_buildings', 'error'); return prev; }
+            let filteredBuildings = prev.buildings;
+            if (existingTowers.length >= towerLimit) {
+                const toRemove = existingTowers[0];
+                filteredBuildings = filteredBuildings.filter(b => b.id !== toRemove.id);
+            }
 
             const newBuilding: Building = {
                 id: `tower-${unit.owner}-${Date.now()}`,
@@ -1393,7 +1397,7 @@ export const usePlayerActions = ({
             };
             return {
                 ...prev,
-                buildings: [...prev.buildings, newBuilding],
+                buildings: [...filteredBuildings, newBuilding],
                 players: { ...prev.players, [unit.owner]: { ...p, energy: p.energy - cost, units: p.units.map(u => u.id === unit.id ? { ...u, energyUsedThisTurn: u.energyUsedThisTurn + cost } : u) } },
                 lastActionTime: Date.now(), isTimeFrozen: true
             };
@@ -1716,7 +1720,7 @@ export const usePlayerActions = ({
         });
 
         addVFX('scan', r, c, 'small');
-        addLog('log_action_sensor_scan', 'move', { unit: getLocalizedUnitName(unit.type), r, c }, unit.owner);
+        addLog('log_action_sensor_scan', 'move', { unit: getLocalizedUnitName(unit.type), r: r + 1, c: c + 1 }, unit.owner);
         setTargetMode(null);
     }, [gameStateRef, getUnit, checkEnergyCap, addLog, setGameState, addVFX, setTargetMode]);
 

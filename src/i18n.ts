@@ -243,8 +243,8 @@ export const TRANSLATIONS = {
 
     evol_swp_a_r1_detail: "Place [Hunter Outpost]: automatically scans mines in a 3x3 area. Costs 6 energy and lasts 2 turns. Enemies can stand on it and spend 2 energy to dismantle it.",
     evol_swp_a_r2_detail: "Outpost becomes a permanent structure (unless dismantled).",
-    evol_swp_a_r3_1_detail: "Up to 2 outposts can exist at the same time, and placement cost is reduced to 5 energy.",
-    evol_swp_a_r3_2_detail: "Unlock \"Detonation Command\": spend 2 energy to remove all enemy mines in the outpost's range and deal 3 damage to enemies in range, but the outpost is destroyed as well.",
+    evol_swp_a_r3_1_detail: "Up to 2 outposts can exist at the same time, and placement cost is reduced to 5 energy. If at cap, placing a new outpost automatically replaces the oldest one.",
+    evol_swp_a_r3_2_detail: "Unlock \"Detonation Command\": requires at least one enemy mine in outpost range. Spend 2 energy to remove enemy mines in range and deal 3 damage to enemies in range, but the outpost is destroyed as well.",
     evol_swp_b_r1_detail: "Gain a new action: choose a target cell within 5x5 range to reveal the total number of mines in the surrounding 3x3 area as a numeric hint. Costs 5 energy.",
     evol_swp_b_r2_detail: "Also reveals whether the center target cell itself contains a mine (equivalent to a basic center sweep).",
     evol_swp_b_r3_1_detail: "Panoramic Mapping: when used, it also shows mine counts around your current position. Cost is reduced to 4 energy.",
@@ -280,7 +280,7 @@ export const TRANSLATIONS = {
     evol_gen_a_detail: "Tier 1: Remove attack damage bonus and apply +1 mine vulnerability on hit (stack up to +2, permanent until death). Tier 2: Increase attack range by 1 and add +2 move energy cost per step for this turn and the next on hit. Tier 3-1: Can attack while carrying the flag, heal 4 HP on flag attacks, and reduce attack cost to 6. Tier 3-2: Attacks include directional movement and knockback (up to 2 tiles; up to 3-tile forward advance in wall-stop cases).",
     evol_gen_b_detail: "Tier 1: Units behind the flag recover 1 HP each turn. Tier 2: Allies within 5x5 around the flag gain 25% damage reduction. Tier 3-1: All units can carry the flag at a fixed movement cost of 4. Tier 3-2: Enemies entering the 3x3 flag domain take 2 damage (once per sub-turn), and those staying inside take another 4 at turn end.",
 
-    evol_swp_a_detail: "Tier 1: Place a 3x3 auto-scan outpost (cost 6, lasts 2 turns, dismantlable by enemies for 2 energy). Tier 2: Outpost becomes permanent unless dismantled. Tier 3-1: Up to 2 outposts can exist and placement cost drops to 5. Tier 3-2: Detonation Command removes enemy mines in outpost range and deals 3 damage to enemies there, but destroys the outpost.",
+    evol_swp_a_detail: "Tier 1: Place a 3x3 auto-scan outpost (cost 6, lasts 2 turns, dismantlable by enemies for 2 energy). Tier 2: Outpost becomes permanent unless dismantled. Tier 3-1: Up to 2 outposts can exist and placement cost drops to 5; if capped, the oldest outpost is replaced automatically. Tier 3-2: Detonation Command requires at least one enemy mine in outpost range, then removes enemy mines there and deals 3 damage to enemies there, but destroys the outpost.",
     evol_swp_b_detail: "Tier 1: New scan action reveals surrounding 3x3 mine count at a chosen target (cost 5). Tier 2: Also reveals whether the center cell contains a mine. Tier 3-1: Also reveals mine counts around your own position and reduces cost to 4. Tier 3-2: Fully reveals all mines in the target 3x3 area.",
 
     evol_rng_a_detail: "Tier 1: Place a teleport beacon field (Manhattan 2) that reduces ally move cost by 1 (minimum 1), cost 4, dismantlable by enemies for 2 energy. Tier 2: Ranger can teleport to beacon for 0 energy, consuming it. Tier 3-1: Beacon creates anti-scan fog in Manhattan 2. Tier 3-2: All allies can teleport without consuming beacon; cost is 5 for non-Rangers and 3 for Ranger.",
@@ -603,8 +603,8 @@ export const TRANSLATIONS = {
 
     evol_swp_a_r1_detail: "放置【獵尋哨站】：自動偵查 3x3 區域地雷，消耗 6 點能耗，持續 2 回合。敵方站在上面可消耗 2 點能量拆除。",
     evol_swp_a_r2_detail: "哨站變為永久建築(除非遭拆除)。",
-    evol_swp_a_r3_1_detail: "允許場上同時存在 2 座哨站，並減少能量消耗至 5 點。",
-    evol_swp_a_r3_2_detail: "解鎖「爆破指令」：消耗 2 點能耗拆除哨站範圍內的所有敵方地雷，並對範圍內敵方單位造成 3 點傷害，但會同時摧毀哨站。",
+    evol_swp_a_r3_1_detail: "允許場上同時存在 2 座哨站，並減少能量消耗至 5 點。若已達上限，再放置新哨站會自動替換最舊哨站。",
+    evol_swp_a_r3_2_detail: "解鎖「爆破指令」：需先有至少一顆敵方地雷位於哨站範圍內，消耗 2 點能耗拆除範圍內敵方地雷，並對範圍內敵方單位造成 3 點傷害，但會同時摧毀哨站。",
     evol_swp_b_r1_detail: "新增一個行動，可選取 5X5 內的目標點，偵測其周圍 3X3 地雷總數並顯示數字提示，消耗 5 點能量。",
     evol_swp_b_r2_detail: "現在可額外顯示目標點中心是否有地雷(相當於中央使用了基礎掃雷)。",
     evol_swp_b_r3_1_detail: "全景映射：使用此能力時，也會顯示腳下周圍的地雷數，能量消耗減少至 4 點。",
@@ -906,8 +906,8 @@ export const TRANSLATIONS = {
 
     evol_swp_a_r1_detail: "获得新的行动，可在自身位置，可侦查3X3范围的地雷，需要6点能量，两回合自动消失，场上只能有一个。解除办法为敌方任一角色站在其上消耗2点能量，多一个拆除建筑的行动。",
     evol_swp_a_r2_detail: "建筑永不消失，解除办法为敌方任一角色站在其上消耗2点能量，多一个拆除建筑的行动。",
-    evol_swp_a_r3_1_detail: "场上能同时出现两个，并减少能量消耗至5点。",
-    evol_swp_a_r3_2_detail: "若建筑范围内有地雷可花费2点拆除这些炸弹，并对敌方单位造成3点伤害，但同时拆除建筑。",
+    evol_swp_a_r3_1_detail: "场上能同时出现两个，并减少能量消耗至5点。若已达上限，放置新塔会自动替换最旧的塔。",
+    evol_swp_a_r3_2_detail: "需先有至少一颗敌方地雷在建筑范围内，才可花费2点拆除这些地雷，并对范围内敌方单位造成3点伤害，但同时拆除建筑。",
     evol_swp_b_r1_detail: "新增一个行动，可以像经典游戏扫雷者那样，告诉这点周围有多少地雷，但不会说该点是否有地雷，需要5点能量，仅维持一回合。",
     evol_swp_b_r2_detail: "现在可显示该点是否有地雷(相当于中央使用了基础扫雷)。",
     evol_swp_b_r3_1_detail: "现在使用此能力时，也会显示脚下周围的地雷数，能量消耗减少至4点。",
