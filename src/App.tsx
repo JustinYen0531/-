@@ -1825,7 +1825,7 @@ export default function App() {
         const hasEnemyUnitAtTarget = gameState.players[enemyId].units
             .some(u => u.r === r && u.c === c && !u.isDead);
         if (!hasEnemyUnitAtTarget) {
-            addLog('log_throw_requires_enemy', 'info');
+            addLog('log_throw_requires_enemy', 'error');
             return;
         }
         const targetUnitForLog = gameState.players[enemyId].units.find(u => !u.isDead && u.r === r && u.c === c);
