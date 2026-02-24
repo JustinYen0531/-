@@ -1903,7 +1903,7 @@ export default function App() {
                 key: 'log_hit_mine',
                 type: 'mine',
                 params: { unit: t(getUnitNameKey(liveTarget.type)), dmg: primaryDmg },
-                owner: ownerId
+                owner: enemyId
             });
 
             if (thrownMine.type === MineType.SLOW) {
@@ -1922,7 +1922,7 @@ export default function App() {
                         } : u)
                     }
                 };
-                pendingLogs.push({ key: 'log_heavy_steps', type: 'evolution', owner: ownerId });
+                pendingLogs.push({ key: 'log_heavy_steps', type: 'evolution', owner: enemyId });
             } else if (thrownMine.type === MineType.SMOKE) {
                 const smokeIdBase = `throw-smoke-${Date.now()}`;
                 const boardRows = prev.cells.length;
@@ -1942,7 +1942,7 @@ export default function App() {
                         }
                     }
                 }
-                pendingLogs.push({ key: 'log_smoke_deployed', type: 'mine', params: { r: r + 1, c: c + 1 }, owner: ownerId });
+                pendingLogs.push({ key: 'log_smoke_deployed', type: 'error', params: { r: r + 1, c: c + 1 } });
             } else if (thrownMine.type === MineType.CHAIN) {
                 const normalMinesInRange = nextMines.filter(m =>
                     m.type === MineType.NORMAL &&
@@ -1958,7 +1958,7 @@ export default function App() {
                                 key: 'log_chain_aoe',
                                 type: 'mine',
                                 params: { unit: t(getUnitNameKey(u.type)), dmg: aoeDmg },
-                                owner: ownerId
+                                owner: enemyId
                             });
                         }
                     });
