@@ -2507,8 +2507,11 @@ export default function App() {
                 index++;
             }
 
-            // Ghost Steps (Level B2+)
-            if (rngLevelB >= 2) {
+            // Ghost Steps:
+            // - B2 / B3-2: always shown
+            // - B3-1: hidden while already stealthed; shown only when revealed
+            const isB31 = rngLevelB >= 3 && player.evolutionLevels[UnitType.RANGER].bVariant === 1;
+            if (rngLevelB >= 2 && (!isB31 || !unit.status.isStealthed)) {
                 if (actionType === 'stealth') return index;
                 index++;
             }

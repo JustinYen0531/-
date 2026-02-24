@@ -238,7 +238,8 @@ export const useGameLoop = ({
                     (m.owner === unit.owner || m.revealedTo.includes(unit.owner))
                 );
 
-                if (rngLevelB >= 2) {
+                const isB31 = rngLevelB >= 3 && player.evolutionLevels[UnitType.RANGER].bVariant === 1;
+                if (rngLevelB >= 2 && (!isB31 || !unit.status.isStealthed)) {
                     buttons.push({ type: 'stealth', action: 'stealth' });
                 }
                 if (!unit.carriedMine && mineInRange) buttons.push({ type: 'pickup_mine', action: 'pickup_mine' });

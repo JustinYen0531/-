@@ -761,8 +761,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                             );
                                                         }
 
-                                                        // Ghost Steps (Level B2+)
-                                                        if (rngLevelB >= 2) {
+                                                        // Ghost Steps:
+                                                        // - B2 / B3-2: always show toggle button
+                                                        // - B3-1: hide when already stealthed (default stealth), show only after being revealed
+                                                        const isB31 = rngLevelB >= 3 && player.evolutionLevels[UnitType.RANGER].bVariant === 1;
+                                                        const shouldShowStealthButton = rngLevelB >= 2 && (!isB31 || !unit.status.isStealthed);
+                                                        if (shouldShowStealthButton) {
                                                             buttons.push(
                                                                 <div key="ghost_steps" className="flex flex-col items-center gap-1">
                                                                     <button
