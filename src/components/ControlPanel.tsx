@@ -761,10 +761,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                             );
                                                         }
 
-                                                        // Ghost Steps (Level B2 or B3-2)
-                                                        // B3-1 has passive stealth (no button), B3-2 keeps active stealth
-                                                        const rngVariantB = player.evolutionLevels[UnitType.RANGER].bVariant;
-                                                        if (rngLevelB === 2 || (rngLevelB >= 3 && rngVariantB === 2)) {
+                                                        // Ghost Steps (Level B2+)
+                                                        if (rngLevelB >= 2) {
                                                             buttons.push(
                                                                 <div key="ghost_steps" className="flex flex-col items-center gap-1">
                                                                     <button

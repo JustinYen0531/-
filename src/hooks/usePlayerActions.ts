@@ -850,6 +850,10 @@ export const usePlayerActions = ({
         if (unit.type === UnitType.RANGER) {
             qStats.rangerSteps += 1;
         }
+        if (mineTriggered && appliedStatus.isStealthed) {
+            // Triggering a mine should break stealth immediately.
+            appliedStatus = { ...appliedStatus, isStealthed: false };
+        }
         if (unit.hasFlag) {
             qStats.generalFlagSteps += 1;
         }
@@ -888,12 +892,7 @@ export const usePlayerActions = ({
                     hasFlag: unit.hasFlag, hasActedThisRound: false,
                     energyUsedThisTurn: u.energyUsedThisTurn + totalCost,
                     carriedMine: u.carriedMine ? { ...u.carriedMine, r, c } : u.carriedMine,
-                    status: (unit.type === UnitType.RANGER &&
-                        prevPlayerState.evolutionLevels[UnitType.RANGER].b >= 3 &&
-                        prevPlayerState.evolutionLevels[UnitType.RANGER].bVariant === 1 &&
-                        !mineTriggered)
-                        ? { ...appliedStatus, isStealthed: true }
-                        : appliedStatus,
+                    status: appliedStatus,
                     startOfActionEnergy: u.energyUsedThisTurn === 0 ? prevPlayerState.energy : u.startOfActionEnergy,
                     stats: { ...u.stats, stepsTaken: u.stats.stepsTaken + 1, minesTriggered: u.stats.minesTriggered + (mineTriggered ? 1 : 0) }
                 };

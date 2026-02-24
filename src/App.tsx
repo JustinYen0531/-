@@ -2507,9 +2507,8 @@ export default function App() {
                 index++;
             }
 
-            // Ghost Steps (Level B2 or B3-2)
-            const rngVariantB = player.evolutionLevels[UnitType.RANGER].bVariant;
-            if (rngLevelB === 2 || (rngLevelB >= 3 && rngVariantB === 2)) {
+            // Ghost Steps (Level B2+)
+            if (rngLevelB >= 2) {
                 if (actionType === 'stealth') return index;
                 index++;
             }

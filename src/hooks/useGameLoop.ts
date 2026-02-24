@@ -238,6 +238,9 @@ export const useGameLoop = ({
                     (m.owner === unit.owner || m.revealedTo.includes(unit.owner))
                 );
 
+                if (rngLevelB >= 2) {
+                    buttons.push({ type: 'stealth', action: 'stealth' });
+                }
                 if (!unit.carriedMine && mineInRange) buttons.push({ type: 'pickup_mine', action: 'pickup_mine' });
                 if (unit.carriedMine) {
                     if (player.evolutionLevels[UnitType.RANGER].b === 3 && player.evolutionLevels[UnitType.RANGER].bVariant === 2) {
@@ -326,6 +329,7 @@ export const useGameLoop = ({
                     case 'teleport': actions.handleTeleportToHubAction(unit); break;
                     case 'custom_dismantle': actions.handleDisarmAction(unit, unit.r, unit.c); break;
                     case 'detonate_tower': actions.handleDetonateTowerAction(unit); break;
+                    case 'stealth': actions.handleStealth(unit.id); break;
                     case 'throw_mine': setTargetMode('throw_mine'); break;
                     case 'move_mine_start': setTargetMode('move_mine_start'); break;
                     case 'convert_mine': setTargetMode('convert_mine'); break;

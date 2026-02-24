@@ -97,11 +97,6 @@ export const getDisplayCost = (unit: Unit | null, baseCost: number, state: GameS
         }
     }
 
-    // Ranger Enforce Minimum Cost (Before Hub discount)
-    if (unit.type === UnitType.RANGER && actionType === 'move') {
-        cost = Math.max(2, cost);
-    }
-
     // Hub discount applies ONLY to MOVE
     if (actionType === 'move') {
         const hub = state.buildings.find(b => b.owner === unit.owner && b.type === 'hub');
@@ -192,9 +187,7 @@ export const getActionButtonIndex = (actionType: string, unit: Unit | null | und
     } else if (unit.type === UnitType.RANGER) {
         // Stealth (B2) - Prioritize to index 2
         const rngLevelB = player.evolutionLevels[UnitType.RANGER].b;
-        const rngVariantB = player.evolutionLevels[UnitType.RANGER].bVariant;
-        // Re-applying fix: Show Stealth button if Level 2 OR (Level 3 AND Variant 2)
-        if (rngLevelB === 2 || (rngLevelB >= 3 && rngVariantB === 2)) {
+        if (rngLevelB >= 2) {
             if (actionType === 'stealth') return index;
             index++;
         }
