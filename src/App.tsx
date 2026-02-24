@@ -1739,8 +1739,8 @@ export default function App() {
 
             // Tier 2: Hub disappears when Ranger teleports. Tier 3.2: Hub persists? 
             // Description indicates the Lv2 Ranger teleport consumes the hub.
-            const levelA = gameState.players[unit.owner].evolutionLevels[UnitType.RANGER].a;
-            const variantA = gameState.players[unit.owner].evolutionLevels[UnitType.RANGER].aVariant;
+            const levelA = pState.evolutionLevels[UnitType.RANGER].a;
+            const variantA = pState.evolutionLevels[UnitType.RANGER].aVariant;
 
             let shouldDestroyHub = true;
 
@@ -1750,7 +1750,9 @@ export default function App() {
                 shouldDestroyHub = true; // Consumable free teleport
             }
 
-            const newBuildings = shouldDestroyHub ? prev.buildings.filter(b => b.id !== hub.id) : prev.buildings;
+            const newBuildings = shouldDestroyHub
+                ? prev.buildings.filter(b => !(b.owner === pId && b.type === 'hub'))
+                : prev.buildings;
 
             return {
                 ...prev,
@@ -1774,6 +1776,9 @@ export default function App() {
         });
 
         setTargetMode(null);
+        if (!applyingRemoteActionRef.current && roomId && isNetworkConnected) {
+            sendGameStateDeferred('teleport_hub');
+        }
     };
 
     const handleThrowMineAction = (unit: Unit, r: number, c: number) => {
@@ -1802,12 +1807,17 @@ export default function App() {
 
         if (!checkEnergyCap(unit, gameState.players[unit.owner], cost)) return;
 
-        spendEnergy(unit.owner, cost);
-        lockUnit(unit.id);
+        const carriedMine = unit.carriedMine;
 
         setGameState(prev => {
             const p = prev.players[unit.owner];
-            const newUnits = p.units.map(u => u.id === unit.id ? { ...u, carriedMine: null, energyUsedThisTurn: u.energyUsedThisTurn + cost } : u);
+            const newEnergy = p.energy - cost;
+            const newUnits = p.units.map(u => u.id === unit.id ? {
+                ...u,
+                carriedMine: null,
+                energyUsedThisTurn: u.energyUsedThisTurn + cost,
+                startOfActionEnergy: u.energyUsedThisTurn === 0 ? newEnergy : u.startOfActionEnergy,
+            } : u);
 
             // Check for immediate unit damage
             const targetUnits = [
@@ -1817,9 +1827,15 @@ export default function App() {
 
             let newState = {
                 ...prev,
+                activeUnitId: unit.id,
                 players: {
                     ...prev.players,
-                    [unit.owner]: { ...p, units: newUnits }
+                    [unit.owner]: {
+                        ...p,
+                        energy: newEnergy,
+                        startOfActionEnergy: newEnergy,
+                        units: newUnits,
+                    }
                 },
                 lastActionTime: Date.now(),
                 isTimeFrozen: true
@@ -1849,16 +1865,18 @@ export default function App() {
                     addLog('log_hit_mine', 'mine', { unit: getUnitNameKey(tu.type), dmg: loggedDmg }, unit.owner);
                 });
             } else {
-                const newMine: Mine = {
-                    // Preserve mine identity so per-round quest dedupe stays stable.
-                    id: unit.carriedMine!.id,
-                    owner: unit.owner,
-                    type: (unit.carriedMine as any).type,
-                    r, c,
-                    revealedTo: [unit.owner]
-                };
-                newState.mines = [...prev.mines, newMine];
-                newState.sensorResults = clearScanMarksAtCells(prev.sensorResults, [{ r, c }]);
+                if (carriedMine) {
+                    const newMine: Mine = {
+                        // Preserve mine identity so per-round quest dedupe stays stable.
+                        id: carriedMine.id,
+                        owner: unit.owner,
+                        type: carriedMine.type,
+                        r, c,
+                        revealedTo: [unit.owner]
+                    };
+                    newState.mines = [...prev.mines, newMine];
+                    newState.sensorResults = clearScanMarksAtCells(prev.sensorResults, [{ r, c }]);
+                }
             }
 
             return newState;
