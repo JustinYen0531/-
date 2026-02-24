@@ -2790,6 +2790,25 @@ export default function App() {
         }
     }, [sendGameState]);
 
+    const stripCarriedMineMirrors = useCallback((state: GameState): GameState => {
+        const carriedMineIds = new Set<string>();
+        [PlayerID.P1, PlayerID.P2].forEach(pid => {
+            state.players[pid].units.forEach(u => {
+                if (u.carriedMine?.id) {
+                    carriedMineIds.add(u.carriedMine.id);
+                }
+            });
+        });
+        if (carriedMineIds.size === 0) {
+            return state;
+        }
+        const filteredMines = state.mines.filter(m => !carriedMineIds.has(m.id));
+        if (filteredMines.length === state.mines.length) {
+            return state;
+        }
+        return { ...state, mines: filteredMines };
+    }, []);
+
     useEffect(() => {
         if (!roomId || !isNetworkConnected) {
             return;
@@ -3253,33 +3272,33 @@ export default function App() {
                 // CRITICAL: Merge synced state with local UI state to prevent "weird jumps"
                 // This keeps the player's current selection and perspective while updating global board state.
                 setGameState(prev => {
-                    let nextSyncedState = syncedState;
-                    if (syncedState.gameMode === 'pvp' && syncedState.phase === 'placement') {
+                    let nextSyncedState = stripCarriedMineMirrors(syncedState);
+                    if (nextSyncedState.gameMode === 'pvp' && nextSyncedState.phase === 'placement') {
                         // Placement mines are monotonic in setup phase; never let an older sync remove local mines.
                         const mergedPlacementMines = mergePlacementMines(
                             mergePlacementMines(getSetupMines(prev.mines), placementMinesRef.current),
-                            getSetupMines(syncedState.mines)
+                            getSetupMines(nextSyncedState.mines)
                         );
                         placementMinesRef.current = mergedPlacementMines;
                         const p1MineCount = mergedPlacementMines.filter(m => m.owner === PlayerID.P1).length;
                         const p2MineCount = mergedPlacementMines.filter(m => m.owner === PlayerID.P2).length;
                         const mergedReadyState = {
-                            [PlayerID.P1]: (prev.pvpReadyState?.[PlayerID.P1] ?? false) || (syncedState.pvpReadyState?.[PlayerID.P1] ?? false),
-                            [PlayerID.P2]: (prev.pvpReadyState?.[PlayerID.P2] ?? false) || (syncedState.pvpReadyState?.[PlayerID.P2] ?? false),
+                            [PlayerID.P1]: (prev.pvpReadyState?.[PlayerID.P1] ?? false) || (nextSyncedState.pvpReadyState?.[PlayerID.P1] ?? false),
+                            [PlayerID.P2]: (prev.pvpReadyState?.[PlayerID.P2] ?? false) || (nextSyncedState.pvpReadyState?.[PlayerID.P2] ?? false),
                         };
 
                         nextSyncedState = {
-                            ...syncedState,
-                            mines: [...syncedState.mines.filter(m => !m.id.startsWith('pm-')), ...mergedPlacementMines],
+                            ...nextSyncedState,
+                            mines: [...nextSyncedState.mines.filter(m => !m.id.startsWith('pm-')), ...mergedPlacementMines],
                             pvpReadyState: mergedReadyState,
                             players: {
-                                ...syncedState.players,
+                                ...nextSyncedState.players,
                                 [PlayerID.P1]: {
-                                    ...syncedState.players[PlayerID.P1],
+                                    ...nextSyncedState.players[PlayerID.P1],
                                     placementMinesPlaced: p1MineCount
                                 },
                                 [PlayerID.P2]: {
-                                    ...syncedState.players[PlayerID.P2],
+                                    ...nextSyncedState.players[PlayerID.P2],
                                     placementMinesPlaced: p2MineCount
                                 }
                             }

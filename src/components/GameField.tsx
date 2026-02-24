@@ -46,6 +46,11 @@ const GameField: React.FC<GameFieldProps> = ({
 
     const rowCount = gameState.cells.length;
     const colCount = gameState.cells[0]?.length || 0;
+    const carriedMineIds = new Set(
+        [...gameState.players[PlayerID.P1].units, ...gameState.players[PlayerID.P2].units]
+            .map(u => u.carriedMine?.id)
+            .filter((id): id is string => !!id)
+    );
 
     const getUnit = (id: string, state: GameState = gameState) => {
         const p1Unit = state.players[PlayerID.P1].units.find(u => u.id === id);
@@ -178,7 +183,7 @@ const GameField: React.FC<GameFieldProps> = ({
                         );
                         const unit = isVisible ? realUnit : undefined;
 
-                        const minesAtCell = gameState.mines.filter(m => m.r === r && m.c === c);
+                        const minesAtCell = gameState.mines.filter(m => m.r === r && m.c === c && !carriedMineIds.has(m.id));
                         const visibleMine = gameState.sandboxShowAllMines
                             ? minesAtCell[0]
                             : minesAtCell.find(m => m.owner === viewerPlayer) ||
