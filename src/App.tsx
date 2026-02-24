@@ -3865,7 +3865,14 @@ export default function App() {
             const unit = getUnit(state.selectedUnitId);
             if (unit) {
                 if (targetMode === 'teleport') {
-                    // Sandbox Teleport: Move unit anywhere instantly
+                    // Sandbox Drag: keep target constraints aligned with board highlights.
+                    const targetCell = state.cells[r]?.[c];
+                    const hasUnitAtTarget = state.players[PlayerID.P1].units.some(u => u.r === r && u.c === c && !u.isDead) ||
+                        state.players[PlayerID.P2].units.some(u => u.r === r && u.c === c && !u.isDead);
+                    const hasBuildingAtTarget = state.buildings.some(b => b.r === r && b.c === c);
+                    if (!targetCell || targetCell.isObstacle || hasUnitAtTarget || hasBuildingAtTarget) {
+                        return;
+                    }
                     setGameState(prev => {
                         const pId = unit.owner;
                         const pState = prev.players[pId];

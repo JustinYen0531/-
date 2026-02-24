@@ -95,7 +95,8 @@ export const usePlayerActions = ({
         }
     }, [gameStateRef, setGameState, addLog]);
 
-    const startNewRound = useCallback((prevState: GameState) => {
+    const startNewRound = useCallback((stateForRound?: GameState) => {
+        const prevState = stateForRound ?? gameStateRef.current;
         const nextTurn = prevState.turnCount + 1;
         const p1 = prevState.players[PlayerID.P1];
         const p2 = prevState.players[PlayerID.P2];
@@ -403,7 +404,7 @@ export const usePlayerActions = ({
             },
             logs: [{ turn: nextTurn, messageKey: 'log_round_start', params: { round: nextTurn }, type: 'info' as const }, ...newLogs]
         });
-    }, [getUnit, setGameState]);
+    }, [gameStateRef, getUnit, setGameState]);
 
     const handleActionComplete = useCallback((actedUnitId: string | null) => {
         const state = gameStateRef.current;

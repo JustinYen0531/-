@@ -7,7 +7,7 @@ import { getUnitNameKey } from '../gameHelpers';
 interface SandboxPanelProps {
     gameState: GameState;
     setGameState: React.Dispatch<React.SetStateAction<GameState>>;
-    startNewRound: (state: GameState) => void;
+    startNewRound: (state?: GameState) => void;
     language: Language;
     isSandboxCollapsed: boolean;
     setIsSandboxCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
@@ -148,13 +148,18 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
         setGameState(prev => ({
             ...prev,
             isGodMode: !prev.isGodMode,
-            logs: [{ turn: prev.turnCount, messageKey: !prev.isGodMode ? 'God Mode Enabled' : 'God Mode Disabled', params: {}, type: 'info' as const }, ...prev.logs]
+            logs: [{
+                turn: prev.turnCount,
+                messageKey: !prev.isGodMode ? 'log_god_mode_enabled' : 'log_god_mode_disabled',
+                params: {},
+                type: 'info' as const
+            }, ...prev.logs]
         }));
         notifyStateMutated('toggle_god_mode');
     };
 
     const skipToNextRound = () => {
-        startNewRound(gameState);
+        startNewRound();
         notifyStateMutated('new_round');
     };
 
