@@ -1922,7 +1922,7 @@ export default function App() {
                         } : u)
                     }
                 };
-                pendingLogs.push({ key: 'log_heavy_steps', type: 'evolution', owner: enemyId });
+                pendingLogs.push({ key: 'log_heavy_steps', type: 'evolution', owner: ownerId });
             } else if (thrownMine.type === MineType.SMOKE) {
                 const smokeIdBase = `throw-smoke-${Date.now()}`;
                 const boardRows = prev.cells.length;
@@ -1958,7 +1958,7 @@ export default function App() {
                                 key: 'log_chain_aoe',
                                 type: 'mine',
                                 params: { unit: t(getUnitNameKey(u.type)), dmg: aoeDmg },
-                                owner: enemyId
+                                owner: ownerId
                             });
                         }
                     });
