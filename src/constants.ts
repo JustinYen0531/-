@@ -15,11 +15,11 @@ export const THINKING_TIMER = 30; // Seconds for planning phase
 export const PLACEMENT_MINE_LIMIT = 3; // New: Limit for setup mines
 export const MAX_MINES_ON_BOARD = 5; // Rule 3: Max 5 mines per player
 
-export const EVOLUTION_COST = 40; // High energy cost for evolution
+export const EVOLUTION_COST = 10; // Flat evolution cost
 export const EVOLUTION_COSTS = {
-  0: 10,  // LV0 → LV1
-  1: 20,  // LV1 → LV2
-  2: 30   // LV2 → LV3
+  0: 10,  // LV0 ??LV1
+  1: 10,  // LV1 ??LV2
+  2: 10   // LV2 ??LV3
 } as const;
 
 export const UNIT_STATS = {
