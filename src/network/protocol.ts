@@ -103,6 +103,7 @@ export interface ReadyPayload {
     playerId: PlayerID;
     phase: ReadyPhase;
     setupMines?: ReadySetupMine[];
+    energyBid?: number;
 }
 
 export interface StateSyncPayload {

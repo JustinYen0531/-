@@ -240,21 +240,10 @@ const applyProjectedAction = (
         const targetCell = action.target;
         const enemy = opposite(actingPlayer);
         const target = next.players[enemy].units.find(u => !u.isDead && u.r === targetCell.r && u.c === targetCell.c);
-        if (target) {
-            const newHp = Math.max(0, target.hp - MINE_DAMAGE);
-            target.hp = newHp;
-            target.isDead = newHp === 0;
-            unit.carriedMine = null;
-            return next;
-        }
-        next.mines.push({
-            id: `sim-throw-${unit.id}-${targetCell.r}-${targetCell.c}`,
-            type: unit.carriedMine?.type ?? MineType.NORMAL,
-            owner: actingPlayer,
-            r: targetCell.r,
-            c: targetCell.c,
-            revealedTo: [actingPlayer]
-        });
+        if (!target) return next;
+        const newHp = Math.max(0, target.hp - MINE_DAMAGE);
+        target.hp = newHp;
+        target.isDead = newHp === 0;
         unit.carriedMine = null;
         return next;
     }

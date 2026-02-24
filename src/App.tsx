@@ -86,6 +86,7 @@ const LOG_SFX_MAP: Partial<Record<string, { sound: SfxName; cooldownMs?: number;
     log_skip_turn: { sound: 'click', cooldownMs: 60, volume: 0.7 },
     log_pass_turn: { sound: 'click', cooldownMs: 60, volume: 0.7 },
     log_place_mine: { sound: 'place_mine', cooldownMs: 120, volume: 0.9 },
+    log_throw_mine: { sound: 'place_mine', cooldownMs: 120, volume: 0.9 },
     log_mine_placed: { sound: 'place_mine', cooldownMs: 120, volume: 0.9 },
     log_mine_disarmed: { sound: 'click', cooldownMs: 120, volume: 0.8 },
     log_pickup_mine: { sound: 'click', cooldownMs: 120, volume: 0.85 },
@@ -1472,22 +1473,24 @@ export default function App() {
 
             setGameState(prev => {
                 const p = prev.players[unit.owner];
+                const liveUnit = p.units.find(u => u.id === unit.id);
+                if (!liveUnit || !liveUnit.carriedMine) return prev;
                 const newUnits = p.units.map(u => u.id === unit.id ? { ...u, carriedMine: null } : u);
 
                 const newMine: Mine = {
                     // Preserve mine identity across pickup/drop in the same match.
-                    id: unit.carriedMine!.id,
+                    id: liveUnit.carriedMine.id,
                     owner: unit.owner,
-                    type: unit.carriedMine!.type,
-                    r: unit.r,
-                    c: unit.c,
+                    type: liveUnit.carriedMine.type,
+                    r: liveUnit.r,
+                    c: liveUnit.c,
                     revealedTo: [unit.owner]
                 };
 
                 return {
                     ...prev,
                     mines: [...prev.mines, newMine],
-                    sensorResults: clearScanMarksAtCells(prev.sensorResults, [{ r: unit.r, c: unit.c }]),
+                    sensorResults: clearScanMarksAtCells(prev.sensorResults, [{ r: liveUnit.r, c: liveUnit.c }]),
                     players: {
                         ...prev.players,
                         [unit.owner]: { ...p, units: newUnits }
@@ -1498,6 +1501,9 @@ export default function App() {
             });
             addLog('log_place_mine', 'move', { r: unit.r + 1, c: unit.c + 1 }, unit.owner);
             lockUnit(unit.id);
+            if (canBroadcastAction(unit.owner) && roomId) {
+                sendGameStateDeferred('ranger_drop_mine');
+            }
         }
     };
 
@@ -1559,7 +1565,7 @@ export default function App() {
                 qStats.rangerMinesMovedThisRound.add(mine.id);
             }
 
-            const newUnits = p.units.map(u => u.id === liveUnit.id ? { ...u, carriedMine: mine, carriedMineRevealed: true } : u);
+            const newUnits = p.units.map(u => u.id === liveUnit.id ? { ...u, carriedMine: mine, carriedMineRevealed: false } : u);
 
             return {
                 ...prev,
@@ -1580,32 +1586,37 @@ export default function App() {
         addLog('log_pickup_mine', 'move', { r: r + 1, c: c + 1 }, unit.owner);
         lockUnit(pickedUnitId);
         setTargetMode(null);
+        if (canBroadcastAction(unit.owner) && roomId) {
+            sendGameStateDeferred('ranger_pickup_mine');
+        }
     };
 
-    const handleStealthAction = (unitId: string) => {
-        const unit = getUnit(unitId);
+    const handleStealthAction = (
+        unitId: string,
+        origin: 'local' | 'remote' = 'local'
+    ) => {
+        const state = gameStateRef.current;
+        const unit = getUnit(unitId, state);
         if (!unit) return;
+        const stealthCost = 3;
+        const isActivatingStealth = !unit.status.isStealthed;
+        const player = state.players[unit.owner];
 
-        // Toggle off if already stealthed (No cost)
-        if (unit.status.isStealthed) {
-            setGameState(prev => {
-                const p = prev.players[unit.owner];
-                const updatedUnits = p.units.map(u => u.id === unitId ? {
-                    ...u,
-                    status: { ...u.status, isStealthed: false }
-                } : u);
-                return {
-                    ...prev,
-                    players: { ...prev.players, [unit.owner]: { ...p, units: updatedUnits } }
-                };
-            });
-            return;
+        if (isActivatingStealth) {
+            if (player.energy < stealthCost) {
+                addLog('log_low_energy', 'info', { cost: stealthCost });
+                return;
+            }
+            if (!checkEnergyCap(unit, player, stealthCost)) {
+                return;
+            }
         }
 
         setGameState(prev => {
             const p = prev.players[unit.owner];
             const updatedUnits = p.units.map(u => u.id === unitId ? {
                 ...u,
+                energyUsedThisTurn: isActivatingStealth ? (u.energyUsedThisTurn + stealthCost) : u.energyUsedThisTurn,
                 status: { ...u.status, isStealthed: !u.status.isStealthed }
             } : u);
 
@@ -1613,12 +1624,25 @@ export default function App() {
                 ...prev,
                 players: {
                     ...prev.players,
-                    [unit.owner]: { ...p, units: updatedUnits }
+                    [unit.owner]: {
+                        ...p,
+                        energy: isActivatingStealth ? (p.energy - stealthCost) : p.energy,
+                        units: updatedUnits
+                    }
                 },
                 lastActionTime: Date.now(),
                 isTimeFrozen: true
             };
         });
+
+        if (isActivatingStealth) {
+            addLog('log_stealth_activated', 'move', { unit: t(getUnitNameKey(unit.type)) }, unit.owner);
+        }
+
+        const shouldBroadcast = origin === 'local' && canBroadcastAction(unit.owner) && !!roomId;
+        if (shouldBroadcast) {
+            sendGameStateDeferred('stealth_toggle');
+        }
     };
 
 
@@ -1796,94 +1820,158 @@ export default function App() {
             return;
         }
 
-        const hasEnemyUnitAtTarget = gameState.players[PlayerID.P1].units
-            .concat(gameState.players[PlayerID.P2].units)
-            .some(u => u.r === r && u.c === c && !u.isDead && u.owner !== unit.owner);
-        const hasMineAtTarget = gameState.mines.some(m => m.r === r && m.c === c);
-        if (!hasEnemyUnitAtTarget && hasMineAtTarget) {
-            addLog('log_space_has_mine', 'info');
+        const enemyId = unit.owner === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
+        const hasEnemyUnitAtTarget = gameState.players[enemyId].units
+            .some(u => u.r === r && u.c === c && !u.isDead);
+        if (!hasEnemyUnitAtTarget) {
+            addLog('log_throw_requires_enemy', 'info');
             return;
         }
 
         if (!checkEnergyCap(unit, gameState.players[unit.owner], cost)) return;
 
-        const carriedMine = unit.carriedMine;
+        const mineBaseDamageByType: Record<MineType, number> = {
+            [MineType.NORMAL]: MINE_DAMAGE,
+            [MineType.SLOW]: 4,
+            [MineType.SMOKE]: 7,
+            [MineType.CHAIN]: 6,
+            [MineType.NUKE]: 12
+        };
 
         setGameState(prev => {
-            const p = prev.players[unit.owner];
-            const newEnergy = p.energy - cost;
-            const newUnits = p.units.map(u => u.id === unit.id ? {
-                ...u,
-                carriedMine: null,
-                energyUsedThisTurn: u.energyUsedThisTurn + cost,
-                startOfActionEnergy: u.energyUsedThisTurn === 0 ? newEnergy : u.startOfActionEnergy,
-            } : u);
+            const ownerId = unit.owner;
+            const enemyId = ownerId === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
+            const ownerState = prev.players[ownerId];
+            const liveThrower = ownerState.units.find(u => u.id === unit.id);
+            if (!liveThrower || !liveThrower.carriedMine) return prev;
 
-            // Check for immediate unit damage
-            const targetUnits = [
-                ...prev.players[PlayerID.P1].units,
-                ...prev.players[PlayerID.P2].units
-            ].filter(u => u.r === r && u.c === c && !u.isDead && u.owner !== unit.owner);
+            const liveTarget = prev.players[enemyId].units.find(u => !u.isDead && u.r === r && u.c === c);
+            if (!liveTarget) return prev;
 
-            let newState = {
-                ...prev,
-                activeUnitId: unit.id,
-                players: {
-                    ...prev.players,
-                    [unit.owner]: {
-                        ...p,
-                        energy: newEnergy,
-                        startOfActionEnergy: newEnergy,
-                        units: newUnits,
+            const thrownMine = liveThrower.carriedMine;
+            const newEnergy = ownerState.energy - cost;
+
+            let nextPlayers = {
+                ...prev.players,
+                [ownerId]: {
+                    ...ownerState,
+                    energy: newEnergy,
+                    startOfActionEnergy: newEnergy,
+                    units: ownerState.units.map(u => u.id === liveThrower.id ? {
+                        ...u,
+                        carriedMine: null,
+                        energyUsedThisTurn: u.energyUsedThisTurn + cost,
+                        startOfActionEnergy: u.energyUsedThisTurn === 0 ? newEnergy : u.startOfActionEnergy,
+                    } : u)
+                }
+            };
+            let nextMines = [...prev.mines];
+            let nextBuildings = [...prev.buildings];
+            let nextSmokes = [...prev.smokes];
+
+            const applyDamageToUnit = (pid: PlayerID, unitId: string, baseDmg: number, hitR: number, hitC: number) => {
+                const targetPlayer = nextPlayers[pid];
+                const targetUnit = targetPlayer.units.find(u => u.id === unitId);
+                if (!targetUnit || targetUnit.isDead) return;
+                const dmg = applyFlagAuraDamageReduction(baseDmg, targetUnit, targetPlayer, { r: hitR, c: hitC }).damage;
+                const newHp = Math.max(0, targetUnit.hp - dmg);
+                const isDead = newHp === 0;
+                nextPlayers = {
+                    ...nextPlayers,
+                    [pid]: {
+                        ...targetPlayer,
+                        units: targetPlayer.units.map(u => u.id === unitId ? {
+                            ...u,
+                            hp: newHp,
+                            isDead,
+                            respawnTimer: (isDead && u.type !== UnitType.GENERAL) ? (prev.turnCount <= 10 ? 2 : 3) : u.respawnTimer
+                        } : u)
                     }
-                },
+                };
+            };
+
+            const primaryBase = Math.floor((mineBaseDamageByType[thrownMine.type] ?? MINE_DAMAGE) * 0.5);
+            applyDamageToUnit(enemyId, liveTarget.id, primaryBase, r, c);
+
+            if (thrownMine.type === MineType.SLOW) {
+                const targetPlayer = nextPlayers[enemyId];
+                nextPlayers = {
+                    ...nextPlayers,
+                    [enemyId]: {
+                        ...targetPlayer,
+                        units: targetPlayer.units.map(u => u.id === liveTarget.id ? {
+                            ...u,
+                            status: {
+                                ...u.status,
+                                moveCostDebuff: Math.max(u.status.moveCostDebuff ?? 0, 2),
+                                moveCostDebuffDuration: Math.max(u.status.moveCostDebuffDuration ?? 0, 2)
+                            }
+                        } : u)
+                    }
+                };
+            } else if (thrownMine.type === MineType.SMOKE) {
+                const smokeIdBase = `throw-smoke-${Date.now()}`;
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        const nr = r + dr;
+                        const nc = c + dc;
+                        if (nr >= 0 && nr < GRID_ROWS && nc >= 0 && nc < GRID_COLS) {
+                            nextSmokes.push({
+                                id: `${smokeIdBase}-${dr}-${dc}`,
+                                r: nr,
+                                c: nc,
+                                owner: ownerId,
+                                duration: 3
+                            });
+                        }
+                    }
+                }
+            } else if (thrownMine.type === MineType.CHAIN) {
+                const normalMinesInRange = nextMines.filter(m =>
+                    m.type === MineType.NORMAL &&
+                    Math.abs(m.r - r) <= 2 &&
+                    Math.abs(m.c - c) <= 2
+                );
+                const enemyUnits = nextPlayers[enemyId].units.filter(u => !u.isDead);
+                normalMinesInRange.forEach(nm => {
+                    enemyUnits.forEach(u => {
+                        if (Math.abs(u.r - nm.r) + Math.abs(u.c - nm.c) <= 2) {
+                            applyDamageToUnit(enemyId, u.id, Math.floor(8 * 0.5), u.r, u.c);
+                        }
+                    });
+                });
+                nextMines = nextMines.filter(m => !normalMinesInRange.some(nm => nm.id === m.id));
+            } else if (thrownMine.type === MineType.NUKE) {
+                const inBlast = (rr: number, cc: number) => (Math.abs(rr - r) + Math.abs(cc - c)) <= 2;
+                nextMines = nextMines.filter(m => m.owner === ownerId || !inBlast(m.r, m.c));
+                nextBuildings = nextBuildings.filter(b => b.owner === ownerId || !inBlast(b.r, b.c));
+                [PlayerID.P1, PlayerID.P2].forEach(pid => {
+                    nextPlayers[pid].units
+                        .filter(u => !u.isDead && u.id !== liveTarget.id && inBlast(u.r, u.c))
+                        .forEach(u => {
+                            const baseBlastDmg = pid === ownerId ? 3 : 6;
+                            applyDamageToUnit(pid, u.id, baseBlastDmg, u.r, u.c);
+                        });
+                });
+            }
+
+            return {
+                ...prev,
+                activeUnitId: liveThrower.id,
+                players: nextPlayers,
+                mines: nextMines,
+                buildings: nextBuildings,
+                smokes: nextSmokes,
                 lastActionTime: Date.now(),
                 isTimeFrozen: true
             };
-
-            if (targetUnits.length > 0) {
-                targetUnits.forEach(tu => {
-                    const baseDmg = Math.floor(MINE_DAMAGE * 0.5);
-                    const targetPId = tu.owner;
-                    const targetP = newState.players[targetPId];
-                    const damagedUnits = targetP.units.map(u => {
-                        if (u.id === tu.id) {
-                            const dmg = applyFlagAuraDamageReduction(baseDmg, u, newState.players[targetPId]).damage;
-                            const newHp = Math.max(0, u.hp - dmg);
-                            const isDead = newHp === 0;
-                            return {
-                                ...u,
-                                hp: newHp,
-                                isDead,
-                                respawnTimer: (isDead && u.type !== UnitType.GENERAL) ? (prev.turnCount <= 10 ? 2 : 3) : 0
-                            };
-                        }
-                        return u;
-                    });
-                    newState.players[targetPId] = { ...targetP, units: damagedUnits };
-                    const loggedDmg = applyFlagAuraDamageReduction(baseDmg, tu, newState.players[targetPId]).damage;
-                    addLog('log_hit_mine', 'mine', { unit: getUnitNameKey(tu.type), dmg: loggedDmg }, unit.owner);
-                });
-            } else {
-                if (carriedMine) {
-                    const newMine: Mine = {
-                        // Preserve mine identity so per-round quest dedupe stays stable.
-                        id: carriedMine.id,
-                        owner: unit.owner,
-                        type: carriedMine.type,
-                        r, c,
-                        revealedTo: [unit.owner]
-                    };
-                    newState.mines = [...prev.mines, newMine];
-                    newState.sensorResults = clearScanMarksAtCells(prev.sensorResults, [{ r, c }]);
-                }
-            }
-
-            return newState;
         });
 
-        addLog('log_place_mine', 'move', { r: r + 1, c: c + 1 }, unit.owner);
+        addLog('log_throw_mine', 'move', { r: r + 1, c: c + 1 }, unit.owner);
         setTargetMode(null);
+        if (canBroadcastAction(unit.owner) && roomId) {
+            sendGameStateDeferred('throw_mine');
+        }
     };
 
     const handlePlaceFactoryAction = (unit: Unit, r: number, c: number) => {

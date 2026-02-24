@@ -421,8 +421,7 @@ export const generateActionCandidatesForUnit = (
                             if (!inBounds(rr, cc)) continue;
                             if (manhattan(unit.r, unit.c, rr, cc) > 2) continue;
                             const hasEnemyUnit = state.players[enemyId].units.some(u => !u.isDead && u.r === rr && u.c === cc);
-                            const hasMine = state.mines.some(m => m.r === rr && m.c === cc);
-                            if (!hasEnemyUnit && hasMine) continue;
+                            if (!hasEnemyUnit) continue;
                             const target = { kind: 'cell' as const, r: rr, c: cc };
                             const scoreBreakdown = evaluateActionCandidate(state, unit, 'throw_mine', target, difficulty, throwCost, unit.carriedMine.type, context);
                             throwCandidates.push({

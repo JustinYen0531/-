@@ -447,7 +447,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                     ? 'bg-slate-950 border-slate-500 shadow-lg shadow-slate-900/50 text-white scale-105'
                                                                     : 'bg-slate-900/60 hover:bg-slate-800/80 border-slate-600 text-slate-300';
                                                             }
-                                                            return targetMode === 'move' && !endTurnConfirm && (!u?.status.isStealthed)
+                                                            return targetMode === 'move' && !endTurnConfirm
                                                                 ? 'bg-emerald-600 shadow-lg shadow-emerald-500/50 scale-105 border-emerald-400 text-white'
                                                                 : 'bg-emerald-900/40 hover:bg-emerald-800/60 border-emerald-800/50 text-emerald-100/70';
                                                         })()}`}
@@ -783,7 +783,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                                                         <Ghost size={28} />
                                                                         <span className="text-xs">{unit.status.isStealthed ? t('cancel') : t('evol_rng_b_r2')}</span>
                                                                     </button>
-                                                                    <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> 0</div>
+                                                                    <div className="bg-slate-800 rounded px-2 py-1 flex items-center gap-1 text-xs font-bold text-white"><Zap size={12} className="text-yellow-400" /> {unit.status.isStealthed ? 0 : 3}</div>
                                                                 </div>
                                                             );
                                                         }

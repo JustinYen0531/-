@@ -951,7 +951,7 @@ export const usePlayerActions = ({
                 ...qStats // Includes rangerSteps, generalFlagSteps, defuserMinesSoaked
             };
 
-            // Clear carriedMineRevealed after the first move post-pickup
+            // Keep carried mine visibility private by default.
             finalPState = {
                 ...finalPState,
                 units: finalPState.units.map((u: Unit) =>
@@ -1645,8 +1645,20 @@ export const usePlayerActions = ({
         const state = gameStateRef.current;
         const unit = getUnit(unitId, state);
         if (!unit) return;
+        const stealthCost = 3;
+        const isActivatingStealth = !unit.status.isStealthed;
+        const player = state.players[unit.owner];
 
-        // Match App.tsx behavior: stealth toggle has no energy cost.
+        if (isActivatingStealth) {
+            if (player.energy < stealthCost) {
+                addLog('log_low_energy', 'info', { cost: stealthCost });
+                return;
+            }
+            if (!checkEnergyCap(unit, player, stealthCost)) {
+                return;
+            }
+        }
+
         setGameState(prev => {
             const p = prev.players[unit.owner];
             return {
@@ -1655,8 +1667,10 @@ export const usePlayerActions = ({
                     ...prev.players,
                     [unit.owner]: {
                         ...p,
+                        energy: isActivatingStealth ? (p.energy - stealthCost) : p.energy,
                         units: p.units.map(u => u.id === unitId ? {
                             ...u,
+                            energyUsedThisTurn: isActivatingStealth ? (u.energyUsedThisTurn + stealthCost) : u.energyUsedThisTurn,
                             status: { ...u.status, isStealthed: !u.status.isStealthed }
                         } : u)
                     }
@@ -1665,7 +1679,10 @@ export const usePlayerActions = ({
                 isTimeFrozen: true
             };
         });
-    }, [gameStateRef, getUnit, setGameState]);
+        if (isActivatingStealth) {
+            addLog('log_stealth_activated', 'move', { unit: getLocalizedUnitName(unit.type) }, unit.owner);
+        }
+    }, [gameStateRef, getLocalizedUnitName, getUnit, setGameState, addLog, checkEnergyCap]);
 
     const handleSensorScan = useCallback((unitId: string, r: number, c: number) => {
         const state = gameStateRef.current;

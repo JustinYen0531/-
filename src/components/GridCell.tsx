@@ -283,9 +283,17 @@ const GridCell: React.FC<GridCellProps> = ({
     } else if ((targetMode === 'place_tower' || targetMode === 'place_hub' || targetMode === 'place_factory') && manhattanDist === 0) {
       isInActionRange = true;
       actionRangeColor = targetMode === 'place_tower' ? 'cell-range-orange' : targetMode === 'place_factory' ? 'cell-range-cyan' : 'cell-range-indigo';
-    } else if (targetMode === 'throw_mine' && manhattanDist <= 2 && !cell.isObstacle && !building && !mine && !unit) {
-      isInActionRange = true;
+    } else if (targetMode === 'throw_mine' && manhattanDist <= 2) {
+      isInActionScope = true;
       actionRangeColor = 'cell-range-purple';
+      const hasEnemyUnitAtTarget = !!unit && unit.owner !== currentPlayer && !unit.isDead;
+      const isExecutableThrowTarget =
+        !cell.isObstacle &&
+        !building &&
+        hasEnemyUnitAtTarget;
+      if (isExecutableThrowTarget) {
+        isInActionRange = true;
+      }
     } else if (targetMode === 'teleport' && !cell.isObstacle && !unit && !building) {
       isInActionRange = true;
       actionRangeColor = 'cell-range-amber';

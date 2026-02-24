@@ -59,7 +59,7 @@ export interface Unit {
   respawnTimer: number;
   hasFlag: boolean;
   carriedMine?: Mine | null;
-  carriedMineRevealed?: boolean; // true until the Ranger moves after pickup
+  carriedMineRevealed?: boolean; // Whether carried mine information is visible to enemy UI
   status: UnitStatus;
   stats: {
     kills: number;
@@ -209,5 +209,9 @@ export interface GameState {
   pvpReadyState?: {
     [PlayerID.P1]: boolean;
     [PlayerID.P2]: boolean;
+  };
+  pvpEnergyBids?: {
+    [PlayerID.P1]: number;
+    [PlayerID.P2]: number;
   };
 }
