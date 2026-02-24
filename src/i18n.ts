@@ -256,7 +256,7 @@ export const TRANSLATIONS = {
     evol_rng_a_r3_2_detail: "All allies can teleport to the beacon, and teleporting no longer consumes it. Non-Rangers pay 5 energy; Ranger teleport cost is reduced to 3.",
     evol_rng_b_r1_detail: "Ranger pickup range increases to Manhattan distance 2.",
     evol_rng_b_r2_detail: "Ranger gains a stealth action: activation costs 3 energy, and stealth movement costs 3 energy per tile. Enemies cannot see Ranger movement unless a mine is triggered.",
-    evol_rng_b_r3_1_detail: "Remove the active stealth skill. Ranger's default movement becomes stealth, with movement cost reduced to 2 energy.",
+    evol_rng_b_r3_1_detail: "Remove the active stealth skill button. Ranger enters passive permanent stealth; movement costs 2 energy, and mine triggers no longer reveal Ranger.",
     evol_rng_b_r3_2_detail: "Ranger gains a new action to throw a carried mine at an enemy unit within Manhattan distance 2 (cannot target empty tiles). On hit, it deals 50% damage and applies the thrown mine's special effect. Costs 5 energy.",
 
     evol_mkr_a_r1_detail: "Unlock Slow Mine: deals 4 damage, and the triggered unit gets +2 move energy cost for this turn and next turn. Costs 4 energy.",
@@ -284,7 +284,7 @@ export const TRANSLATIONS = {
     evol_swp_b_detail: "Tier 1: New scan action reveals surrounding 3x3 mine count at a chosen target (cost 5). Tier 2: Also reveals whether the center cell contains a mine. Tier 3-1: Also reveals mine counts around your own position and reduces cost to 4. Tier 3-2: Fully reveals all mines in the target 3x3 area.",
 
     evol_rng_a_detail: "Tier 1: Place a teleport beacon field (Manhattan 2) that reduces ally move cost by 1 (minimum 1), cost 4, dismantlable by enemies for 2 energy. Tier 2: Ranger can teleport to beacon for 0 energy, consuming it. Tier 3-1: Beacon creates anti-scan fog in Manhattan 2. Tier 3-2: All allies can teleport without consuming beacon; cost is 5 for non-Rangers and 3 for Ranger.",
-    evol_rng_b_detail: "Tier 1: Ranger pickup range increases to Manhattan 2. Tier 2: Ranger unlocks active stealth movement (activation cost 3, movement cost 3 per tile, hidden unless mine-triggered). Tier 3-1: Default movement becomes stealth at 2 energy. Tier 3-2: Ranger can throw carried mines only at enemy units within Manhattan 2 (not empty tiles), dealing 50% damage and applying the thrown mine's special effect (cost 5).",
+    evol_rng_b_detail: "Tier 1: Ranger pickup range increases to Manhattan 2. Tier 2: Ranger unlocks active stealth movement (activation cost 3, movement cost 3 per tile, hidden unless mine-triggered). Tier 3-1: Active stealth button is removed; Ranger gains passive permanent stealth at 2 move energy and is not revealed by mine triggers. Tier 3-2: Ranger can throw carried mines only at enemy units within Manhattan 2 (not empty tiles), dealing 50% damage and applying the thrown mine's special effect (cost 5).",
 
     evol_mkr_a_detail: "Tier 1: Unlock Slow Mine (4 damage, +2 move energy cost this and next turn, cost 4). Tier 2: Unlock Smoke Mine (7 damage, 3x3 fog for 3 turns, cost 6). Tier 3-1: Unlock Chain Mine (6 single-tile trigger plus chain detonations dealing 8 AoE within Manhattan 2, cost 7). Tier 3-2: Unlock Ultimate Mine (12 damage, enemy-proximity 3x3 trigger, Manhattan-distance-2 blast with half friendly fire, destroys enemy mines/buildings, cost 9).",
     evol_mkr_b_detail: "Tier 1: Unlock Autonomous Workshop; mine cap becomes 5+1 (extra mine must be in workshop 3x3), cost 6, dismantlable by enemies for 2 energy. Tier 2: Supports special mines and expands to Manhattan 2, cap becomes 5+2. Tier 3-1: Near-workshop mine placement costs 3 energy, cap becomes 5+3. Tier 3-2: Up to 2 workshops; mine cap becomes 5+2+2.",
@@ -618,7 +618,7 @@ export const TRANSLATIONS = {
     evol_rng_a_r3_2_detail: "所有隊友皆可傳送至道標，且不會使建築消失。非遊俠傳送能耗為 5，遊俠傳送能耗減至 3。",
     evol_rng_b_r1_detail: "遊俠的拾取範圍加至曼哈頓距離為2。",
     evol_rng_b_r2_detail: "遊俠獲得新能力：啟用隱身消耗 3 點能量，隱身移動每格再消耗 3 點；敵人完全看不到遊俠行動，除非踩到炸彈。",
-    evol_rng_b_r3_1_detail: "刪除該能力，遊俠預設行動即為隱形，能量消耗為2。",
+    evol_rng_b_r3_1_detail: "移除主動隱形按鈕。遊俠改為被動永久隱形，移動能耗為 2，且被地雷觸發也不會顯形。",
     evol_rng_b_r3_2_detail: "遊俠獲得新能力，可將手持地雷投擲至曼哈頓距離 2 內的敵方單位（不可投擲空地），命中後造成 50% 傷害，並造成該特殊地雷效果，能量消耗為 5。",
 
     evol_mkr_a_r1_detail: "解鎖減速雷：傷害 4，踩到後該角色此回合和下回合移動能量消耗 +2，能量消耗 4 點。",
@@ -923,7 +923,7 @@ export const TRANSLATIONS = {
     evol_rng_a_r3_2_detail: "所有角色皆能传送至传送点，且不会使建筑消失，非游侠角色需要5点，游侠本身能耗减少至3。",
     evol_rng_b_r1_detail: "游侠的拾取范围加至曼哈顿距离为2。",
     evol_rng_b_r2_detail: "游侠获得新能力：启用隐身消耗 3 点能量，隐身移动每格再消耗 3 点；敌人完全看不到游侠行动，除非踩到炸弹。",
-    evol_rng_b_r3_1_detail: "删除该能力，游侠预设行动即为隐形，能量消耗为2。",
+    evol_rng_b_r3_1_detail: "移除主动隐形按钮。游侠改为被动永久隐形，移动能耗为 2，且被地雷触发也不会显形。",
     evol_rng_b_r3_2_detail: "游侠获得新能力，可将手持地雷投掷到曼哈顿距离 2 内的敌方单位（不可投掷空地），命中后造成 50% 伤害，并造成该特殊地雷效果，能量消耗为 5。",
 
     evol_mkr_a_r1_detail: "解锁减速雷：伤害 4，踩到后该角色此回合和下回合移动能量消耗 +2，能量消耗 4 点。",

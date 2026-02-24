@@ -188,7 +188,7 @@ export const getActionButtonIndex = (actionType: string, unit: Unit | null | und
         // Stealth (B2) - Prioritize to index 2
         const rngLevelB = player.evolutionLevels[UnitType.RANGER].b;
         const isB31 = rngLevelB >= 3 && player.evolutionLevels[UnitType.RANGER].bVariant === 1;
-        if (rngLevelB >= 2 && (!isB31 || !unit.status.isStealthed)) {
+        if (rngLevelB >= 2 && !isB31) {
             if (actionType === 'stealth') return index;
             index++;
         }

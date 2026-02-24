@@ -2508,10 +2508,10 @@ export default function App() {
             }
 
             // Ghost Steps:
-            // - B2 / B3-2: always shown
-            // - B3-1: hidden while already stealthed; shown only when revealed
+            // - B2 / B3-2: active stealth toggle
+            // - B3-1: passive permanent stealth, no toggle action
             const isB31 = rngLevelB >= 3 && player.evolutionLevels[UnitType.RANGER].bVariant === 1;
-            if (rngLevelB >= 2 && (!isB31 || !unit.status.isStealthed)) {
+            if (rngLevelB >= 2 && !isB31) {
                 if (actionType === 'stealth') return index;
                 index++;
             }
