@@ -68,6 +68,7 @@ interface GridCellProps {
   phase: 'placement' | 'thinking' | 'action';
   unit?: Unit;
   mine?: Mine;
+  hasMineAtCell?: boolean;
   scanMarkSuccess?: boolean | null;
   building?: Building;
   isSelected: boolean;
@@ -108,6 +109,7 @@ const GridCell: React.FC<GridCellProps> = ({
   phase,
   unit,
   mine,
+  hasMineAtCell = false,
   scanMarkSuccess = null,
   building,
   isSelected,
@@ -385,7 +387,7 @@ const GridCell: React.FC<GridCellProps> = ({
         !!unit &&
         unit.owner !== currentPlayer &&
         !unit.isDead;
-      if (dr + dc <= 2 && !cell.isObstacle && !building && !mine && (!unit || isEnemyDamageTarget)) {
+      if (dr + dc <= 2 && !cell.isObstacle && !building && !hasMineAtCell && (!unit || isEnemyDamageTarget)) {
         isInActionRange = true;
         actionRangeColor = 'cell-range-rose';
       }

@@ -2083,13 +2083,14 @@ export default function App() {
         const state = gameStateRef.current;
         const defLevelB = state.players[unit.owner].evolutionLevels[UnitType.DEFUSER].b;
 
-        const enemyPlayerId = unit.owner === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
-        const enemyUnitAtLocation = state.players[enemyPlayerId].units.find(u => u.r === r && u.c === c && !u.isDead);
+        const enemyMineAtLocation = state.mines.find(m =>
+            m.r === r && m.c === c && m.owner !== unit.owner
+        );
 
         // 1. Identify Target & Action Type
         // Mine Priority
         const revealedMineIndex = state.mines.findIndex(m =>
-            m.r === r && m.c === c && m.owner !== unit.owner && (m.revealedTo.includes(unit.owner) || enemyUnitAtLocation)
+            m.r === r && m.c === c && m.owner !== unit.owner && m.revealedTo.includes(unit.owner)
         );
         // Building Priority (if no mine or fallback)
         const buildingIndex = state.buildings.findIndex(b => b.r === r && b.c === c && b.owner !== unit.owner);
@@ -2102,7 +2103,11 @@ export default function App() {
         }
 
         if (!actionType) {
-            addLog('log_no_mine', 'info');
+            if (enemyMineAtLocation && !enemyMineAtLocation.revealedTo.includes(unit.owner)) {
+                addLog('log_mine_not_revealed', 'info');
+            } else {
+                addLog('log_no_mine', 'info');
+            }
             return;
         }
 
@@ -2215,6 +2220,15 @@ export default function App() {
 
         const isVariantDamage = (defLevelB === 3 && variantB === 2);
         const cost = isVariantDamage ? 5 : 2;
+        const enemyId = unit.owner === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
+        const enemyAtTarget = gameState.players[enemyId].units.find(u => u.r === toR && u.c === toC && !u.isDead);
+        const unitAtTarget = [...gameState.players[PlayerID.P1].units, ...gameState.players[PlayerID.P2].units]
+            .find(u => u.r === toR && u.c === toC && !u.isDead);
+        const mineAtTarget = gameState.mines.find(m => m.r === toR && m.c === toC);
+        const buildingAtTarget = gameState.buildings.find(b => b.r === toR && b.c === toC);
+        const cellAtTarget = gameState.cells[toR]?.[toC];
+        const canDamageEnemyUnit = isVariantDamage && !!enemyAtTarget;
+        const hasBlockingUnit = !!unitAtTarget && !canDamageEnemyUnit;
 
         if (gameState.players[unit.owner].energy < cost) {
             addLog('log_low_energy', 'info', { cost });
@@ -2230,6 +2244,7 @@ export default function App() {
         const tr = Math.abs(unit.r - toR);
         const tc = Math.abs(unit.c - toC);
         if (tr + tc > 2) return;
+        if (!cellAtTarget || cellAtTarget.isObstacle || buildingAtTarget || mineAtTarget || hasBlockingUnit) return;
 
         const mineIndex = gameState.mines.findIndex(m =>
             m.r === fromR &&
@@ -2249,7 +2264,6 @@ export default function App() {
             const newMines = [...prev.mines];
 
             // Check if moving to enemy unit for damage
-            const enemyId = unit.owner === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1;
             const enemyAtTarget = prev.players[enemyId].units.find(u => u.r === toR && u.c === toC && !u.isDead);
 
             if (isVariantDamage && enemyAtTarget) {
@@ -3076,23 +3090,10 @@ export default function App() {
         const state = gameStateRef.current;
         const shouldBroadcast = origin === 'local' && canBroadcastAction() && !!roomId;
         const isTimedOut = state.phase === 'action' && state.timeLeft <= 0;
-        let shouldDeferComplete = false;
 
         if (origin === 'local' && isTimedOut && targetMode === 'move_mine_end' && selectedMineId) {
-            const actingUnitId = actedUnitId || state.selectedUnitId || state.activeUnitId;
-            const actingUnit = actingUnitId ? getUnit(actingUnitId, state) : null;
-            const selectedMine = state.mines.find(m => m.id === selectedMineId);
-
-            if (
-                actingUnit &&
-                actingUnit.type === UnitType.DEFUSER &&
-                actingUnit.owner === state.currentPlayer &&
-                selectedMine
-            ) {
-                handleMoveEnemyMineAction(actingUnit, selectedMine.r, selectedMine.c, actingUnit.r, actingUnit.c);
-                shouldDeferComplete = true;
-            }
-
+            // Timeout during target selection means the move-mine action fails:
+            // no energy spent and no mine relocation.
             setSelectedMineId(null);
             setTargetMode(null);
         }
@@ -3108,16 +3109,6 @@ export default function App() {
             });
         }
 
-        if (shouldDeferComplete) {
-            setTimeout(() => {
-                playerActions.handleActionComplete(actedUnitId);
-                if (shouldBroadcast) {
-                    sendGameStateDeferred('end_turn');
-                }
-            }, 0);
-            return;
-        }
-
         playerActions.handleActionComplete(actedUnitId);
 
         if (shouldBroadcast) {
@@ -3125,8 +3116,6 @@ export default function App() {
         }
     }, [
         canBroadcastAction,
-        getUnit,
-        handleMoveEnemyMineAction,
         playerActions.handleActionComplete,
         roomId,
         selectedMineId,

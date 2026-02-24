@@ -253,6 +253,7 @@ const GameField: React.FC<GameFieldProps> = ({
                                     phase={gameState.phase}
                                     unit={unit}
                                     mine={mine}
+                                    hasMineAtCell={minesAtCell.length > 0}
                                     scanMarkSuccess={markResult ? !!markResult.success : null}
                                     building={building}
                                     isSelected={gameState.selectedUnitId === unit?.id}
