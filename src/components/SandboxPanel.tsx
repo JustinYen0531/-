@@ -49,11 +49,11 @@ const SandboxPanel: React.FC<SandboxPanelProps> = ({
             ...prev,
             players: {
                 ...prev.players,
-                // Add energy only for the local sandbox player.
-                // Fallback to current player for existing callers/tests.
-                [localPlayerId ?? prev.currentPlayer]: {
-                    ...prev.players[localPlayerId ?? prev.currentPlayer],
-                    energy: prev.players[localPlayerId ?? prev.currentPlayer].energy + 100
+                // In sandbox mode, boost whoever is currently taking the turn.
+                // In non-sandbox devtools contexts, keep local-player targeting.
+                [prev.gameMode === 'sandbox' ? prev.currentPlayer : (localPlayerId ?? prev.currentPlayer)]: {
+                    ...prev.players[prev.gameMode === 'sandbox' ? prev.currentPlayer : (localPlayerId ?? prev.currentPlayer)],
+                    energy: prev.players[prev.gameMode === 'sandbox' ? prev.currentPlayer : (localPlayerId ?? prev.currentPlayer)].energy + 100
                 }
             }
         }));

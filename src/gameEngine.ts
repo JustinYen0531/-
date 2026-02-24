@@ -131,7 +131,8 @@ export const calculateMineInteraction = (
     targetC: number,
     unitOwnerState: PlayerState,
     unitStartR: number,
-    unitStartC: number
+    unitStartC: number,
+    isGodMode: boolean = false
 ): MineTriggerResult => {
     const result: MineTriggerResult = {
         damage: 0,
@@ -280,6 +281,7 @@ export const calculateMineInteraction = (
         // Manual log in hook to include target name
     }
 
+    if (isGodMode) dmg = 0;
     result.damage = dmg;
     return result;
 };

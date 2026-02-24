@@ -778,7 +778,7 @@ export const usePlayerActions = ({
                 addVFX('chain', r, c, 'large');
             } else {
                 // Calculate interaction for scope usage
-                result = calculateMineInteraction(unit, state.mines, r, c, state.players[unit.owner], unit.r, unit.c);
+                result = calculateMineInteraction(unit, state.mines, r, c, state.players[unit.owner], unit.r, unit.c, state.isGodMode ?? false);
                 if (result.triggered || result.isNukeTriggered) {
                     mineTriggered = true;
                     mineOwnerId = result.mineOwnerId;
@@ -1048,7 +1048,13 @@ export const usePlayerActions = ({
 
         if (!checkEnergyCap(attacker, player, cost)) return;
 
-        const { damage: dmg, logKey } = calculateAttackDamage(attacker, targetUnit, state.players[attacker.owner], state.players[targetUnit.owner], false);
+        const { damage: dmg, logKey } = calculateAttackDamage(
+            attacker,
+            targetUnit,
+            state.players[attacker.owner],
+            state.players[targetUnit.owner],
+            state.isGodMode ?? false
+        );
         if (logKey) addLog(logKey, 'evolution', undefined, targetUnit.owner);
 
         let isDead = targetUnit.hp - dmg <= 0;
@@ -1585,7 +1591,7 @@ export const usePlayerActions = ({
             if (targetCellOccupied) { addLog('log_obstacle', 'error'); return prev; }
 
             // BUG-5 修復：傳送落點有敵方地雷時，觸發地雷傷害
-            const mineResult = calculateMineInteraction(unit, prev.mines, hub.r, hub.c, p, unit.r, unit.c);
+            const mineResult = calculateMineInteraction(unit, prev.mines, hub.r, hub.c, p, unit.r, unit.c, prev.isGodMode ?? false);
             let newMines = prev.mines;
             let mineTriggeredDmg = 0;
             if (mineResult.triggered || mineResult.isNukeTriggered) {
