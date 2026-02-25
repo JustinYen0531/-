@@ -16,7 +16,9 @@ import {
 } from './gameInit';
 import {
     checkEnergyCap as engineCheckEnergyCap,
-    applyFlagAuraDamageReduction
+    applyFlagAuraDamageReduction,
+    calculateMineInteraction,
+    shouldTriggerMine
 } from './gameEngine';
 import {
     getUnitNameKey, getEnemyTerritoryEnergyCost, getDisplayCost as getDisplayCostRaw
@@ -1761,6 +1763,9 @@ export default function App() {
         setGameState(prev => {
             const pId = unit.owner;
             const pState = prev.players[pId];
+            const liveUnit = pState.units.find(u => u.id === unit.id);
+            const liveHub = prev.buildings.find(b => b.owner === pId && b.type === 'hub');
+            if (!liveUnit || !liveHub) return prev;
 
             // Tier 2: Hub disappears when Ranger teleports. Tier 3.2: Hub persists? 
             // Description indicates the Lv2 Ranger teleport consumes the hub.
@@ -1779,22 +1784,80 @@ export default function App() {
                 ? prev.buildings.filter(b => !(b.owner === pId && b.type === 'hub'))
                 : prev.buildings;
 
+            // Teleporting onto enemy mines should trigger mine interaction the same way as normal movement.
+            const proximityNukeIndex = prev.mines.findIndex(m =>
+                m.type === MineType.NUKE &&
+                m.owner !== pId &&
+                Math.abs(m.r - liveHub.r) <= 1 &&
+                Math.abs(m.c - liveHub.c) <= 1 &&
+                Math.max(Math.abs(m.r - liveUnit.r), Math.abs(m.c - liveUnit.c)) > 1
+            );
+            let triggeredMineIndex = -1;
+            if (proximityNukeIndex !== -1) {
+                triggeredMineIndex = proximityNukeIndex;
+            } else {
+                triggeredMineIndex = prev.mines.findIndex(m =>
+                    m.r === liveHub.r &&
+                    m.c === liveHub.c &&
+                    shouldTriggerMine(liveUnit, m, pState)
+                );
+            }
+
+            const mineResult = calculateMineInteraction(
+                liveUnit,
+                prev.mines,
+                liveHub.r,
+                liveHub.c,
+                pState,
+                liveUnit.r,
+                liveUnit.c,
+                prev.isGodMode ?? false
+            );
+
+            const mineTriggered = mineResult.triggered || mineResult.isNukeTriggered;
+            const mineDamage = mineTriggered ? mineResult.damage : 0;
+            const updatedStatus = mineTriggered
+                ? { ...liveUnit.status, ...mineResult.statusUpdates }
+                : liveUnit.status;
+            const newSmokes = mineResult.createdSmokes.length > 0
+                ? [...prev.smokes, ...mineResult.createdSmokes]
+                : prev.smokes;
+            const newMines = (mineTriggered && triggeredMineIndex !== -1)
+                ? prev.mines.filter((_, idx) => idx !== triggeredMineIndex)
+                : prev.mines;
+
+            const newHp = Math.max(0, liveUnit.hp - mineDamage);
+            const isDead = newHp <= 0;
+            const respawnTimer = (isDead && liveUnit.type !== UnitType.GENERAL)
+                ? (prev.turnCount <= 10 ? 2 : 3)
+                : 0;
+            const generalDied = isDead && liveUnit.type === UnitType.GENERAL;
+
             return {
                 ...prev,
+                mines: newMines,
+                smokes: newSmokes,
                 buildings: newBuildings,
                 players: {
                     ...prev.players,
                     [pId]: {
                         ...pState,
-                        flagPosition: unit.hasFlag ? { r: hub.r, c: hub.c } : pState.flagPosition,
+                        flagPosition: liveUnit.hasFlag ? { r: liveHub.r, c: liveHub.c } : pState.flagPosition,
                         units: pState.units.map(u => u.id === unit.id ? {
                             ...u,
-                            r: hub.r,
-                            c: hub.c,
+                            r: liveHub.r,
+                            c: liveHub.c,
+                            hp: newHp,
+                            isDead,
+                            respawnTimer,
+                            status: updatedStatus,
+                            carriedMine: u.carriedMine ? { ...u.carriedMine, r: liveHub.r, c: liveHub.c } : u.carriedMine,
                             energyUsedThisTurn: u.energyUsedThisTurn + cost
                         } : u)
                     }
                 },
+                gameOver: generalDied || prev.gameOver,
+                winner: generalDied ? (pId === PlayerID.P1 ? PlayerID.P2 : PlayerID.P1) : prev.winner,
                 lastActionTime: Date.now(),
                 isTimeFrozen: true
             };
@@ -1947,6 +2010,7 @@ export default function App() {
             } else if (thrownMine.type === MineType.CHAIN) {
                 const normalMinesInRange = nextMines.filter(m =>
                     m.type === MineType.NORMAL &&
+                    m.owner === ownerId &&
                     Math.abs(m.r - r) <= 2 &&
                     Math.abs(m.c - c) <= 2
                 );
