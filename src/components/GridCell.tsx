@@ -354,9 +354,10 @@ const GridCell: React.FC<GridCellProps> = ({
       const factories = buildings.filter(b => b.owner === selectedUnit.owner && b.type === 'factory');
       const manhattanDistLocal = Math.abs(selectedUnit.r - cell.r) + Math.abs(selectedUnit.c - cell.c);
       let allowed = manhattanDistLocal <= 1;
+      const hasFactoryDiamondRange = selectedUnitLevelB >= 2;
 
       const isInFactoryRange = factories.some(f =>
-        f.level >= 2
+        hasFactoryDiamondRange
           ? (Math.abs(f.r - cell.r) + Math.abs(f.c - cell.c) <= 2)
           : (Math.max(Math.abs(f.r - cell.r), Math.abs(f.c - cell.c)) <= 1)
       );
@@ -872,7 +873,7 @@ const GridCell: React.FC<GridCellProps> = ({
       return (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[145] overflow-visible">
           {/* Effect Range Indicator */}
-          {isLvl3 ? (
+          {isLvl2 ? (
             <svg
               className="absolute pointer-events-none overflow-visible"
               viewBox="0 0 100 100"

@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import { GameState, Unit, PlayerID, UnitType, TargetMode } from '../types';
+import { GameState, Unit, PlayerID, UnitType, TargetMode, VFXEffect } from '../types';
 import GridCell from './GridCell';
 
 interface GameFieldProps {
@@ -51,6 +51,14 @@ const GameField: React.FC<GameFieldProps> = ({
             .map(u => u.carriedMine?.id)
             .filter((id): id is string => !!id)
     );
+    const displayBuildings = gameState.buildings.map((b) => {
+        if (b.type !== 'factory') return b;
+        const ownerMakerB = gameState.players[b.owner].evolutionLevels[UnitType.MAKER].b;
+        return {
+            ...b,
+            level: Math.max(b.level ?? 1, ownerMakerB)
+        };
+    });
 
     const getUnit = (id: string, state: GameState = gameState) => {
         const p1Unit = state.players[PlayerID.P1].units.find(u => u.id === id);
@@ -115,18 +123,53 @@ const GameField: React.FC<GameFieldProps> = ({
             onMouseLeave={handleBoardMouseLeave}
         >
             <style>{`
-                @keyframes boardExplosionPulse {
-                    0% { transform: scale(0.25); opacity: 0.95; }
-                    65% { transform: scale(1.1); opacity: 0.8; }
-                    100% { transform: scale(1.5); opacity: 0; }
+                @keyframes vfx-explode {
+                    0% { transform: scale(0.1); opacity: 1; filter: brightness(3) blur(0px); }
+                    15% { transform: scale(1.2); opacity: 1; filter: brightness(2) blur(2px); }
+                    100% { transform: scale(2.5); opacity: 0; filter: brightness(1) blur(12px); }
                 }
-                @keyframes boardExplosionSpark {
-                    0% { transform: scale(0.2); opacity: 0.9; }
-                    100% { transform: scale(1.9); opacity: 0; }
+                @keyframes vfx-ring {
+                    0% { transform: scale(0.1); opacity: 1; border-width: 12px; }
+                    20% { transform: scale(2); opacity: 0.8; border-width: 6px; }
+                    100% { transform: scale(5); opacity: 0; border-width: 0px; }
                 }
-                @keyframes boardScanPing {
-                    0% { transform: scale(0.2); opacity: 0.95; }
-                    100% { transform: scale(1.4); opacity: 0; }
+                @keyframes vfx-impact-glow {
+                    0% { transform: scale(0.1); opacity: 1; }
+                    10% { transform: scale(3); opacity: 0.4; }
+                    100% { transform: scale(4); opacity: 0; }
+                }
+                @keyframes vfx-nuke {
+                    0% { transform: scale(0.1); opacity: 1; filter: brightness(3); }
+                    15% { transform: scale(3); opacity: 1; filter: brightness(1.5); }
+                    100% { transform: scale(4.5); opacity: 0; filter: blur(20px); }
+                }
+                @keyframes vfx-ring-large {
+                    0% { transform: scale(0.1); opacity: 1; }
+                    100% { transform: scale(6); opacity: 0; }
+                }
+                @keyframes vfx-smoke {
+                    0% { transform: scale(0.5); opacity: 0; }
+                    15% { opacity: 1; }
+                    100% { transform: scale(3.5); opacity: 0; filter: blur(15px); }
+                }
+                @keyframes vfx-ice {
+                    0% { transform: scale(0.1) rotate(45deg); opacity: 1; filter: brightness(2); }
+                    15% { transform: scale(1.3) rotate(60deg); opacity: 1; filter: brightness(1.5); }
+                    100% { transform: scale(2) rotate(135deg); opacity: 0; filter: blur(8px); }
+                }
+                @keyframes vfx-chain-pulse {
+                    0% { transform: scale(0.1); opacity: 1; border-width: 12px; }
+                    15% { transform: scale(1); opacity: 1; border-width: 6px; }
+                    100% { transform: scale(1.6); opacity: 0; border-width: 1px; }
+                }
+                @keyframes vfx-chain-core {
+                    0% { transform: scale(0.1); opacity: 1; filter: brightness(2); }
+                    10% { transform: scale(1.5); opacity: 1; }
+                    100% { transform: scale(0.5); opacity: 0; filter: blur(10px); }
+                }
+                @keyframes vfx-scan-ring {
+                    0% { transform: scale(0.3); opacity: 1; }
+                    100% { transform: scale(1.8); opacity: 0; }
                 }
                 @keyframes boardScanPinFloat {
                     0%, 100% { transform: translateY(0px); }
@@ -140,6 +183,26 @@ const GameField: React.FC<GameFieldProps> = ({
                     0%, 100% { transform: translateY(0) scale(1); }
                     50% { transform: translateY(-0.5px) scale(1.05); }
                 }
+                @keyframes float-pin {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-8px); }
+                }
+                @keyframes shadow-pulse {
+                    0%, 100% { transform: scale(1); opacity: 0.4; }
+                    50% { transform: scale(0.7); opacity: 0.2; }
+                }
+                .animate-vfx-explode { animation: vfx-explode 0.8s cubic-bezier(0.15, 1, 0.3, 1) forwards; }
+                .animate-vfx-ring { animation: vfx-ring 0.8s cubic-bezier(0.15, 1, 0.3, 1) forwards; }
+                .animate-vfx-impact-glow { animation: vfx-impact-glow 0.6s ease-out forwards; }
+                .animate-vfx-nuke { animation: vfx-nuke 1.5s cubic-bezier(0.1, 1, 0.2, 1) forwards; }
+                .animate-vfx-ring-large { animation: vfx-ring-large 1.2s ease-out forwards; }
+                .animate-vfx-smoke { animation: vfx-smoke 1.2s ease-out forwards; }
+                .animate-vfx-ice { animation: vfx-ice 1s cubic-bezier(0.15, 1, 0.3, 1) forwards; }
+                .animate-vfx-chain-pulse { animation: vfx-chain-pulse 1s cubic-bezier(0.15, 1, 0.3, 1) forwards; }
+                .animate-vfx-chain-core { animation: vfx-chain-core 1.2s ease-out forwards; }
+                .animate-vfx-scan-ring { animation: vfx-scan-ring 0.9s ease-out forwards; }
+                .animate-float-pin { animation: float-pin 2s ease-in-out infinite; }
+                .animate-shadow-pulse { animation: shadow-pulse 2s ease-in-out infinite; }
             `}</style>
             <div ref={boardRef} className="grid gap-0 border-4 border-white bg-slate-900 rounded-lg overflow-hidden relative z-10 shadow-[0_0_10px_rgba(255,255,255,0.3)]"
                 style={{
@@ -191,7 +254,7 @@ const GameField: React.FC<GameFieldProps> = ({
                             undefined;
                         const mine = visibleMine;
 
-                        const building = gameState.buildings.find(b => b.r === r && b.c === c);
+                        const building = displayBuildings.find(b => b.r === r && b.c === c);
                         const selectedUnitId = gameState.selectedUnitId;
                         const selectedUnit = selectedUnitId ? getUnit(selectedUnitId) : undefined;
                         const selectedUnitOwner = selectedUnit ? gameState.players[selectedUnit.owner] : null;
@@ -292,7 +355,7 @@ const GameField: React.FC<GameFieldProps> = ({
                                     p2GeneralVariantB={gameState.players[PlayerID.P2].evolutionLevels[UnitType.GENERAL].bVariant}
                                     selectedUnitLevelB={selectedUnit ? gameState.players[selectedUnit.owner].evolutionLevels[selectedUnit.type].b : 0}
                                     selectedUnitVariantB={selectedUnit ? gameState.players[selectedUnit.owner].evolutionLevels[selectedUnit.type].bVariant : null}
-                                    buildings={gameState.buildings}
+                                    buildings={displayBuildings}
                                     isSmoked={isSmoked}
                                     smokeOwner={smokesAtCell[0]?.owner}
                                     forceShowMines={gameState.sandboxShowAllMines}
@@ -302,74 +365,6 @@ const GameField: React.FC<GameFieldProps> = ({
                                     onDismissMiss={markResult?.success === false && onDismissMiss ? () => onDismissMiss(r, c, viewerPlayer) : undefined}
                                     hoveredPos={hoveredPos}
                                 />
-                                {gameState.vfx
-                                    .filter(v => v.r === r && v.c === c)
-                                    .map(v => {
-                                        const sizePx = v.size === 'large' ? 64 : v.size === 'small' ? 34 : 48;
-                                        const isMineTriggerFx = v.type === 'explosion' || v.type === 'nuke' || v.type === 'smoke' || v.type === 'slow' || v.type === 'chain';
-                                        const isScan = v.type === 'scan';
-                                        if (!isMineTriggerFx && !isScan) return null;
-                                        const mineFxColors =
-                                            v.type === 'nuke'
-                                                ? {
-                                                    background: 'radial-gradient(circle, rgba(255,255,210,0.98) 0%, rgba(250,204,21,0.92) 28%, rgba(249,115,22,0.8) 52%, rgba(220,38,38,0.55) 72%, rgba(220,38,38,0) 100%)',
-                                                    boxShadow: '0 0 18px rgba(250,204,21,0.95), 0 0 34px rgba(220,38,38,0.75)'
-                                                }
-                                                : v.type === 'smoke'
-                                                    ? {
-                                                        background: 'radial-gradient(circle, rgba(241,245,249,0.95) 0%, rgba(148,163,184,0.82) 42%, rgba(71,85,105,0.55) 70%, rgba(51,65,85,0) 100%)',
-                                                        boxShadow: '0 0 14px rgba(148,163,184,0.9), 0 0 28px rgba(71,85,105,0.65)'
-                                                    }
-                                                    : v.type === 'slow'
-                                                        ? {
-                                                            background: 'radial-gradient(circle, rgba(219,234,254,0.95) 0%, rgba(56,189,248,0.82) 42%, rgba(37,99,235,0.58) 70%, rgba(37,99,235,0) 100%)',
-                                                            boxShadow: '0 0 14px rgba(56,189,248,0.9), 0 0 28px rgba(37,99,235,0.65)'
-                                                        }
-                                                        : v.type === 'chain'
-                                                            ? {
-                                                                background: 'radial-gradient(circle, rgba(243,232,255,0.95) 0%, rgba(168,85,247,0.86) 40%, rgba(124,58,237,0.62) 68%, rgba(91,33,182,0) 100%)',
-                                                                boxShadow: '0 0 16px rgba(168,85,247,0.95), 0 0 30px rgba(124,58,237,0.7)'
-                                                            }
-                                                            : {
-                                                                background: 'radial-gradient(circle, rgba(255,245,180,0.95) 0%, rgba(255,130,0,0.9) 38%, rgba(255,40,0,0.55) 62%, rgba(255,40,0,0) 100%)',
-                                                                boxShadow: '0 0 14px rgba(255,120,0,0.9), 0 0 24px rgba(255,70,0,0.55)'
-                                                            };
-                                        return (
-                                            <div
-                                                key={v.id}
-                                                className="absolute inset-0 pointer-events-none z-[70] flex items-center justify-center"
-                                            >
-                                                <div
-                                                    style={{
-                                                        width: `${sizePx}px`,
-                                                        height: `${sizePx}px`,
-                                                        borderRadius: '9999px',
-                                                        background: isMineTriggerFx
-                                                            ? mineFxColors.background
-                                                            : 'radial-gradient(circle, rgba(180,255,255,0.95) 0%, rgba(56,189,248,0.7) 45%, rgba(56,189,248,0) 100%)',
-                                                        boxShadow: isMineTriggerFx
-                                                            ? mineFxColors.boxShadow
-                                                            : '0 0 14px rgba(56,189,248,0.85)',
-                                                        animation: isMineTriggerFx
-                                                            ? 'boardExplosionPulse 420ms ease-out forwards'
-                                                            : 'boardScanPing 520ms ease-out forwards'
-                                                    }}
-                                                />
-                                                {isMineTriggerFx && (
-                                                    <div
-                                                        style={{
-                                                            position: 'absolute',
-                                                            width: `${Math.round(sizePx * 0.55)}px`,
-                                                            height: `${Math.round(sizePx * 0.55)}px`,
-                                                            borderRadius: '9999px',
-                                                            border: '2px solid rgba(255,230,150,0.9)',
-                                                            animation: 'boardExplosionSpark 380ms ease-out forwards'
-                                                        }}
-                                                    />
-                                                )}
-                                            </div>
-                                        );
-                                    })}
                                 {countResult && (
                                     <div className="absolute inset-0 z-[260] flex flex-col items-center justify-center">
                                         <div className="group/scanpin relative mb-6 flex flex-col items-center opacity-100 p-2 -m-2">
@@ -422,6 +417,63 @@ const GameField: React.FC<GameFieldProps> = ({
                         );
                     })
                 ))}
+
+                {/* VFX Overlay Layer */}
+                <div className="absolute inset-0 pointer-events-none z-[100] overflow-visible">
+                    {gameState.vfx.map((vfx: VFXEffect) => (
+                        <div
+                            key={vfx.id}
+                            className="absolute"
+                            style={{
+                                left: `${toActualCol(vfx.c) * 48 + 24}px`,
+                                top: `${vfx.r * 48 + 24}px`,
+                                transform: 'translate(-50%, -50%)',
+                            }}
+                        >
+                            {vfx.type === 'explosion' && (
+                                <div className="w-12 h-12 relative">
+                                    <div className="absolute inset-0 bg-white rounded-full animate-vfx-impact-glow opacity-0"></div>
+                                    <div className="absolute inset-0 bg-orange-600 rounded-full animate-vfx-explode opacity-0"></div>
+                                    <div className="absolute inset-2 bg-yellow-400 rounded-full animate-vfx-explode opacity-0" style={{ animationDelay: '0.05s' }}></div>
+                                    <div className="absolute inset-0 border-4 border-yellow-300 rounded-full animate-vfx-ring opacity-0"></div>
+                                </div>
+                            )}
+                            {vfx.type === 'nuke' && (
+                                <div className="w-24 h-24 relative">
+                                    <div className="absolute inset-[-48px] bg-white rounded-full animate-vfx-impact-glow opacity-0" style={{ animationDuration: '1s' }}></div>
+                                    <div className="absolute inset-0 bg-emerald-500 rounded-full animate-vfx-nuke opacity-0"></div>
+                                    <div className="absolute inset-[-48px] border-8 border-emerald-300 rounded-full animate-vfx-ring-large opacity-0"></div>
+                                </div>
+                            )}
+                            {vfx.type === 'smoke' && (
+                                <div className="w-16 h-16 bg-slate-400/60 rounded-full blur-xl animate-vfx-smoke opacity-0"></div>
+                            )}
+                            {vfx.type === 'slow' && (
+                                <div className="w-12 h-12 relative">
+                                    <div className="absolute inset-[-12px] bg-cyan-400 rounded-full animate-vfx-impact-glow opacity-0"></div>
+                                    <div className="absolute inset-0 border-2 border-cyan-300 bg-cyan-200/30 rounded-lg rotate-45 animate-vfx-ice opacity-0"></div>
+                                    <div className="absolute inset-2 border-2 border-white/40 rounded-lg rotate-[15deg] animate-vfx-ice opacity-0" style={{ animationDelay: '0.1s' }}></div>
+                                </div>
+                            )}
+                            {vfx.type === 'scan' && (
+                                <div className="w-16 h-16 relative">
+                                    <div className="absolute inset-[-10px] bg-cyan-300/40 rounded-full animate-vfx-impact-glow opacity-0"></div>
+                                    <div className="absolute inset-0 border-2 border-cyan-300 rounded-full animate-vfx-scan-ring opacity-0"></div>
+                                    <div className="absolute inset-2 border-2 border-cyan-400 rounded-full animate-vfx-scan-ring opacity-0" style={{ animationDelay: '0.12s' }}></div>
+                                    <div className="absolute inset-4 border border-white/70 rounded-full animate-vfx-scan-ring opacity-0" style={{ animationDelay: '0.22s' }}></div>
+                                </div>
+                            )}
+                            {vfx.type === 'chain' && (
+                                <div className={`relative flex items-center justify-center ${vfx.size === 'large' ? 'w-[240px] h-[240px]' : 'w-[144px] h-[144px]'}`}>
+                                    <div className="absolute inset-0 bg-purple-600 rounded-full animate-vfx-impact-glow opacity-0" style={{ animationDuration: '0.8s' }}></div>
+                                    <div className="absolute inset-0 border-4 border-purple-400 rounded-full animate-vfx-chain-pulse opacity-0"></div>
+                                    <div className="absolute inset-8 border-2 border-purple-300 rounded-full animate-vfx-chain-pulse opacity-0" style={{ animationDelay: '0.1s' }}></div>
+                                    <div className="absolute w-4 h-4 bg-white rounded-full animate-vfx-chain-core opacity-0"></div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

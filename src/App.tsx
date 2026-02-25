@@ -144,6 +144,7 @@ export default function App() {
     const lastHandledPacketSeqRef = useRef<number | null>(null);
     const lastLogEmitRef = useRef<Map<string, number>>(new Map());
     const placementMinesRef = useRef<Mine[]>([]);
+    const autoEndedDeadUnitKeyRef = useRef<string | null>(null);
     const logScrollRef = useRef<HTMLDivElement>(null);
     const {
         isConnected: isNetworkConnected,
@@ -3127,6 +3128,43 @@ export default function App() {
         sendGameStateDeferred,
         setTargetMode,
         targetMode
+    ]);
+
+    useEffect(() => {
+        if (gameState.phase !== 'action' || gameState.gameOver || gameState.isPaused) return;
+
+        if (gameState.gameMode === 'pvp') {
+            const localPlayer = isHost ? PlayerID.P1 : PlayerID.P2;
+            if (gameState.currentPlayer !== localPlayer) return;
+        }
+
+        const actingUnitId = gameState.activeUnitId ?? gameState.selectedUnitId;
+        if (!actingUnitId) return;
+
+        const actingUnit =
+            gameState.players[PlayerID.P1].units.find(u => u.id === actingUnitId) ||
+            gameState.players[PlayerID.P2].units.find(u => u.id === actingUnitId);
+        if (!actingUnit) return;
+        if (actingUnit.owner !== gameState.currentPlayer) return;
+        if (!actingUnit.isDead || actingUnit.hasActedThisRound) return;
+
+        const dedupeKey = `${gameState.turnCount}:${gameState.currentPlayer}:${actingUnit.id}`;
+        if (autoEndedDeadUnitKeyRef.current === dedupeKey) return;
+        autoEndedDeadUnitKeyRef.current = dedupeKey;
+
+        executeEndTurnAction(actingUnit.id);
+    }, [
+        executeEndTurnAction,
+        gameState.activeUnitId,
+        gameState.currentPlayer,
+        gameState.gameMode,
+        gameState.gameOver,
+        gameState.isPaused,
+        gameState.phase,
+        gameState.players,
+        gameState.selectedUnitId,
+        gameState.turnCount,
+        isHost
     ]);
 
     const executeSkipTurnAction = useCallback((

@@ -622,7 +622,7 @@ export const usePlayerActions = ({
         if (state.phase === 'thinking' || state.phase === 'placement') return;
 
         const unit = getUnit(unitId, state);
-        if (!unit || unit.hasActedThisRound) return;
+        if (!unit || unit.isDead || unit.hasActedThisRound) return;
 
         const player = state.players[unit.owner];
         if (player.energy < cost) {
@@ -1034,7 +1034,7 @@ export const usePlayerActions = ({
     const handleAttack = useCallback((attackerId: string, targetUnit: Unit) => {
         const state = gameStateRef.current;
         const attacker = getUnit(attackerId, state);
-        if (!attacker || attacker.type !== UnitType.GENERAL) return;
+        if (!attacker || attacker.isDead || attacker.type !== UnitType.GENERAL) return;
 
         const genLevelA = state.players[attacker.owner].evolutionLevels[UnitType.GENERAL].a;
         const attackRange = (genLevelA >= 2) ? 2 : 1;
@@ -1292,8 +1292,9 @@ export const usePlayerActions = ({
         const mkrVariantB = player.evolutionLevels[UnitType.MAKER].bVariant;
 
         const factories = state.buildings.filter(b => b.owner === unit.owner && b.type === 'factory');
+        const hasFactoryDiamondRange = mkrLevelB >= 2;
         const isInFactoryRange = factories.some(f => {
-            if (f.level >= 2) {
+            if (hasFactoryDiamondRange) {
                 return Math.abs(f.r - targetR) + Math.abs(f.c - targetC) <= 2;
             }
             return Math.max(Math.abs(f.r - targetR), Math.abs(f.c - targetC)) <= 1;
@@ -1388,7 +1389,7 @@ export const usePlayerActions = ({
         // Once placed mines exceed base 5, there must be enough own mines inside workshop ranges.
         if (placedMinesCount + 1 > MAX_MINES_ON_BOARD) {
             const isMineInFactoryRange = (mr: number, mc: number) => factories.some(f => {
-                if (f.level >= 2) {
+                if (hasFactoryDiamondRange) {
                     return Math.abs(f.r - mr) + Math.abs(f.c - mc) <= 2;
                 }
                 return Math.max(Math.abs(f.r - mr), Math.abs(f.c - mc)) <= 1;
@@ -1404,7 +1405,7 @@ export const usePlayerActions = ({
             const isInFactoryRangeByIndex = (factoryIndex: number, mr: number, mc: number) => {
                 const f = factories[factoryIndex];
                 if (!f) return false;
-                if (f.level >= 2) {
+                if (hasFactoryDiamondRange) {
                     return Math.abs(f.r - mr) + Math.abs(f.c - mc) <= 2;
                 }
                 return Math.max(Math.abs(f.r - mr), Math.abs(f.c - mc)) <= 1;
