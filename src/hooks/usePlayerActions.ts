@@ -594,22 +594,26 @@ export const usePlayerActions = ({
         }
 
         // Update state: deduct energy, increment skip count
-        setGameState(prev => ({
-            ...prev,
-            currentPlayer: nextPlayer,
-            activeUnitId: null,
-            selectedUnitId: null,
-            timeLeft: TURN_TIMER,
-            movements: [],
-            players: {
-                ...prev.players,
-                [state.currentPlayer]: {
-                    ...prev.players[state.currentPlayer],
-                    energy: prev.players[state.currentPlayer].energy - skipCost,
-                    skipCountThisRound: prev.players[state.currentPlayer].skipCountThisRound + 1,
+        // Use prev.currentPlayer (not closure `state.currentPlayer`) to avoid stale closure bug.
+        setGameState(prev => {
+            const actingPlayer = prev.currentPlayer;
+            return {
+                ...prev,
+                currentPlayer: nextPlayer,
+                activeUnitId: null,
+                selectedUnitId: null,
+                timeLeft: TURN_TIMER,
+                movements: [],
+                players: {
+                    ...prev.players,
+                    [actingPlayer]: {
+                        ...prev.players[actingPlayer],
+                        energy: prev.players[actingPlayer].energy - skipCost,
+                        skipCountThisRound: prev.players[actingPlayer].skipCountThisRound + 1,
+                    }
                 }
-            }
-        }));
+            };
+        });
         setTargetMode(null);
     }, [gameStateRef, setGameState, addLog, startNewRound, setTargetMode]);
 
@@ -718,10 +722,12 @@ export const usePlayerActions = ({
                 dmg = chainHitDmg;
                 addLog('log_hit_mine', 'mine', { unit: getLocalizedUnitName(unit.type), dmg: chainHitDmg }, unit.owner);
 
-                // Only chain to NORMAL mines within 5x5 range
+                // Only chain to NORMAL mines of the SAME OWNER within 5x5 range
+                // (enemy normal mines must not be consumed as part of the chain)
                 const normalMinesInRange = newMines.filter(m =>
                     m.id !== mine.id &&
                     m.type === MineType.NORMAL &&
+                    m.owner === mine.owner &&
                     Math.abs(m.r - r) <= 2 &&
                     Math.abs(m.c - c) <= 2
                 );
@@ -1163,9 +1169,10 @@ export const usePlayerActions = ({
         if (killReward > 0) addLog('log_kill_reward', 'info', { amount: killReward });
     }, [gameStateRef, getUnit, addLog, checkEnergyCap, setGameState, handleActionComplete]);
 
-    const handlePickupFlag = useCallback(() => {
+    const handlePickupFlag = useCallback((unitIdOverride?: string) => {
         const state = gameStateRef.current;
-        const unit = state.selectedUnitId ? getUnit(state.selectedUnitId) : null;
+        const unitId = unitIdOverride ?? state.selectedUnitId;
+        const unit = unitId ? getUnit(unitId, state) : null;
         if (!unit) return;
         if (unit.hasFlag) return;
         if (unit.hasActedThisRound) return; // BUG-2 修復：已行動過的單位不得拿旗
@@ -1182,9 +1189,10 @@ export const usePlayerActions = ({
         addLog('log_flag_pickup', 'move', { r: unit.r + 1, c: unit.c + 1 }, unit.owner);
     }, [gameStateRef, getUnit, setGameState, addLog]);
 
-    const handleDropFlag = useCallback(() => {
+    const handleDropFlag = useCallback((unitIdOverride?: string) => {
         const state = gameStateRef.current;
-        const unit = state.selectedUnitId ? getUnit(state.selectedUnitId) : null;
+        const unitId = unitIdOverride ?? state.selectedUnitId;
+        const unit = unitId ? getUnit(unitId, state) : null;
         if (!unit || !unit.hasFlag) return;
         setGameState(prev => {
             const p = prev.players[unit.owner];
@@ -1585,6 +1593,9 @@ export const usePlayerActions = ({
         const cost = getEnemyTerritoryEnergyCost(unit, 5);
         if (state.players[unit.owner].energy < cost) { addLog('log_low_energy', 'info', { cost }); return; }
 
+        // Capture mine presence BEFORE setGameState (ref is not yet updated when setGameState is async)
+        const mineAtHubSnapshot = state.mines.find(m => m.r === hub.r && m.c === hub.c && m.owner !== unit.owner);
+
         setGameState(prev => {
             const p = prev.players[unit.owner];
             const targetCellOccupied = prev.players[PlayerID.P1].units.concat(prev.players[PlayerID.P2].units).some(u => u.r === hub.r && u.c === hub.c && !u.isDead);
@@ -1628,10 +1639,8 @@ export const usePlayerActions = ({
             };
         });
 
-        // Log mine trigger if any
-        const freshState = gameStateRef.current;
-        const mineAtHub = freshState.mines.find(m => m.r === hub.r && m.c === hub.c && m.owner !== unit.owner);
-        if (mineAtHub) {
+        // Log mine trigger using snapshot captured BEFORE setGameState (ref not yet updated at this point)
+        if (mineAtHubSnapshot) {
             addLog('log_hit_mine', 'mine', { unit: getLocalizedUnitName(unit.type), dmg: '?' }, unit.owner);
         }
 

@@ -2452,7 +2452,11 @@ export default function App() {
 
 
     // --- Helper: Calculate button index for action buttons ---
-    const getActionButtonIndex = (actionType: string, unit: Unit | null | undefined): number => {
+    const getActionButtonIndex = (
+        actionType: string,
+        unit: Unit | null | undefined,
+        state: GameState = gameState
+    ): number => {
         if (!unit) return -1;
 
         let index = 0;
@@ -2461,7 +2465,7 @@ export default function App() {
         if (actionType === 'move') return 1;
         index = 2;
 
-        const player = gameState.players[unit.owner];
+        const player = state.players[unit.owner];
 
         // Button 2: Placement skills (if available)
         const canPlaceTower = unit.type === UnitType.MINESWEEPER && player.evolutionLevels[UnitType.MINESWEEPER].a >= 1;
@@ -2474,7 +2478,7 @@ export default function App() {
         }
 
         // --- Universal Dismantle (If on enemy building) ---
-        const isOnEnemyBuilding = gameState.buildings.some(b => b.r === unit.r && b.c === unit.c && b.owner !== unit.owner);
+        const isOnEnemyBuilding = state.buildings.some(b => b.r === unit.r && b.c === unit.c && b.owner !== unit.owner);
         if (isOnEnemyBuilding) {
             if (actionType === 'custom_dismantle') return index;
             index++;
@@ -2501,7 +2505,7 @@ export default function App() {
             // Detonate Tower (Path A 3-2)
             const swpLevelA = player.evolutionLevels[UnitType.MINESWEEPER].a;
             const swpVariantA = player.evolutionLevels[UnitType.MINESWEEPER].aVariant;
-            const hasTower = gameState.buildings.some(b => b.owner === unit.owner && b.type === 'tower');
+            const hasTower = state.buildings.some(b => b.owner === unit.owner && b.type === 'tower');
             if (swpLevelA === 3 && swpVariantA === 2 && hasTower) {
                 if (actionType === 'detonate_tower') return index;
                 index++;
@@ -2512,7 +2516,7 @@ export default function App() {
         } else if (unit.type === UnitType.RANGER) {
             const rngLevelB = player.evolutionLevels[UnitType.RANGER].b;
             const pickupRange = rngLevelB >= 1 ? 2 : 0;
-            const mineInRange = gameState.mines.find(m =>
+            const mineInRange = state.mines.find(m =>
                 (Math.abs(m.r - unit.r) + Math.abs(m.c - unit.c) <= pickupRange) &&
                 (m.owner === unit.owner || m.revealedTo.includes(unit.owner))
             );
@@ -2553,7 +2557,7 @@ export default function App() {
         // --- Teleport Action (Moved After unit-specific skills) ---
         const rangerLevelA = player.evolutionLevels[UnitType.RANGER].a;
         const rangerVariantA = player.evolutionLevels[UnitType.RANGER].aVariant;
-        const hasHub = gameState.buildings.some(b => b.owner === unit.owner && b.type === 'hub');
+        const hasHub = state.buildings.some(b => b.owner === unit.owner && b.type === 'hub');
         const canTeleport = ((unit.type === UnitType.RANGER && rangerLevelA >= 2) || (rangerLevelA === 3 && rangerVariantA === 2)) && hasHub;
         if (canTeleport) {
             if (actionType === 'teleport') return index;
@@ -2578,7 +2582,7 @@ export default function App() {
 
         // Flag pickup/drop for non-General units (when Gen B Level 3+)
         if (unit.type !== UnitType.GENERAL) {
-            const player = gameState.players[unit.owner];
+            const player = state.players[unit.owner];
             const genLevelB = player.evolutionLevels[UnitType.GENERAL].b;
             const genVariantB = player.evolutionLevels[UnitType.GENERAL].bVariant;
             const canCarry = genLevelB >= 3 && genVariantB === 1;
@@ -3150,12 +3154,13 @@ export default function App() {
     }, [canBroadcastAction, playerActions.handleSkipTurn, roomId, sendActionPacket, sendGameStateDeferred]);
 
     const executePickupFlagAction = useCallback((
-        origin: 'local' | 'remote' = 'local'
+        origin: 'local' | 'remote' = 'local',
+        unitIdOverride?: string
     ) => {
         const state = gameStateRef.current;
-        const selectedUnitId = state.selectedUnitId;
-        if (!selectedUnitId) return;
-        const unit = getUnit(selectedUnitId, state);
+        const actingUnitId = unitIdOverride ?? state.selectedUnitId;
+        if (!actingUnitId) return;
+        const unit = getUnit(actingUnitId, state);
         if (!unit) return;
         if (unit.hasFlag) return;
         const player = state.players[unit.owner];
@@ -3171,7 +3176,7 @@ export default function App() {
             });
         }
 
-        playerActions.handlePickupFlag();
+        playerActions.handlePickupFlag(actingUnitId);
 
         if (shouldBroadcast) {
             sendGameStateDeferred('pickup_flag');
@@ -3179,12 +3184,13 @@ export default function App() {
     }, [canBroadcastAction, getUnit, playerActions.handlePickupFlag, roomId, sendActionPacket, sendGameStateDeferred]);
 
     const executeDropFlagAction = useCallback((
-        origin: 'local' | 'remote' = 'local'
+        origin: 'local' | 'remote' = 'local',
+        unitIdOverride?: string
     ) => {
         const state = gameStateRef.current;
-        const selectedUnitId = state.selectedUnitId;
-        if (!selectedUnitId) return;
-        const unit = getUnit(selectedUnitId, state);
+        const actingUnitId = unitIdOverride ?? state.selectedUnitId;
+        if (!actingUnitId) return;
+        const unit = getUnit(actingUnitId, state);
         if (!unit) return;
         if (!unit.hasFlag) return;
 
@@ -3198,7 +3204,7 @@ export default function App() {
             });
         }
 
-        playerActions.handleDropFlag();
+        playerActions.handleDropFlag(actingUnitId);
 
         if (shouldBroadcast) {
             sendGameStateDeferred('drop_flag');
@@ -3605,8 +3611,7 @@ export default function App() {
                 if (!unit || unit.owner !== expectedRemoteOwner) {
                     return;
                 }
-                setGameState(prev => ({ ...prev, selectedUnitId: payload.unitId }));
-                executePickupFlagAction('remote');
+                executePickupFlagAction('remote', payload.unitId);
                 if (isHost) {
                     sendGameStateDeferred('remote_pickup_flag_applied');
                 }
@@ -3624,8 +3629,7 @@ export default function App() {
                 if (!unit || unit.owner !== expectedRemoteOwner) {
                     return;
                 }
-                setGameState(prev => ({ ...prev, selectedUnitId: payload.unitId }));
-                executeDropFlagAction('remote');
+                executeDropFlagAction('remote', payload.unitId);
                 if (isHost) {
                     sendGameStateDeferred('remote_drop_flag_applied');
                 }
@@ -4030,11 +4034,21 @@ export default function App() {
         handleTeleportToHubAction,
         handleDisarmAction,
         handleDetonateTowerAction,
+        handleStealth: handleStealthAction,
         handleRangerAction,
         handlePickupFlag: executePickupFlagAction,
         handleDropFlag: executeDropFlagAction,
         setShowEvolutionTree,
         getLocalizedUnitName: (type: UnitType) => t(getUnitNameKey(type)),
+        getActionButtonIndex,
+        // Bug 10 fix: playerActions spread 帶入 hook 版（無網路廣播），
+        // 用 App.tsx 版（有廣播）統一覆蓋，確保 AI/GameLoop 都走正確路徑
+        handlePlaceTower: handlePlaceTowerAction,
+        handlePlaceFactory: handlePlaceFactoryAction,
+        handlePlaceHub: handlePlaceHubAction,
+        handleTeleportToHub: handleTeleportToHubAction,
+        handleDisarm: handleDisarmAction,
+        handleDetonateTower: handleDetonateTowerAction,
     };
 
 
