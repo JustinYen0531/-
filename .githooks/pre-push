@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+set -e
+
+echo "[pre-push] Packaging upload zip before push..."
+
+if command -v pwsh >/dev/null 2>&1; then
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "./scripts/package-upload.ps1"
+elif command -v powershell >/dev/null 2>&1; then
+  powershell -NoProfile -ExecutionPolicy Bypass -File "./scripts/package-upload.ps1"
+else
+  echo "[pre-push] PowerShell not found. Aborting push." >&2
+  exit 1
+fi
+
+echo "[pre-push] Packaging completed."

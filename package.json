@@ -11,6 +11,8 @@
     "dev": "vite",
     "build": "npm run build:node20",
     "build:node20": "npx -y node@20 node_modules/vite/bin/vite.js build",
+    "package:upload": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-upload.ps1",
+    "hooks:install": "git config core.hooksPath .githooks",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
