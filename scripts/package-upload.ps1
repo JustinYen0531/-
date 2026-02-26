@@ -35,7 +35,26 @@ if (Test-Path $versionedZipPath) {
 }
 
 Write-Host "[package-upload] Creating $([System.IO.Path]::GetFileName($versionedZipPath))..."
-Compress-Archive -Path (Join-Path $distDir '*') -DestinationPath $versionedZipPath -CompressionLevel Optimal -Force
+$createdByTar = $false
+$tarCommand = Get-Command tar -ErrorAction SilentlyContinue
+
+if ($tarCommand) {
+    try {
+        # Prefer tar because it preserves explicit directory entries (better compatibility on some zip unpackers).
+        & tar -a -cf $versionedZipPath -C $distDir .
+        if ($LASTEXITCODE -eq 0) {
+            $createdByTar = $true
+        } else {
+            Write-Warning "[package-upload] tar exited with code $LASTEXITCODE. Falling back to Compress-Archive."
+        }
+    } catch {
+        Write-Warning "[package-upload] tar failed: $($_.Exception.Message). Falling back to Compress-Archive."
+    }
+}
+
+if (-not $createdByTar) {
+    Compress-Archive -Path (Join-Path $distDir '*') -DestinationPath $versionedZipPath -CompressionLevel Optimal -Force
+}
 
 Write-Host "[package-upload] Updating $([System.IO.Path]::GetFileName($latestZipPath))..."
 Copy-Item $versionedZipPath $latestZipPath -Force
