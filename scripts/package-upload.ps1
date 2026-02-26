@@ -28,7 +28,8 @@ foreach ($zipFile in $existingZips) {
 }
 
 $nextVersion = $maxVersion + 1
-$versionedZipPath = Join-Path $projectRoot "$baseName-v$nextVersion.zip"
+$versionedZipName = "$baseName-v$nextVersion.zip"
+$versionedZipPath = Join-Path $projectRoot $versionedZipName
 
 if (Test-Path $versionedZipPath) {
     Remove-Item $versionedZipPath -Force
@@ -41,7 +42,7 @@ $tarCommand = Get-Command tar -ErrorAction SilentlyContinue
 if ($tarCommand) {
     try {
         # Prefer tar because it preserves explicit directory entries (better compatibility on some zip unpackers).
-        & tar -a -cf $versionedZipPath -C $distDir .
+        & tar -a -cf $versionedZipName -C 'dist' .
         if ($LASTEXITCODE -eq 0) {
             $createdByTar = $true
         } else {
