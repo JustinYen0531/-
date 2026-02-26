@@ -72,14 +72,18 @@ const PRIVATE_HINT_LOG_TTL_TURNS = 1;
 
 type SfxName = 'click' | 'place_mine' | 'attack' | 'mine_hit' | 'error' | 'victory' | 'defeat';
 
+const BASE_URL = import.meta.env.BASE_URL || './';
+const toAssetUrl = (relativePath: string): string =>
+    `${BASE_URL.replace(/\/?$/, '/')}${relativePath.replace(/^\/+/, '')}`;
+
 const SFX_SOURCE: Record<SfxName, string> = {
-    click: '/sfx/click.wav',
-    place_mine: '/sfx/place-mine.wav',
-    attack: '/sfx/attack.wav',
-    mine_hit: '/sfx/mine-hit.wav',
-    error: '/sfx/error.wav',
-    victory: '/sfx/victory.wav',
-    defeat: '/sfx/defeat.wav'
+    click: toAssetUrl('sfx/click.wav'),
+    place_mine: toAssetUrl('sfx/place-mine.wav'),
+    attack: toAssetUrl('sfx/attack.wav'),
+    mine_hit: toAssetUrl('sfx/mine-hit.wav'),
+    error: toAssetUrl('sfx/error.wav'),
+    victory: toAssetUrl('sfx/victory.wav'),
+    defeat: toAssetUrl('sfx/defeat.wav')
 };
 
 const LOG_SFX_MAP: Partial<Record<string, { sound: SfxName; cooldownMs?: number; volume?: number }>> = {
@@ -4277,7 +4281,7 @@ export default function App() {
             {/* Background Music */}
             <audio
                 ref={audioRef}
-                src={view === 'lobby' ? '/lobby-bgm.mp3' : '/the-final-boss-battle-158700.mp3'}
+                src={view === 'lobby' ? toAssetUrl('lobby-bgm.mp3') : toAssetUrl('the-final-boss-battle-158700.mp3')}
                 loop
             />
 
