@@ -4277,7 +4277,7 @@ export default function App() {
             {/* Background Music */}
             <audio
                 ref={audioRef}
-                src={view === 'lobby' ? '/日常を描いたbgmdailyフリー素材.mp3' : '/the-final-boss-battle-158700.mp3'}
+                src={view === 'lobby' ? '/lobby-bgm.mp3' : '/the-final-boss-battle-158700.mp3'}
                 loop
             />
 

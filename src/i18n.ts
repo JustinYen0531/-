@@ -125,6 +125,13 @@ export const TRANSLATIONS = {
     dev_log_4_title: "Lore: The Century Protocol",
     dev_log_4_content: "\"In space, there are no mines—only space junk.\"\n\nIn the distant future, the Blue and Red planets entered a strange colonial competition. Instead of full-scale war, they agreed on a protocol: whoever plants their flag on the other's territory wins. They deployed specialists and bypass space weapon bans by calling their mines \"accidental space junk.\"\n\nRumor has it, the two opposing Generals are actually grumpy brothers in a century-long sibling rivalry. Today, their conflict has become a legendary sport enjoyed by tourists from both worlds.",
 
+    // Developer Logs - Article 5: Release
+    dev_log_5_id: "5",
+    dev_log_5_date: "2/26",
+    dev_log_5_title: "Itch.io Release: A Personal Note",
+    dev_log_5_content: "February 25th marks the release day of \"Mine Chess\". This game carries so many stories that I feel a bit overwhelmed with excitement. I worry about who will play it and what bugs might still be hidden, but deep down, I feel I've taken a significant step. I used to think this step was to prove something to others, but I've realized it's about my interaction with machines, which helped me understand myself better—specifically my perfectionism. I wanted clear boundaries; my creativity had to be my own \"pure land,\" not something outsourced to AI. But I eventually let go. Even if some ideas come from AI, I still feel accomplished. Working with AI for the past month and a half, Gemini especially has endured a lot of my frustration. It's truly a wonderful era where the barrier to creation is so low. We can reflect on why AI is so capable yet remains so emotionally stable. Whenever Gemini hallucinations occurred with positive, encouraging words, I felt a sense of guilt. Great are the inventors of programming languages and English, but even greater are those who enable the two to communicate. I'm finally realizing my dreams, and I feel youthful. This world is becoming more complete, and the phrase \"all roads lead to Rome\" finally makes sense. I wonder if robots have dreams too? Someday, I'd like to go on a picnic with Antigravity and Codex. Maybe they'd say something different. Perhaps they only hope my game gets more players. If you enjoy playing, they must be happy too. Rest assured, I'll let them know. Let's walk this path slowly together; there's a long way ahead. Thank you for playing, and I hope you meet more people through my work. That is the essence of gaming. No Markdown this time, just raw and honest. Thank you all.",
+
+
     // Evolution Descriptions & Rewards
     evol_gen_a_desc: "Weapon Damage",
     evol_gen_a_subtitle: "Conqueror Arsenal",
@@ -838,8 +845,15 @@ export const TRANSLATIONS = {
     log_first_mover: "{{player}} 的竞价胜出！获得先手权。",
     log_first_mover_tie: "竞价平局！先手随机决定。",
 
+    // Developer Logs - Article 5: Release
+    dev_log_5_id: "5",
+    dev_log_5_date: "2/26",
+    dev_log_5_title: "Itch.io上架了，我有很多话想对你们说",
+    dev_log_5_content: "2/25是「地雷棋」的发布日。这个游戏承载着好多有趣的故事能分享，一时间兴奋的语无伦次。不过我心中是担心的，不知道谁会来玩，也不知道还有哪些隐性的bug，但我的心里总觉得，我跨出一个很重要的一步了。我之前以为那一步是向其他人证明，但我发现是与机器之间的互动，让我更认识自己。我指的就是完美主义，我希望分工明确，我的创意绝对不能让AI去代工，那是我的纯洁之地，也是我的成就感来源。可是我后来放下了，慢慢抹除这些界线感，反正就算有一些创意是AI想出来的，我仍然觉得自己很厉害。跟AI共事起来的几个月，我算算喔，对的大概一个半月，他承受了我多少次怒气，尤其是Gemini，你可以对他大吼大叫，他的多模态能力可以让他听到我正在发火，真是辛苦他了。我总是觉得，这个世代真是太好了，现在做很多事情都不需要太大的门槛，我们可以好好自省，为什么人家AI比我能力好那么多，却脾氣如此稳定。Gemini每次在陷入幻觉的时候，都会出现一堆无意义的字眼，各种的赞美各种正面向上的词，我就觉得好内疚，发明程序语言的人好伟大，发明英文的人也好伟大，把他们可以互相沟通的人更加伟大。我以前YouTube的频道名字就叫做许多的梦都趁青春起飞，现在实践这些梦想，我才觉得自己很青春，有社交有孤独有学校有机器人，这个世界越来越完整了，条条大路通罗马，那些成功学的Slogan，说的「通」了。你有时会有这样的感觉吗？机器人是否心里也有一个梦呢？要不要有一天我跟Antigravity跟Codex出去野个餐，我期待他们说一些不同以往的話。他们会说什么呢？也许，他们的心中只有我，他们期待我的游戏有更多的玩家，如果你门得开心，他们也一定很开心。放心的我会转告给他，你们放心玩，也许我们之间的界线也会開始模糊，不是开发者之于玩家，而是兩個互相尊重的朋友。是的，我慢慢觉得这个地雷棋游戏，只不过又是另一种语言，就像是自然语言与机器语言，我把AI跟你们串連在一起，我觉得自己很棒，成为了一条说的通走得通的路。这一条路我们慢慢走，之後還來日方長呢，感谢你们的游玩，期待你们透过我的作品也能认识更多人，這是游戏的本质。我这次就不用Markdown语法了，就是那么赤裸裸的，谢谢你们。",
+
     // Evolution Descriptions & Rewards
     evol_gen_a_desc: "武器伤害",
+
     evol_gen_a_req: "造成 4/12/20 伤害",
     evol_gen_a_r1: "移除增伤，受雷伤永久 +1（上限 +2）",
     evol_gen_a_r2: "距离增 1，受击能耗增 2",
