@@ -619,6 +619,26 @@ describe('usePlayerActions', () => {
             expect(placed!.owner).toBe(PlayerID.P1);
         });
 
+        it('reveals a newly placed mine to enemy when inside enemy tower range', () => {
+            const { props, getState } = createHookProps();
+            const state = props.gameStateRef.current;
+            const maker = state.players[PlayerID.P1].units.find(u => u.type === UnitType.MAKER)!;
+            const targetR = maker.r;
+            const targetC = maker.c + 1;
+            state.buildings = [createTestBuilding('tower', PlayerID.P2, maker.r, maker.c + 2)];
+
+            const { result } = renderHook(() => usePlayerActions(props));
+
+            act(() => {
+                result.current.handleMinePlacement(maker, targetR, targetC, MineType.NORMAL);
+            });
+
+            const updated = getState();
+            const placed = updated.mines.find(m => m.r === targetR && m.c === targetC && m.owner === PlayerID.P1);
+            expect(placed).toBeDefined();
+            expect(placed!.revealedTo).toContain(PlayerID.P2);
+        });
+
         it('deducts mine placement energy cost', () => {
             const { props, getState } = createHookProps();
             const state = props.gameStateRef.current;

@@ -1455,6 +1455,16 @@ export const usePlayerActions = ({
 
         setGameState(prev => {
             const p = prev.players[unit.owner];
+            const towerRevealOwners = Array.from(new Set(
+                prev.buildings
+                    .filter(b =>
+                        b.type === 'tower' &&
+                        Math.abs(b.r - targetR) <= 1 &&
+                        Math.abs(b.c - targetC) <= 1 &&
+                        b.owner !== unit.owner
+                    )
+                    .map(b => b.owner)
+            ));
             return {
                 ...prev,
                 mines: [...prev.mines, {
@@ -1463,7 +1473,7 @@ export const usePlayerActions = ({
                     type: effectiveMineType,
                     r: targetR,
                     c: targetC,
-                    revealedTo: [],
+                    revealedTo: towerRevealOwners,
                     immuneUnitIds: prev.players[PlayerID.P1].units.concat(prev.players[PlayerID.P2].units).filter(u => u.r === targetR && u.c === targetC).map(u => u.id)
                 }],
                 sensorResults: prev.sensorResults.filter(sr => !(sr.kind === 'mark' && sr.r === targetR && sr.c === targetC)),

@@ -1483,6 +1483,16 @@ export default function App() {
                 const liveUnit = p.units.find(u => u.id === unit.id);
                 if (!liveUnit || !liveUnit.carriedMine) return prev;
                 const newUnits = p.units.map(u => u.id === unit.id ? { ...u, carriedMine: null } : u);
+                const towerRevealOwners = Array.from(new Set(
+                    prev.buildings
+                        .filter(b =>
+                            b.type === 'tower' &&
+                            Math.abs(b.r - liveUnit.r) <= 1 &&
+                            Math.abs(b.c - liveUnit.c) <= 1
+                        )
+                        .map(b => b.owner)
+                ));
+                const revealedTo = Array.from(new Set([unit.owner, ...towerRevealOwners]));
 
                 const newMine: Mine = {
                     // Preserve mine identity across pickup/drop in the same match.
@@ -1491,7 +1501,7 @@ export default function App() {
                     type: liveUnit.carriedMine.type,
                     r: liveUnit.r,
                     c: liveUnit.c,
-                    revealedTo: [unit.owner]
+                    revealedTo
                 };
 
                 return {
