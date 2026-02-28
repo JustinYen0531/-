@@ -80,7 +80,11 @@ type PhotonRoomInfoLike = {
 type PhotonClientLike = {
     connectToRegionMaster: (region: string) => boolean;
     disconnect: () => void;
-    joinRoom: (roomName: string, options?: Record<string, unknown>) => boolean;
+    joinRoom: (
+        roomName: string,
+        options?: Record<string, unknown>,
+        createRoomOptions?: Record<string, unknown>
+    ) => boolean;
     leaveRoom?: () => boolean;
     raiseEvent: (code: number, payload: unknown, options?: Record<string, unknown>) => void;
     isJoinedToRoom: () => boolean;
@@ -935,14 +939,17 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
 
                     setStatus('connecting');
                     roomJoinRequested = true;
-                    const joinStarted = client.joinRoom(roomToCreate, {
-                        createIfNotExists: true,
-                        maxPlayers: 2,
-                        isVisible: true,
-                        isOpen: true,
-                        customGameProperties,
-                        propsListedInLobby: ['roomLabel', 'matchStatus']
-                    });
+                    const joinStarted = client.joinRoom(
+                        roomToCreate,
+                        { createIfNotExists: true },
+                        {
+                            maxPlayers: 2,
+                            isVisible: true,
+                            isOpen: true,
+                            customGameProperties,
+                            propsListedInLobby: ['roomLabel', 'matchStatus']
+                        }
+                    );
                     if (!joinStarted) {
                         const message = `Failed to create room ${roomToCreate}.`;
                         setError(message);
