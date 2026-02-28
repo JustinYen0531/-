@@ -17,7 +17,9 @@ import {
 import type {
     ConnectionContextValue,
     LobbyRoomSnapshot,
-    ConnectionStatus
+    ConnectionStatus,
+    OpenPeerOptions,
+    RoomMatchStatus
 } from './PeerJsConnectionProvider';
 
 interface SendPacketOptions {
@@ -51,6 +53,8 @@ interface PhotonConfig {
 interface PhotonConnectOptions {
     roomToCreate?: string;
     localPeerId?: string;
+    roomLabel?: string;
+    matchStatus?: RoomMatchStatus;
 }
 
 type PhotonActorLike = {
@@ -67,6 +71,10 @@ type PhotonRoomInfoLike = {
     isOpen?: boolean;
     isVisible?: boolean;
     removed?: boolean;
+    getCustomProperty?: (key: string) => unknown;
+    getCustomProperties?: () => Record<string, unknown>;
+    customProperties?: Record<string, unknown>;
+    _customProperties?: Record<string, unknown>;
 };
 
 type PhotonClientLike = {
@@ -76,7 +84,11 @@ type PhotonClientLike = {
     leaveRoom?: () => boolean;
     raiseEvent: (code: number, payload: unknown, options?: Record<string, unknown>) => void;
     isJoinedToRoom: () => boolean;
-    myRoom?: () => { name?: string } | null;
+    myRoom?: () => {
+        name?: string;
+        setCustomProperty?: (key: string, value: unknown) => void;
+        setIsOpen?: (isOpen: boolean) => void;
+    } | null;
     availableRooms?: () => PhotonRoomInfoLike[];
     myRoomActorsArray?: () => PhotonActorLike[];
     setUserId?: (userId: string) => void;
@@ -167,18 +179,65 @@ const normalizeLobbyRooms = (roomInfos: PhotonRoomInfoLike[] | null | undefined)
         return [];
     }
 
+    const readCustomProperty = (room: PhotonRoomInfoLike, key: string): unknown => {
+        if (typeof room.getCustomProperty === 'function') {
+            return room.getCustomProperty(key);
+        }
+        if (typeof room.getCustomProperties === 'function') {
+            return room.getCustomProperties()?.[key];
+        }
+        if (room.customProperties && key in room.customProperties) {
+            return room.customProperties[key];
+        }
+        if (room._customProperties && key in room._customProperties) {
+            return room._customProperties[key];
+        }
+        return undefined;
+    };
+
+    const normalizeMatchStatus = (
+        rawStatus: unknown,
+        playerCount: number,
+        maxPlayers: number,
+        isOpen: boolean
+    ): RoomMatchStatus => {
+        if (rawStatus === 'waiting_players' || rawStatus === 'waiting_start' || rawStatus === 'playing') {
+            return rawStatus;
+        }
+        if (!isOpen) {
+            return 'playing';
+        }
+        if (playerCount >= maxPlayers) {
+            return 'waiting_start';
+        }
+        return 'waiting_players';
+    };
+
     return roomInfos
         .filter((room) => room && !room.removed && typeof room.name === 'string' && room.name.trim().length > 0)
         .map((room) => {
             const roomId = room.name?.trim() || '';
             const rawMaxPlayers = typeof room.maxPlayers === 'number' ? room.maxPlayers : 0;
             const maxPlayers = rawMaxPlayers > 0 ? rawMaxPlayers : 2;
+            const playerCount = typeof room.playerCount === 'number' ? Math.max(0, room.playerCount) : 0;
+            const isOpen = room.isOpen !== false;
+            const roomLabel = typeof readCustomProperty(room, 'roomLabel') === 'string'
+                ? String(readCustomProperty(room, 'roomLabel')).trim()
+                : '';
+            const matchStatus = normalizeMatchStatus(
+                readCustomProperty(room, 'matchStatus'),
+                playerCount,
+                maxPlayers,
+                isOpen
+            );
             return {
                 roomId,
-                playerCount: typeof room.playerCount === 'number' ? Math.max(0, room.playerCount) : 0,
+                playerCount,
                 maxPlayers,
-                isOpen: room.isOpen !== false,
-                isVisible: room.isVisible !== false
+                isOpen,
+                isVisible: room.isVisible !== false,
+                roomLabel: roomLabel || undefined,
+                matchStatus
             };
         })
         .sort((a, b) => a.roomId.localeCompare(b.roomId));
@@ -789,6 +848,14 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
 
         const roomToCreate = options.roomToCreate ? normalizeRoomId(options.roomToCreate) : '';
         const localPeer = options.localPeerId?.trim() || generatePeerId();
+        const normalizedRoomLabel = options.roomLabel?.trim() || '';
+        const initialMatchStatus: RoomMatchStatus = options.matchStatus || 'waiting_players';
+        const customGameProperties: Record<string, unknown> = {
+            matchStatus: initialMatchStatus
+        };
+        if (normalizedRoomLabel) {
+            customGameProperties.roomLabel = normalizedRoomLabel;
+        }
         manualDisconnectRef.current = false;
         autoReconnectBlockedRef.current = false;
         lastOperationErrorRef.current = null;
@@ -872,7 +939,9 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
                         createIfNotExists: true,
                         maxPlayers: 2,
                         isVisible: true,
-                        isOpen: true
+                        isOpen: true,
+                        customGameProperties,
+                        propsListedInLobby: ['roomLabel', 'matchStatus']
                     });
                     if (!joinStarted) {
                         const message = `Failed to create room ${roomToCreate}.`;
@@ -1043,9 +1112,13 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         throw new Error(fallbackError || 'Photon connection failed.');
     }, [connectPhotonWithConfig, generatePeerId]);
 
-    const openPeer = useCallback((preferredId?: string): Promise<string> => {
+    const openPeer = useCallback((preferredId?: string, options?: OpenPeerOptions): Promise<string> => {
         const roomToCreate = preferredId?.trim();
-        return connectPhoton({ roomToCreate });
+        return connectPhoton({
+            roomToCreate,
+            roomLabel: options?.roomLabel,
+            matchStatus: options?.matchStatus
+        });
     }, [connectPhoton]);
 
     const connectToPeer = useCallback((targetPeerId: string) => {
@@ -1165,6 +1238,28 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         return sent;
     }, [sendRawString]);
 
+    const setRoomMatchStatus = useCallback((nextStatus: RoomMatchStatus) => {
+        const client = clientRef.current;
+        if (!client || !client.isJoinedToRoom()) {
+            return;
+        }
+        const room = client.myRoom?.();
+        if (!room) {
+            return;
+        }
+
+        try {
+            room.setCustomProperty?.('matchStatus', nextStatus);
+            if (nextStatus === 'playing') {
+                room.setIsOpen?.(false);
+            } else {
+                room.setIsOpen?.(true);
+            }
+        } catch {
+            // no-op
+        }
+    }, []);
+
     const disconnect = useCallback(() => {
         manualDisconnectRef.current = true;
         autoReconnectBlockedRef.current = true;
@@ -1240,6 +1335,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         sendActionPacket,
         sendJson,
         sendJsonString,
+        setRoomMatchStatus,
         disconnect,
         destroyPeer
     }), [
@@ -1261,6 +1357,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         sendActionPacket,
         sendJson,
         sendJsonString,
+        setRoomMatchStatus,
         disconnect,
         destroyPeer
     ]);

@@ -20,12 +20,21 @@ export type ConnectionStatus =
     | 'disconnected'
     | 'error';
 
+export type RoomMatchStatus = 'waiting_players' | 'waiting_start' | 'playing';
+
+export interface OpenPeerOptions {
+    roomLabel?: string;
+    matchStatus?: RoomMatchStatus;
+}
+
 export interface LobbyRoomSnapshot {
     roomId: string;
     playerCount: number;
     maxPlayers: number;
     isOpen: boolean;
     isVisible: boolean;
+    roomLabel?: string;
+    matchStatus?: RoomMatchStatus;
 }
 
 interface SendPacketOptions {
@@ -63,7 +72,7 @@ export interface ConnectionContextValue {
     error: string | null;
     lobbyRooms: LobbyRoomSnapshot[];
     generatePeerId: () => string;
-    openPeer: (preferredId?: string) => Promise<string>;
+    openPeer: (preferredId?: string, options?: OpenPeerOptions) => Promise<string>;
     connectToPeer: (targetPeerId: string) => void;
     reconnect: () => Promise<boolean>;
     sendPacket: (packet: ActionPacket, options?: SendPacketOptions) => boolean;
@@ -73,6 +82,7 @@ export interface ConnectionContextValue {
     ) => ActionPacket<TPayload> | null;
     sendJson: (payload: unknown) => boolean;
     sendJsonString: (jsonString: string) => boolean;
+    setRoomMatchStatus: (status: RoomMatchStatus) => void;
     disconnect: () => void;
     destroyPeer: () => void;
 }
@@ -412,7 +422,7 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
         });
     }, [clearPendingPacket, clearReconnectTimer, rememberReceivedSeq, scheduleReconnect, sendAckFor]);
 
-    const openPeer = useCallback((preferredId?: string): Promise<string> => {
+    const openPeer = useCallback((preferredId?: string, _options?: OpenPeerOptions): Promise<string> => {
         const requestedId = preferredId?.trim() || generatePeerId();
         const canFallbackToPublic = Boolean(import.meta.env.VITE_PEER_HOST?.trim());
         manualDisconnectRef.current = false;
@@ -553,6 +563,10 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
             bindPeerEvents(createPeerInstance(requestedId), 'configured');
         });
     }, [attachConnection, clearAllPendingPackets, clearReconnectTimer, generatePeerId, scheduleReconnect]);
+
+    const setRoomMatchStatus = useCallback((_status: RoomMatchStatus) => {
+        // PeerJS has no server-side lobby metadata.
+    }, []);
 
     const connectToPeer = useCallback((targetPeerId: string) => {
         const peer = peerRef.current;
@@ -755,6 +769,7 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
         sendActionPacket,
         sendJson,
         sendJsonString,
+        setRoomMatchStatus,
         disconnect,
         destroyPeer
     }), [
@@ -776,6 +791,7 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
         sendActionPacket,
         sendJson,
         sendJsonString,
+        setRoomMatchStatus,
         disconnect,
         destroyPeer
     ]);
