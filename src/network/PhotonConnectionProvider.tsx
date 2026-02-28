@@ -116,6 +116,7 @@ const ACK_TIMEOUT_MS = 2500;
 const ACK_MAX_RETRIES = 2;
 const MAX_REMEMBERED_RECEIVED_SEQ = 512;
 const PHOTON_EVENT_CODE = 1;
+const DEFAULT_PHOTON_APP_ID = '15b845ad-9011-4f7e-b9fd-78c9e8aab8dc';
 const DEFAULT_PHOTON_REGION = 'us';
 const DEFAULT_PHOTON_VERSION = '1.0';
 const DEFAULT_PHOTON_PROTOCOL: PhotonConfig['protocol'] = 'wss';
@@ -153,7 +154,7 @@ const toRawString = (value: unknown): string => {
 };
 
 const resolvePhotonConfig = (): PhotonConfig => {
-    const appId = (import.meta.env.VITE_PHOTON_APP_ID || '').trim();
+    const appId = (import.meta.env.VITE_PHOTON_APP_ID || DEFAULT_PHOTON_APP_ID).trim();
     const appVersion = (import.meta.env.VITE_PHOTON_APP_VERSION || DEFAULT_PHOTON_VERSION).trim();
     const region = (import.meta.env.VITE_PHOTON_REGION || DEFAULT_PHOTON_REGION).trim();
     const protocolValue = (import.meta.env.VITE_PHOTON_PROTOCOL || DEFAULT_PHOTON_PROTOCOL)
@@ -161,7 +162,7 @@ const resolvePhotonConfig = (): PhotonConfig => {
         .toLowerCase();
 
     return {
-        appId,
+        appId: appId || DEFAULT_PHOTON_APP_ID,
         appVersion: appVersion || DEFAULT_PHOTON_VERSION,
         region: region || DEFAULT_PHOTON_REGION,
         protocol: protocolValue === 'ws' ? 'ws' : 'wss'
