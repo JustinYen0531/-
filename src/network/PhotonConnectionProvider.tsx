@@ -196,6 +196,8 @@ const DEFAULT_PHOTON_ERROR_CODES = {
     ServerFull: 32762,
     GameDoesNotExist: 32758,
     InvalidRegion: 32756,
+    PluginReportedError: 32752,
+    PluginMismatch: 32751,
     JoinFailedPeerAlreadyJoined: 32750,
     JoinFailedFoundInactiveJoiner: 32749,
     JoinFailedWithRejoinerNotFound: 32748,
@@ -215,6 +217,8 @@ const isFatalReconnectError = (
     const fatalErrors = new Set<number>([
         getPhotonCode(errorCodes, 'InvalidAuthentication'),
         getPhotonCode(errorCodes, 'InvalidRegion'),
+        getPhotonCode(errorCodes, 'PluginReportedError'),
+        getPhotonCode(errorCodes, 'PluginMismatch'),
         getPhotonCode(errorCodes, 'GameIdAlreadyExists'),
         getPhotonCode(errorCodes, 'GameFull'),
         getPhotonCode(errorCodes, 'GameClosed'),
@@ -274,6 +278,12 @@ const formatPhotonOperationError = (input: {
     if (input.errorCode === getPhotonCode(input.errorCodes, 'ServerFull')) {
         return 'Photon server is busy. Please try again in a moment.';
     }
+    if (input.errorCode === getPhotonCode(input.errorCodes, 'PluginMismatch')) {
+        return 'Photon plugin mismatch. Check your Photon dashboard plugin settings for this App ID.';
+    }
+    if (input.errorCode === getPhotonCode(input.errorCodes, 'PluginReportedError')) {
+        return `Photon plugin error: ${fallback}`;
+    }
 
     if (isJoinRoomOp && !input.errorMessage?.trim()) {
         return `Failed to join ${roomLabel}. (${input.errorCode})`;
@@ -301,6 +311,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
     const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const reconnectFnRef = useRef<(() => Promise<boolean>) | null>(null);
     const autoReconnectBlockedRef = useRef(false);
+    const lastOperationErrorRef = useRef<{ message: string; at: number } | null>(null);
     const manualDisconnectRef = useRef(false);
     const nextSeqRef = useRef(1);
     const reconnectAttemptsRef = useRef(0);
@@ -418,6 +429,31 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
             // no-op
         }
         clientRef.current = null;
+    }, []);
+
+    const getPreferredErrorMessage = useCallback((fallbackMessage: string): string => {
+        const recentOperationError = lastOperationErrorRef.current;
+        if (!recentOperationError) {
+            return fallbackMessage;
+        }
+
+        const elapsedMs = Date.now() - recentOperationError.at;
+        const isRecent = elapsedMs >= 0 && elapsedMs <= 8000;
+        if (!isRecent) {
+            return fallbackMessage;
+        }
+
+        const genericMessage = fallbackMessage.toLowerCase();
+        if (
+            genericMessage.includes('master peer error') ||
+            genericMessage.includes('master server closed connection') ||
+            genericMessage.includes('game server closed connection') ||
+            genericMessage.includes('game peer error')
+        ) {
+            return recentOperationError.message;
+        }
+
+        return fallbackMessage;
     }, []);
 
     const sendRawString = useCallback((rawPayload: string): boolean => {
@@ -597,6 +633,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         const localPeer = options.localPeerId?.trim() || generatePeerId();
         manualDisconnectRef.current = false;
         autoReconnectBlockedRef.current = false;
+        lastOperationErrorRef.current = null;
         clearReconnectTimer();
         clearAllPendingPackets();
         clearReceivedSeqMemory();
@@ -706,7 +743,9 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
                     }
 
                     setStatus('disconnected');
-                    setError('Network connection lost. Trying to reconnect...');
+                    if (!autoReconnectBlockedRef.current) {
+                        setError('Network connection lost. Trying to reconnect...');
+                    }
                     scheduleReconnect();
                 }
             };
@@ -739,10 +778,12 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
             };
 
             client.onError = (_errorCode: number, message: string) => {
-                const normalized = message || 'Photon network error.';
+                const normalized = getPreferredErrorMessage(message || 'Photon network error.');
                 setError(normalized);
                 setStatus('error');
-                scheduleReconnect();
+                if (!autoReconnectBlockedRef.current) {
+                    scheduleReconnect();
+                }
                 rejectOnce(normalized);
             };
 
@@ -762,6 +803,10 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
                     errorCodes,
                     roomId: currentRoomIdRef.current || lastTargetRoomIdRef.current
                 });
+                lastOperationErrorRef.current = {
+                    message,
+                    at: Date.now()
+                };
                 setError(message);
                 setStatus('error');
 
@@ -790,6 +835,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         clearAllPendingPackets,
         clearReceivedSeqMemory,
         clearTransport,
+        getPreferredErrorMessage,
         generatePeerId,
         processIncoming,
         refreshRemotePeer,
@@ -935,6 +981,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
 
         currentRoomIdRef.current = null;
         lastTargetRoomIdRef.current = null;
+        lastOperationErrorRef.current = null;
         setRemotePeerId(null);
         setError(null);
         setStatus(client ? 'peer-ready' : 'idle');
@@ -952,6 +999,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         lastTargetRoomIdRef.current = null;
         localCreatedRoomRef.current = false;
         currentRoomIdRef.current = null;
+        lastOperationErrorRef.current = null;
         reconnectAttemptsRef.current = 0;
         setReconnectAttempt(0);
         setLocalPeerId(null);

@@ -176,6 +176,11 @@ const formatConnectionError = (message: string, isZh: boolean): string => {
     if (lower.includes('photon region is invalid')) {
         return isZh ? 'Photon 區域設定錯誤，請檢查 VITE_PHOTON_REGION。' : 'Photon region is invalid. Check VITE_PHOTON_REGION.';
     }
+    if (lower.includes('plugin mismatch') || lower.includes('unsupported plugin') || lower.includes('plugin error')) {
+        return isZh
+            ? 'Photon 房間插件設定不相容。請到 Photon Dashboard 檢查該 App ID 的 Plugin/Webhooks 設定。'
+            : 'Photon room plugin settings are incompatible. Check Plugin/Webhooks config in Photon Dashboard for this App ID.';
+    }
     if (lower.includes('network connection lost') || lower.includes('trying to reconnect')) {
         return isZh ? '連線中斷，系統正在嘗試自動重連。' : 'Connection lost. Trying to reconnect automatically.';
     }
