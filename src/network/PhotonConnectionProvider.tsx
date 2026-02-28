@@ -16,6 +16,7 @@ import {
 } from './protocol';
 import type {
     ConnectionContextValue,
+    LobbyRoomSnapshot,
     ConnectionStatus
 } from './PeerJsConnectionProvider';
 
@@ -59,6 +60,15 @@ type PhotonActorLike = {
     name?: string;
 };
 
+type PhotonRoomInfoLike = {
+    name?: string;
+    playerCount?: number;
+    maxPlayers?: number;
+    isOpen?: boolean;
+    isVisible?: boolean;
+    removed?: boolean;
+};
+
 type PhotonClientLike = {
     connectToRegionMaster: (region: string) => boolean;
     disconnect: () => void;
@@ -67,6 +77,7 @@ type PhotonClientLike = {
     raiseEvent: (code: number, payload: unknown, options?: Record<string, unknown>) => void;
     isJoinedToRoom: () => boolean;
     myRoom?: () => { name?: string } | null;
+    availableRooms?: () => PhotonRoomInfoLike[];
     myRoomActorsArray?: () => PhotonActorLike[];
     setUserId?: (userId: string) => void;
     onStateChange?: (state: number) => void;
@@ -75,6 +86,13 @@ type PhotonClientLike = {
     onActorLeave?: (actor: PhotonActorLike, isInactive: boolean) => void;
     onEvent?: (code: number, data: unknown, actorNr: number) => void;
     onError?: (code: number, message: string) => void;
+    onRoomList?: (roomInfos: PhotonRoomInfoLike[]) => void;
+    onRoomListUpdate?: (
+        roomInfos: PhotonRoomInfoLike[],
+        roomsUpdated: PhotonRoomInfoLike[],
+        roomsAdded: PhotonRoomInfoLike[],
+        roomsRemoved: PhotonRoomInfoLike[]
+    ) => void;
     onOperationResponse?: (
         errorCode: number,
         errorMsg: string,
@@ -116,7 +134,9 @@ const ACK_TIMEOUT_MS = 2500;
 const ACK_MAX_RETRIES = 2;
 const MAX_REMEMBERED_RECEIVED_SEQ = 512;
 const PHOTON_EVENT_CODE = 1;
-const DEFAULT_PHOTON_APP_ID = '15b845ad-9011-4f7e-b9fd-78c9e8aab8dc';
+const PHOTON_APP_ID_STORAGE_KEY = 'minechess_photon_app_id';
+const DEFAULT_PHOTON_PRIMARY_APP_ID = '15b845ad-9011-4f7e-b9fd-78c9e8aab8dc';
+const DEFAULT_PHOTON_SECONDARY_APP_ID = '9f22e99c-fdd6-45ce-98e1-0014d7115e98';
 const DEFAULT_PHOTON_REGION = 'us';
 const DEFAULT_PHOTON_VERSION = '1.0';
 const DEFAULT_PHOTON_PROTOCOL: PhotonConfig['protocol'] = 'wss';
@@ -142,6 +162,28 @@ const formatErrorMessage = (error: unknown): string => {
     return String(error);
 };
 
+const normalizeLobbyRooms = (roomInfos: PhotonRoomInfoLike[] | null | undefined): LobbyRoomSnapshot[] => {
+    if (!Array.isArray(roomInfos)) {
+        return [];
+    }
+
+    return roomInfos
+        .filter((room) => room && !room.removed && typeof room.name === 'string' && room.name.trim().length > 0)
+        .map((room) => {
+            const roomId = room.name?.trim() || '';
+            const rawMaxPlayers = typeof room.maxPlayers === 'number' ? room.maxPlayers : 0;
+            const maxPlayers = rawMaxPlayers > 0 ? rawMaxPlayers : 2;
+            return {
+                roomId,
+                playerCount: typeof room.playerCount === 'number' ? Math.max(0, room.playerCount) : 0,
+                maxPlayers,
+                isOpen: room.isOpen !== false,
+                isVisible: room.isVisible !== false
+            };
+        })
+        .sort((a, b) => a.roomId.localeCompare(b.roomId));
+};
+
 const toRawString = (value: unknown): string => {
     if (typeof value === 'string') {
         return value;
@@ -153,8 +195,103 @@ const toRawString = (value: unknown): string => {
     }
 };
 
+const normalizePhotonAppId = (value: string | null | undefined): string | null => {
+    const normalized = (value || '').trim();
+    if (!normalized) {
+        return null;
+    }
+    const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized);
+    return isGuid ? normalized : null;
+};
+
+const dedupePhotonAppIds = (input: string[]): string[] => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    input.forEach((candidate) => {
+        const normalized = normalizePhotonAppId(candidate);
+        if (!normalized) {
+            return;
+        }
+        const dedupeKey = normalized.toLowerCase();
+        if (seen.has(dedupeKey)) {
+            return;
+        }
+        seen.add(dedupeKey);
+        result.push(normalized);
+    });
+    return result;
+};
+
+const getBuiltInPhotonAppIds = (): string[] => dedupePhotonAppIds([
+    DEFAULT_PHOTON_PRIMARY_APP_ID,
+    DEFAULT_PHOTON_SECONDARY_APP_ID
+]);
+
+const getEnvPhotonAppIds = (): string[] => dedupePhotonAppIds([
+    import.meta.env.VITE_PHOTON_APP_ID,
+    import.meta.env.VITE_PHOTON_APP_ID_BACKUP
+]);
+
+export const getAvailablePhotonAppIds = (): string[] => (
+    dedupePhotonAppIds([
+        ...getEnvPhotonAppIds(),
+        ...getBuiltInPhotonAppIds()
+    ])
+);
+
+export const getPreferredPhotonAppId = (): string => {
+    const available = getAvailablePhotonAppIds();
+    const fallback = available[0] || DEFAULT_PHOTON_PRIMARY_APP_ID;
+    if (typeof window === 'undefined') {
+        return fallback;
+    }
+
+    try {
+        const stored = normalizePhotonAppId(window.localStorage.getItem(PHOTON_APP_ID_STORAGE_KEY));
+        return stored || fallback;
+    } catch {
+        return fallback;
+    }
+};
+
+export const setPreferredPhotonAppId = (appId: string): void => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    const normalized = normalizePhotonAppId(appId);
+    if (!normalized) {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(PHOTON_APP_ID_STORAGE_KEY, normalized);
+    } catch {
+        // no-op
+    }
+};
+
+export const clearPreferredPhotonAppId = (): void => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.localStorage.removeItem(PHOTON_APP_ID_STORAGE_KEY);
+    } catch {
+        // no-op
+    }
+};
+
+const getPhotonAppIdCandidates = (preferredAppId: string): string[] => (
+    dedupePhotonAppIds([
+        preferredAppId,
+        ...getAvailablePhotonAppIds()
+    ])
+);
+
 const resolvePhotonConfig = (): PhotonConfig => {
-    const appId = (import.meta.env.VITE_PHOTON_APP_ID || DEFAULT_PHOTON_APP_ID).trim();
+    const appId = getPreferredPhotonAppId();
     const appVersion = (import.meta.env.VITE_PHOTON_APP_VERSION || DEFAULT_PHOTON_VERSION).trim();
     const region = (import.meta.env.VITE_PHOTON_REGION || DEFAULT_PHOTON_REGION).trim();
     const protocolValue = (import.meta.env.VITE_PHOTON_PROTOCOL || DEFAULT_PHOTON_PROTOCOL)
@@ -162,7 +299,7 @@ const resolvePhotonConfig = (): PhotonConfig => {
         .toLowerCase();
 
     return {
-        appId: appId || DEFAULT_PHOTON_APP_ID,
+        appId: appId || DEFAULT_PHOTON_PRIMARY_APP_ID,
         appVersion: appVersion || DEFAULT_PHOTON_VERSION,
         region: region || DEFAULT_PHOTON_REGION,
         protocol: protocolValue === 'ws' ? 'ws' : 'wss'
@@ -296,6 +433,23 @@ const formatPhotonOperationError = (input: {
     return fallback;
 };
 
+const shouldRetryWithBackupAppId = (message: string, roomToCreate: string): boolean => {
+    const normalized = (message || '').trim().toLowerCase();
+    if (!normalized) {
+        return true;
+    }
+
+    if (roomToCreate && normalized.includes('already exists')) {
+        return false;
+    }
+
+    if (normalized.includes('is full') || normalized.includes('is closed')) {
+        return false;
+    }
+
+    return true;
+};
+
 export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
     const [status, setStatus] = useState<ConnectionStatus>('idle');
     const [localPeerId, setLocalPeerId] = useState<string | null>(null);
@@ -306,6 +460,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
     const [lastIncomingPacket, setLastIncomingPacket] = useState<ActionPacket | null>(null);
     const [lastMessageAt, setLastMessageAt] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [lobbyRooms, setLobbyRooms] = useState<LobbyRoomSnapshot[]>([]);
 
     const photonModuleRef = useRef<PhotonModuleLike | null>(null);
     const clientRef = useRef<PhotonClientLike | null>(null);
@@ -624,10 +779,12 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         setStatus(nextRemotePeerId ? 'connected' : fallbackStatus);
     }, []);
 
-    const connectPhoton = useCallback(async (options: PhotonConnectOptions): Promise<string> => {
-        const config = resolvePhotonConfig();
+    const connectPhotonWithConfig = useCallback(async (
+        config: PhotonConfig,
+        options: PhotonConnectOptions
+    ): Promise<string> => {
         if (!config.appId) {
-            throw new Error('Photon App ID is missing. Set VITE_PHOTON_APP_ID.');
+            throw new Error('Photon App ID is missing. Set VITE_PHOTON_APP_ID or select one in More Info.');
         }
 
         const roomToCreate = options.roomToCreate ? normalizeRoomId(options.roomToCreate) : '';
@@ -649,6 +806,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         setLastIncomingData(null);
         setLastIncomingPacket(null);
         setLastMessageAt(null);
+        setLobbyRooms([]);
         setLocalPeerId(localPeer);
 
         lastOpenedPeerIdRef.current = localPeer;
@@ -738,6 +896,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
 
                 if (nextState === states.Disconnected) {
                     setRemotePeerId(null);
+                    setLobbyRooms([]);
                     if (manualDisconnectRef.current) {
                         setStatus('idle');
                         return;
@@ -776,6 +935,14 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
                     return;
                 }
                 processIncoming(data);
+            };
+
+            client.onRoomList = (roomInfos: PhotonRoomInfoLike[]) => {
+                setLobbyRooms(normalizeLobbyRooms(roomInfos));
+            };
+
+            client.onRoomListUpdate = (roomInfos: PhotonRoomInfoLike[]) => {
+                setLobbyRooms(normalizeLobbyRooms(roomInfos));
             };
 
             client.onError = (_errorCode: number, message: string) => {
@@ -842,6 +1009,39 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         refreshRemotePeer,
         scheduleReconnect
     ]);
+
+    const connectPhoton = useCallback(async (options: PhotonConnectOptions): Promise<string> => {
+        const baseConfig = resolvePhotonConfig();
+        const roomToCreate = options.roomToCreate ? normalizeRoomId(options.roomToCreate) : '';
+        const localPeer = options.localPeerId?.trim() || generatePeerId();
+        const appIdCandidates = getPhotonAppIdCandidates(baseConfig.appId);
+        let lastError: unknown = null;
+
+        for (let index = 0; index < appIdCandidates.length; index += 1) {
+            const appId = appIdCandidates[index];
+            try {
+                const connectResult = await connectPhotonWithConfig(
+                    { ...baseConfig, appId },
+                    { ...options, roomToCreate, localPeerId: localPeer }
+                );
+                if (appId !== baseConfig.appId) {
+                    setPreferredPhotonAppId(appId);
+                }
+                return connectResult;
+            } catch (attemptError) {
+                lastError = attemptError;
+                const message = formatErrorMessage(attemptError);
+                const isLastAttempt = index >= appIdCandidates.length - 1;
+                if (isLastAttempt || !shouldRetryWithBackupAppId(message, roomToCreate)) {
+                    throw attemptError instanceof Error ? attemptError : new Error(message);
+                }
+                setError(`Photon App ID failed (${appId.slice(0, 8)}...). Retrying backup App ID...`);
+            }
+        }
+
+        const fallbackError = formatErrorMessage(lastError);
+        throw new Error(fallbackError || 'Photon connection failed.');
+    }, [connectPhotonWithConfig, generatePeerId]);
 
     const openPeer = useCallback((preferredId?: string): Promise<string> => {
         const roomToCreate = preferredId?.trim();
@@ -984,6 +1184,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         lastTargetRoomIdRef.current = null;
         lastOperationErrorRef.current = null;
         setRemotePeerId(null);
+        setLobbyRooms([]);
         setError(null);
         setStatus(client ? 'peer-ready' : 'idle');
     }, [clearAllPendingPackets, clearReconnectTimer]);
@@ -1005,6 +1206,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         setReconnectAttempt(0);
         setLocalPeerId(null);
         setRemotePeerId(null);
+        setLobbyRooms([]);
         setError(null);
         setStatus('idle');
     }, [clearAllPendingPackets, clearReceivedSeqMemory, clearReconnectTimer, clearTransport]);
@@ -1029,6 +1231,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         lastIncomingPacket,
         lastMessageAt,
         error,
+        lobbyRooms,
         generatePeerId,
         openPeer,
         connectToPeer,
@@ -1049,6 +1252,7 @@ export const PhotonConnectionProvider: React.FC<React.PropsWithChildren> = ({ ch
         lastIncomingPacket,
         lastMessageAt,
         error,
+        lobbyRooms,
         generatePeerId,
         openPeer,
         connectToPeer,

@@ -6,6 +6,10 @@ import {
 } from './PeerJsConnectionProvider';
 import {
     PhotonConnectionProvider,
+    getAvailablePhotonAppIds as getAvailablePhotonAppIdsFromPhoton,
+    getPreferredPhotonAppId as getPreferredPhotonAppIdFromPhoton,
+    setPreferredPhotonAppId as setPreferredPhotonAppIdFromPhoton,
+    clearPreferredPhotonAppId as clearPreferredPhotonAppIdFromPhoton,
     usePhotonConnection
 } from './PhotonConnectionProvider';
 
@@ -85,4 +89,16 @@ export const clearPreferredNetworkMode = (): void => {
     } catch {
         // no-op
     }
+};
+
+export const getAvailablePhotonAppIds = (): string[] => getAvailablePhotonAppIdsFromPhoton();
+
+export const getPreferredPhotonAppId = (): string => getPreferredPhotonAppIdFromPhoton();
+
+export const setPreferredPhotonAppId = (appId: string): void => {
+    setPreferredPhotonAppIdFromPhoton(appId);
+};
+
+export const clearPreferredPhotonAppId = (): void => {
+    clearPreferredPhotonAppIdFromPhoton();
 };

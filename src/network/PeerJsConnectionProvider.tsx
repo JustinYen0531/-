@@ -20,6 +20,14 @@ export type ConnectionStatus =
     | 'disconnected'
     | 'error';
 
+export interface LobbyRoomSnapshot {
+    roomId: string;
+    playerCount: number;
+    maxPlayers: number;
+    isOpen: boolean;
+    isVisible: boolean;
+}
+
 interface SendPacketOptions {
     requireAck?: boolean;
     timeoutMs?: number;
@@ -53,6 +61,7 @@ export interface ConnectionContextValue {
     lastIncomingPacket: ActionPacket | null;
     lastMessageAt: number | null;
     error: string | null;
+    lobbyRooms: LobbyRoomSnapshot[];
     generatePeerId: () => string;
     openPeer: (preferredId?: string) => Promise<string>;
     connectToPeer: (targetPeerId: string) => void;
@@ -737,6 +746,7 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
         lastIncomingPacket,
         lastMessageAt,
         error,
+        lobbyRooms: [],
         generatePeerId,
         openPeer,
         connectToPeer,
@@ -757,6 +767,7 @@ export const ConnectionProvider: React.FC<React.PropsWithChildren> = ({ children
         lastIncomingPacket,
         lastMessageAt,
         error,
+        // PeerJS has no cloud lobby; keep empty list for unified UI contract.
         generatePeerId,
         openPeer,
         connectToPeer,

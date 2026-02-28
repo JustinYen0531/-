@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GameState, PlayerID } from '../types';
 import { AIDifficulty } from '../ai/types';
 import { Language } from '../i18n';
@@ -6,8 +6,11 @@ import { FlaskConical, Cpu, DoorOpen, Swords, X, ArrowRight, HelpCircle, Crown, 
 import Tutorial from './Tutorial';
 import CircularMeteorShower from './CircularMeteorShower';
 import {
+    getAvailablePhotonAppIds,
     getNetworkMode,
+    getPreferredPhotonAppId,
     setPreferredNetworkMode,
+    setPreferredPhotonAppId as savePreferredPhotonAppId,
     type NetworkMode,
     useConnection
 } from '../network/ConnectionProvider';
@@ -44,9 +47,6 @@ interface GameModalsProps {
 interface LobbyPreviewRoom {
     id: string;
     name: string;
-    players: number;
-    maxPlayers: number;
-    status: 'waiting' | 'playing';
 }
 
 interface DeveloperLogEntry {
@@ -59,13 +59,19 @@ interface DeveloperLogEntry {
 }
 
 const LOBBY_PREVIEW_ROOMS: LobbyPreviewRoom[] = [
-    { id: '1001', name: 'Elite Arena', players: 1, maxPlayers: 2, status: 'waiting' },
-    { id: '1002', name: 'Noobs Only', players: 2, maxPlayers: 2, status: 'playing' },
-    { id: '1003', name: 'Test Room', players: 0, maxPlayers: 2, status: 'waiting' },
-    { id: '1004', name: 'Championship', players: 2, maxPlayers: 2, status: 'playing' },
-    { id: '1005', name: 'Casual Play', players: 1, maxPlayers: 2, status: 'waiting' },
-    { id: '1006', name: 'Late Night', players: 1, maxPlayers: 2, status: 'waiting' }
+    { id: '1001', name: 'Elite Arena' },
+    { id: '1002', name: 'Noobs Only' },
+    { id: '1003', name: 'Test Room' },
+    { id: '1004', name: 'Championship' },
+    { id: '1005', name: 'Casual Play' }
 ];
+const ONLINE_MATCH_ROOM_NAME_OPTIONS = [
+    'Elite Arena',
+    'Noobs Only',
+    'Test Room',
+    'Championship',
+    'Casual Play'
+] as const;
 
 const PEER_ID_PATTERN = /^\d{4}$/;
 const DEVELOPER_LOG_HEADER_PATTERN = /^(\d+)\.\((\d{1,2})\/(\d{1,2})\)(.+)$/gm;
@@ -138,6 +144,41 @@ const parseDeveloperLogs = (rawContent: string): DeveloperLogEntry[] => {
 
 const normalizePeerIdInput = (value: string): string => (
     value.replace(/\D/g, '').slice(0, 4)
+);
+
+const OFFICIAL_SITE_PHOTON_APP_ID = '15b845ad-9011-4f7e-b9fd-78c9e8aab8dc';
+const ITCH_IO_PHOTON_APP_ID = '9f22e99c-fdd6-45ce-98e1-0014d7115e98';
+
+const getPhotonAppIdRank = (appId: string): number => {
+    if (appId === OFFICIAL_SITE_PHOTON_APP_ID) {
+        return 0;
+    }
+    if (appId === ITCH_IO_PHOTON_APP_ID) {
+        return 1;
+    }
+    return 2;
+};
+
+const formatPhotonAppIdLabel = (appId: string): string => {
+    const normalized = appId.trim();
+    if (normalized.length <= 16) {
+        return normalized;
+    }
+    return `${normalized.slice(0, 8)}...${normalized.slice(-4)}`;
+};
+
+const getPhotonAppIdDisplayName = (appId: string, isZh: boolean): string => {
+    if (appId === OFFICIAL_SITE_PHOTON_APP_ID) {
+        return isZh ? '遊戲官網' : 'Official Website';
+    }
+    if (appId === ITCH_IO_PHOTON_APP_ID) {
+        return 'itch.io';
+    }
+    return formatPhotonAppIdLabel(appId);
+};
+
+const isOnlineMatchRoomName = (value: string): boolean => (
+    (ONLINE_MATCH_ROOM_NAME_OPTIONS as readonly string[]).includes(value)
 );
 
 const isValidPeerId = (value: string): boolean => PEER_ID_PATTERN.test(value);
@@ -269,7 +310,9 @@ const GameModals: React.FC<GameModalsProps> = ({
     const [delayedConnectionError, setDelayedConnectionError] = useState<string | null>(null);
     const [switchingNetworkMode, setSwitchingNetworkMode] = useState<NetworkMode | null>(null);
     const [showAdvancedNetworkInfo, setShowAdvancedNetworkInfo] = useState(false);
+    const [preferredPhotonAppId, setPreferredPhotonAppIdState] = useState<string>(() => getPreferredPhotonAppId());
     const helloSentKeyRef = useRef('');
+    const photonLobbyProbeRef = useRef(false);
 
     const {
         status: connectionStatus,
@@ -278,6 +321,7 @@ const GameModals: React.FC<GameModalsProps> = ({
         remotePeerId,
         reconnectAttempt,
         error: connectionError,
+        lobbyRooms,
         lastIncomingPacket,
         generatePeerId,
         openPeer,
@@ -290,8 +334,8 @@ const GameModals: React.FC<GameModalsProps> = ({
 
     const isZh = language === 'zh_tw' || language === 'zh_cn';
     const networkModeLabel = networkMode === 'photon'
-        ? (isZh ? 'Photon 雲端' : 'Photon Cloud')
-        : 'PeerJS';
+        ? (isZh ? '線上對決' : 'Online Match')
+        : (isZh ? '區域連線' : 'LAN Connection');
     const normalizedConnectionError = connectionError
         ? formatConnectionError(connectionError, isZh)
         : null;
@@ -314,8 +358,8 @@ const GameModals: React.FC<GameModalsProps> = ({
         reconnect: isZh ? '重新連線' : 'Reconnect',
         switchMode: isZh ? '切換連線模式' : 'Switch Connection Mode',
         lanConnection: networkMode === 'photon'
-            ? (isZh ? '雲端連線 (Photon)' : 'Cloud Connection (Photon)')
-            : (isZh ? '區域網路連線' : 'LAN Connection'),
+            ? (isZh ? '線上對決 (Photon)' : 'Online Match (Photon)')
+            : (isZh ? '區域連線 (PeerJS)' : 'LAN Connection (PeerJS)'),
         enterRoomCode: isZh ? '輸入房間碼' : 'Enter Room Code',
         inputRoomHint: networkMode === 'photon'
             ? (isZh ? '輸入 4 位數房間 ID 加入雲端房間' : 'Input a 4-digit room ID to join a cloud room')
@@ -331,6 +375,8 @@ const GameModals: React.FC<GameModalsProps> = ({
         joinExistingRoom: isZh ? '加入既有房間' : 'Join Existing Room',
         roomId: isZh ? '房間 ID' : 'Room ID',
         roomName: isZh ? '房間名稱' : 'Room Name',
+        roomNameSelectHint: isZh ? '請選擇房間名稱' : 'Select Room Name',
+        roomNameLimitedOnline: isZh ? '線上對戰只能選擇指定房間名稱。' : 'Online Match allows only preset room names.',
         allowDevToolsInPvpRoom: isZh ? 'PvP 對戰開放 Dev Tools/Sandbox' : 'Allow Dev Tools/Sandbox in PvP',
         waiting: isZh ? '等待中' : 'Waiting',
         playing: isZh ? '遊戲中' : 'Playing',
@@ -338,12 +384,17 @@ const GameModals: React.FC<GameModalsProps> = ({
         refreshId: isZh ? '重產 ID' : 'New',
         status: isZh ? '連線狀態' : 'Status',
         connectionMode: isZh ? '連線模式' : 'Mode',
-        modePhoton: isZh ? 'Photon 雲端' : 'Photon Cloud',
-        modePeerjs: isZh ? 'PeerJS 區域' : 'PeerJS LAN',
+        modePhoton: isZh ? '線上對決' : 'Online Match',
+        modePeerjs: isZh ? '區域連線' : 'LAN Connection',
         switchModeHint: isZh ? '切換後會自動重新整理。' : 'Switching mode will reload the page.',
         switchingMode: isZh ? '正在切換模式...' : 'Switching mode...',
         moreInfo: isZh ? '查看更多資訊' : 'View More Info',
         hideInfo: isZh ? '隱藏資訊' : 'Hide Info',
+        photonAppIdTitle: isZh ? '現在正在何處遊玩?' : 'Where Are You Playing?',
+        photonAppIdCurrent: isZh ? '目前位置' : 'Current Location',
+        photonAppIdHint: isZh ? '選好後這個視窗會自動收起。' : 'This panel closes after you choose.',
+        active: isZh ? '目前' : 'Active',
+        roomCount: isZh ? '房間數' : 'Room Count',
         localPeer: isZh ? '本機 Peer ID' : 'Local Peer ID',
         remotePeer: isZh ? '遠端 Peer ID' : 'Remote Peer ID',
         joinedRoom: isZh ? '已加入房間' : 'Joined Room',
@@ -356,6 +407,115 @@ const GameModals: React.FC<GameModalsProps> = ({
     const isUltraLowDetail = detailMode === 'ultra_low';
     const roomIdPreview = roomId || (joinMode === 'join' ? roomCode.trim() : createRoomId.trim()) || '-';
     const visibleConnectionError = networkUiError || delayedConnectionError;
+    const availablePhotonAppIds = getAvailablePhotonAppIds();
+    const sortedPhotonAppIds = [...availablePhotonAppIds].sort((a, b) => (
+        getPhotonAppIdRank(a) - getPhotonAppIdRank(b) || a.localeCompare(b)
+    ));
+    const preferredPhotonAppLabel = getPhotonAppIdDisplayName(preferredPhotonAppId, isZh);
+    const normalizedCreateRoomName = createRoomName.trim();
+    const isOnlineRoomNameValid = networkMode !== 'photon' || isOnlineMatchRoomName(normalizedCreateRoomName);
+    const lobbyPreviewRooms = networkMode === 'photon'
+        ? LOBBY_PREVIEW_ROOMS.filter((room) => isOnlineMatchRoomName(room.name))
+        : LOBBY_PREVIEW_ROOMS;
+    const liveLobbyRoomById = useMemo(() => {
+        const lookup = new Map<string, { playerCount: number; maxPlayers: number; isOpen: boolean; isVisible: boolean }>();
+        lobbyRooms.forEach((roomSnapshot) => {
+            const normalizedId = roomSnapshot.roomId.trim();
+            if (!normalizedId) {
+                return;
+            }
+            lookup.set(normalizedId, {
+                playerCount: Math.max(0, roomSnapshot.playerCount),
+                maxPlayers: Math.max(1, roomSnapshot.maxPlayers || 2),
+                isOpen: roomSnapshot.isOpen,
+                isVisible: roomSnapshot.isVisible
+            });
+        });
+        return lookup;
+    }, [lobbyRooms]);
+    const lobbyPreviewCards = useMemo(() => (
+        lobbyPreviewRooms.map((room) => {
+            const liveRoom = liveLobbyRoomById.get(room.id);
+            const playerCount = liveRoom?.playerCount ?? 0;
+            const maxPlayers = liveRoom?.maxPlayers ?? 2;
+            const hasLiveRoom = Boolean(liveRoom);
+            const canJoin = Boolean(liveRoom && liveRoom.isOpen && liveRoom.isVisible && playerCount < maxPlayers);
+            return {
+                ...room,
+                playerCount,
+                maxPlayers,
+                hasLiveRoom,
+                canJoin
+            };
+        })
+    ), [lobbyPreviewRooms, liveLobbyRoomById]);
+    const canCreateRoom = (
+        isValidPeerId(createRoomId.trim()) &&
+        normalizedCreateRoomName.length > 0 &&
+        isOnlineRoomNameValid &&
+        (!createRoomNeedsPassword || createRoomPassword.trim().length > 0)
+    );
+
+    useEffect(() => {
+        if (networkMode !== 'photon') {
+            return;
+        }
+        setPreferredPhotonAppIdState(getPreferredPhotonAppId());
+    }, [networkMode, showJoinModal, showAdvancedNetworkInfo]);
+
+    useEffect(() => {
+        if (networkMode !== 'photon') {
+            return;
+        }
+        setCreateRoomName((current) => (isOnlineMatchRoomName(current.trim()) ? current : ''));
+    }, [networkMode, showJoinModal]);
+
+    useEffect(() => {
+        if (!showJoinModal) {
+            photonLobbyProbeRef.current = false;
+            return;
+        }
+        if (networkMode !== 'photon' || roomId) {
+            return;
+        }
+        if (
+            connectionStatus === 'peer-opening' ||
+            connectionStatus === 'peer-ready' ||
+            connectionStatus === 'connecting' ||
+            connectionStatus === 'connected' ||
+            connectionStatus === 'reconnecting'
+        ) {
+            return;
+        }
+        if (photonLobbyProbeRef.current) {
+            return;
+        }
+
+        photonLobbyProbeRef.current = true;
+        openPeer()
+            .then(() => {
+                setNetworkUiError((current) => {
+                    if (!current) {
+                        return current;
+                    }
+                    const lower = current.toLowerCase();
+                    if (lower.includes('photon') || lower.includes('master') || lower.includes('region')) {
+                        return null;
+                    }
+                    return current;
+                });
+            })
+            .catch((probeError) => {
+                photonLobbyProbeRef.current = false;
+                setNetworkUiError(probeError instanceof Error ? probeError.message : String(probeError));
+            });
+    }, [connectionStatus, networkMode, openPeer, roomId, showJoinModal]);
+
+    useEffect(() => {
+        if (showJoinModal) {
+            setShowAdvancedNetworkInfo(false);
+        }
+    }, [showJoinModal]);
 
     useEffect(() => {
         setDelayedConnectionError(null);
@@ -574,6 +734,10 @@ const GameModals: React.FC<GameModalsProps> = ({
         }
         if (createRoomNeedsPassword && !roomPassword) {
             setNetworkUiError(uiText.passwordRequired);
+            return;
+        }
+        if (networkMode === 'photon' && !isOnlineMatchRoomName(roomName)) {
+            setNetworkUiError(uiText.roomNameLimitedOnline);
             return;
         }
 
@@ -883,33 +1047,33 @@ const GameModals: React.FC<GameModalsProps> = ({
                                     </h2>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                    {LOBBY_PREVIEW_ROOMS.map(room => {
-                                        const canJoin = room.status === 'waiting';
+                                    {lobbyPreviewCards.map(room => {
+                                        const isHighlighted = room.hasLiveRoom;
                                         return (
                                             <div
                                                 key={room.id}
                                                 onClick={() => {
-                                                    if (!canJoin) return;
+                                                    if (!isHighlighted) return;
                                                     setJoinMode('join');
                                                     setRoomCode(room.id);
+                                                    setNetworkUiError(null);
                                                 }}
-                                                className={`p-4 rounded-xl border transition-all flex items-center justify-between gap-4 ${canJoin
-                                                    ? 'border-slate-600 hover:border-cyan-400 bg-slate-800/40 hover:bg-slate-800/80 cursor-pointer'
-                                                    : 'border-slate-800 bg-slate-900/60 opacity-60 cursor-not-allowed'}`}
+                                                className={`p-4 rounded-xl border transition-all flex items-center justify-between gap-4 ${isHighlighted
+                                                    ? 'border-cyan-500/70 bg-slate-800/60 shadow-[0_0_18px_rgba(34,211,238,0.2)] hover:border-cyan-300 hover:bg-slate-800/85 cursor-pointer'
+                                                    : 'border-slate-800 bg-slate-900/60 opacity-55 cursor-not-allowed'}`}
                                             >
                                                 <div className="min-w-0">
-                                                    <div className={`font-black text-2xl md:text-3xl leading-tight ${canJoin ? 'text-white' : 'text-slate-500'}`}>
+                                                    <div className={`font-black text-2xl md:text-3xl leading-tight ${isHighlighted ? 'text-white drop-shadow-[0_0_14px_rgba(34,211,238,0.35)]' : 'text-slate-500'}`}>
                                                         {room.name}
                                                     </div>
-                                                    <div className="text-xs font-mono text-slate-400 mt-1">ID: {room.id}</div>
                                                 </div>
-                                                <div className="flex items-center gap-4 shrink-0">
-                                                    <div className={`px-3 py-1 rounded-full text-xs font-black ${canJoin ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
-                                                        {canJoin ? uiText.waiting : uiText.playing}
+                                                <div className="flex flex-col items-end shrink-0">
+                                                    <div className="text-[10px] font-mono uppercase tracking-wide text-slate-400">
+                                                        {uiText.roomCount}
                                                     </div>
-                                                    <div className="flex items-center gap-1 text-slate-300">
+                                                    <div className={`mt-0.5 flex items-center gap-1 ${isHighlighted ? 'text-cyan-200' : 'text-slate-400'}`}>
                                                         <Users size={14} />
-                                                        <span className="text-sm font-mono">{room.players}/{room.maxPlayers}</span>
+                                                        <span className="text-sm font-mono">{room.playerCount}/{room.maxPlayers}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -923,13 +1087,54 @@ const GameModals: React.FC<GameModalsProps> = ({
 
                                 <div className="relative z-10 w-full max-w-sm h-full min-h-0 flex flex-col">
                                     <div className="space-y-4">
+                                        {renderNetworkModeSwitcher()}
+
                                         {showAdvancedNetworkInfo && (
                                             <>
-                                                {renderNetworkModeSwitcher()}
+                                                {networkMode === 'photon' && sortedPhotonAppIds.length > 0 && (
+                                                    <div className="rounded border border-slate-700 bg-slate-950/70 p-3 text-[11px] font-mono text-cyan-200">
+                                                        <div className="text-slate-300">{uiText.photonAppIdTitle}</div>
+                                                        <div className="mt-2 grid gap-2">
+                                                            {sortedPhotonAppIds.map((appId) => {
+                                                                const isActiveAppId = preferredPhotonAppId === appId;
+                                                                return (
+                                                                    <button
+                                                                        key={appId}
+                                                                        onClick={() => {
+                                                                            savePreferredPhotonAppId(appId);
+                                                                            setPreferredPhotonAppIdState(appId);
+                                                                            setNetworkUiError(null);
+                                                                            setShowAdvancedNetworkInfo(false);
+                                                                        }}
+                                                                        className={`flex items-center justify-between rounded border px-2 py-1.5 text-[11px] transition-colors ${
+                                                                            isActiveAppId
+                                                                                ? 'border-cyan-400 bg-cyan-600/30 text-cyan-100'
+                                                                                : 'border-slate-600 bg-slate-900 text-slate-300 hover:border-cyan-500/70 hover:text-cyan-200'
+                                                                        }`}
+                                                                    >
+                                                                        <span>{getPhotonAppIdDisplayName(appId, isZh)}</span>
+                                                                        <span className={`text-[10px] ${isActiveAppId ? 'text-cyan-100' : 'text-slate-500'}`}>
+                                                                            {isActiveAppId ? uiText.active : ''}
+                                                                        </span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        <div className="mt-2 text-[10px] text-slate-400">
+                                                            {uiText.photonAppIdCurrent}: {preferredPhotonAppLabel || '-'}
+                                                        </div>
+                                                        <div className="mt-1 text-[10px] text-slate-500">
+                                                            {uiText.photonAppIdHint}
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div className="rounded border border-slate-700 bg-slate-950/70 p-3 text-[11px] font-mono text-cyan-200">
                                                     <div>{uiText.status}: {connectionStatus}</div>
                                                     <div>{uiText.connectionMode}: {networkModeLabel}</div>
                                                     <div className="break-all">{uiText.roomId}: {roomIdPreview}</div>
+                                                    {networkMode === 'photon' && (
+                                                        <div>{uiText.photonAppIdCurrent}: {preferredPhotonAppLabel || '-'}</div>
+                                                    )}
                                                     <div className="break-all">{uiText.localPeer}: {localPeerId || '-'}</div>
                                                     <div className="break-all">{uiText.remotePeer}: {remotePeerId || '-'}</div>
                                                 </div>
@@ -1013,13 +1218,30 @@ const GameModals: React.FC<GameModalsProps> = ({
                                                         {uiText.refreshId}
                                                     </button>
                                                 </div>
-                                                <input
-                                                    type="text"
-                                                    value={createRoomName}
-                                                    onChange={(event) => setCreateRoomName(event.target.value)}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white"
-                                                    placeholder={uiText.roomName}
-                                                />
+                                                {networkMode === 'photon' ? (
+                                                    <select
+                                                        value={createRoomName}
+                                                        onChange={(event) => setCreateRoomName(event.target.value)}
+                                                        className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white cursor-pointer"
+                                                    >
+                                                        <option value="" className="bg-slate-900 text-slate-400">
+                                                            {uiText.roomNameSelectHint}
+                                                        </option>
+                                                        {ONLINE_MATCH_ROOM_NAME_OPTIONS.map((name) => (
+                                                            <option key={name} value={name} className="bg-slate-900 text-white">
+                                                                {name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={createRoomName}
+                                                        onChange={(event) => setCreateRoomName(event.target.value)}
+                                                        className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white"
+                                                        placeholder={uiText.roomName}
+                                                    />
+                                                )}
                                                 <label className="flex items-center justify-between rounded border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-200">
                                                     <span>{uiText.requirePassword}</span>
                                                     <input
@@ -1056,7 +1278,7 @@ const GameModals: React.FC<GameModalsProps> = ({
                                                 )}
                                                 <button
                                                     onClick={handleCreateRoom}
-                                                    disabled={!isValidPeerId(createRoomId.trim()) || !createRoomName.trim() || (createRoomNeedsPassword && !createRoomPassword.trim())}
+                                                    disabled={!canCreateRoom}
                                                     className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-black disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     {uiText.createRoom}
@@ -1188,3 +1410,4 @@ const GameModals: React.FC<GameModalsProps> = ({
 };
 
 export default GameModals;
+
