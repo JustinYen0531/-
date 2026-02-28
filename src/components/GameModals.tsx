@@ -181,6 +181,10 @@ const isOnlineMatchRoomName = (value: string): boolean => (
     (ONLINE_MATCH_ROOM_NAME_OPTIONS as readonly string[]).includes(value)
 );
 
+const getOnlineMatchRoomIdByName = (roomName: string): string => (
+    LOBBY_PREVIEW_ROOMS.find((room) => room.name === roomName)?.id || ''
+);
+
 const isTransientNetworkProbeError = (message: string): boolean => {
     const lower = message.trim().toLowerCase();
     return (
@@ -601,9 +605,20 @@ const GameModals: React.FC<GameModalsProps> = ({
         if (joinMode !== 'create') {
             return;
         }
+        if (networkMode === 'photon') {
+            return;
+        }
 
         setCreateRoomId((currentId) => currentId || generatePeerId());
-    }, [generatePeerId, joinMode]);
+    }, [generatePeerId, joinMode, networkMode]);
+
+    useEffect(() => {
+        if (joinMode !== 'create' || networkMode !== 'photon') {
+            return;
+        }
+        const mappedRoomId = getOnlineMatchRoomIdByName(createRoomName.trim());
+        setCreateRoomId(mappedRoomId);
+    }, [createRoomName, joinMode, networkMode]);
 
     useEffect(() => {
         if (!roomId || !isConnected || !remotePeerId) return;
@@ -797,8 +812,8 @@ const GameModals: React.FC<GameModalsProps> = ({
         }
     };
 
-    const handleJoinRoom = async () => {
-        const targetRoomId = roomCode.trim();
+    const joinRoomById = async (targetRoomIdInput: string) => {
+        const targetRoomId = targetRoomIdInput.trim();
         if (!targetRoomId) return;
         if (!isValidPeerId(targetRoomId)) {
             setNetworkUiError(peerIdValidationText);
@@ -816,6 +831,10 @@ const GameModals: React.FC<GameModalsProps> = ({
         } catch (openError) {
             setNetworkUiError(openError instanceof Error ? openError.message : String(openError));
         }
+    };
+
+    const handleJoinRoom = async () => {
+        await joinRoomById(roomCode);
     };
 
     const handleStartMultiplayerGame = () => {
@@ -1099,8 +1118,14 @@ const GameModals: React.FC<GameModalsProps> = ({
                                                 onClick={() => {
                                                     if (!isHighlighted) return;
                                                     setJoinMode('join');
-                                                    setRoomCode(room.id);
                                                     setNetworkUiError(null);
+                                                    if (roomCode.trim() === room.id) {
+                                                        if (room.canJoin) {
+                                                            void joinRoomById(room.id);
+                                                        }
+                                                        return;
+                                                    }
+                                                    setRoomCode(room.id);
                                                 }}
                                                 className={`p-4 rounded-xl border transition-all flex items-center justify-between gap-4 ${isHighlighted
                                                     ? 'border-cyan-500/70 bg-slate-800/60 shadow-[0_0_18px_rgba(34,211,238,0.2)] hover:border-cyan-300 hover:bg-slate-800/85 cursor-pointer'
@@ -1248,24 +1273,39 @@ const GameModals: React.FC<GameModalsProps> = ({
                                                     <input
                                                         type="text"
                                                         value={createRoomId}
-                                                        onChange={(event) => setCreateRoomId(normalizePeerIdInput(event.target.value))}
-                                                        className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white font-mono"
+                                                        onChange={(event) => {
+                                                            if (networkMode === 'photon') {
+                                                                return;
+                                                            }
+                                                            setCreateRoomId(normalizePeerIdInput(event.target.value));
+                                                        }}
+                                                        readOnly={networkMode === 'photon'}
+                                                        className={`w-full border border-slate-700 rounded p-3 text-white font-mono ${networkMode === 'photon'
+                                                            ? 'bg-slate-900/70 cursor-not-allowed'
+                                                            : 'bg-slate-900'
+                                                            }`}
                                                         placeholder={uiText.roomId}
                                                         inputMode="numeric"
                                                         pattern="[0-9]{4}"
                                                         maxLength={4}
                                                     />
-                                                    <button
-                                                        onClick={() => setCreateRoomId(generatePeerId())}
-                                                        className="px-3 py-2 rounded border border-slate-600 text-xs font-bold hover:bg-slate-800"
-                                                    >
-                                                        {uiText.refreshId}
-                                                    </button>
+                                                    {networkMode !== 'photon' && (
+                                                        <button
+                                                            onClick={() => setCreateRoomId(generatePeerId())}
+                                                            className="px-3 py-2 rounded border border-slate-600 text-xs font-bold hover:bg-slate-800"
+                                                        >
+                                                            {uiText.refreshId}
+                                                        </button>
+                                                    )}
                                                 </div>
                                                 {networkMode === 'photon' ? (
                                                     <select
                                                         value={createRoomName}
-                                                        onChange={(event) => setCreateRoomName(event.target.value)}
+                                                        onChange={(event) => {
+                                                            const nextRoomName = event.target.value;
+                                                            setCreateRoomName(nextRoomName);
+                                                            setCreateRoomId(getOnlineMatchRoomIdByName(nextRoomName));
+                                                        }}
                                                         className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white cursor-pointer"
                                                     >
                                                         <option value="" className="bg-slate-900 text-slate-400">
