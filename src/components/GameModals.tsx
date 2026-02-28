@@ -181,6 +181,20 @@ const isOnlineMatchRoomName = (value: string): boolean => (
     (ONLINE_MATCH_ROOM_NAME_OPTIONS as readonly string[]).includes(value)
 );
 
+const isTransientNetworkProbeError = (message: string): boolean => {
+    const lower = message.trim().toLowerCase();
+    return (
+        lower.includes('nameserver') ||
+        lower.includes('master peer error') ||
+        lower.includes('master server closed connection') ||
+        lower.includes('connect failed') ||
+        lower.includes('connect closed') ||
+        lower.includes('timeout') ||
+        lower.includes('network connection lost') ||
+        lower.includes('trying to reconnect')
+    );
+};
+
 const isValidPeerId = (value: string): boolean => PEER_ID_PATTERN.test(value);
 
 const isAuthResultPayload = (payload: unknown): payload is AuthResultPayload => {
@@ -216,6 +230,21 @@ const formatConnectionError = (message: string, isZh: boolean): string => {
     }
     if (lower.includes('photon region is invalid')) {
         return isZh ? 'Photon 區域設定錯誤，請檢查 VITE_PHOTON_REGION。' : 'Photon region is invalid. Check VITE_PHOTON_REGION.';
+    }
+    if (lower.includes('nameserver')) {
+        return isZh
+            ? 'Photon 雲端連線暫時不穩（NameServer）。系統會自動重試，請稍候。'
+            : 'Photon cloud connection is unstable (NameServer). The system will retry automatically.';
+    }
+    if (lower.includes('master peer error') || lower.includes('master server closed connection')) {
+        return isZh
+            ? 'Photon 主伺服器連線中斷，系統正在自動重連。'
+            : 'Photon master server connection was interrupted. Reconnecting automatically.';
+    }
+    if (lower.includes('connect failed') || lower.includes('connect closed') || lower.includes('timeout')) {
+        return isZh
+            ? 'Photon 連線逾時或失敗，請稍後再試。'
+            : 'Photon connection failed or timed out. Please try again shortly.';
     }
     if (lower.includes('plugin mismatch') || lower.includes('unsupported plugin') || lower.includes('plugin error')) {
         return isZh
@@ -506,8 +535,12 @@ const GameModals: React.FC<GameModalsProps> = ({
                 });
             })
             .catch((probeError) => {
-                photonLobbyProbeRef.current = false;
-                setNetworkUiError(probeError instanceof Error ? probeError.message : String(probeError));
+                const probeMessage = probeError instanceof Error ? probeError.message : String(probeError);
+                if (isTransientNetworkProbeError(probeMessage)) {
+                    setNetworkUiError(null);
+                    return;
+                }
+                setNetworkUiError(probeMessage);
             });
     }, [connectionStatus, networkMode, openPeer, roomId, showJoinModal]);
 
@@ -516,6 +549,17 @@ const GameModals: React.FC<GameModalsProps> = ({
             setShowAdvancedNetworkInfo(false);
         }
     }, [showJoinModal]);
+
+    useEffect(() => {
+        if (connectionStatus === 'peer-ready' || connectionStatus === 'connected') {
+            setNetworkUiError((current) => {
+                if (!current) {
+                    return current;
+                }
+                return isTransientNetworkProbeError(current) ? null : current;
+            });
+        }
+    }, [connectionStatus]);
 
     useEffect(() => {
         setDelayedConnectionError(null);
