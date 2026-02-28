@@ -148,6 +148,180 @@ const normalizePeerIdInput = (value: string): string => (
 
 const OFFICIAL_SITE_PHOTON_APP_ID = '15b845ad-9011-4f7e-b9fd-78c9e8aab8dc';
 const ITCH_IO_PHOTON_APP_ID = '9f22e99c-fdd6-45ce-98e1-0014d7115e98';
+const MAX_PLATFORM_ONLINE_COUNT = 20;
+const ONLINE_COUNT_REFRESH_INTERVAL_MS = 12000;
+const ONLINE_COUNT_FETCH_TIMEOUT_MS = 4500;
+const ONLINE_COUNT_LOBBY_SETTLE_MS = 700;
+const PHOTON_PROBE_REGION = (import.meta.env.VITE_PHOTON_REGION || 'us').trim() || 'us';
+const PHOTON_PROBE_APP_VERSION = (import.meta.env.VITE_PHOTON_APP_VERSION || '1.0').trim() || '1.0';
+
+type PhotonProbeRoomLike = {
+    playerCount?: number;
+    removed?: boolean;
+};
+
+type PhotonProbeClientLike = {
+    connectToRegionMaster: (region: string) => boolean;
+    disconnect: () => void;
+    availableRooms?: () => PhotonProbeRoomLike[];
+    setUserId?: (userId: string) => void;
+    onStateChange?: (state: number) => void;
+    onError?: (code: number, message: string) => void;
+    onRoomList?: (roomInfos: PhotonProbeRoomLike[]) => void;
+    onRoomListUpdate?: (roomInfos: PhotonProbeRoomLike[]) => void;
+    onOperationResponse?: (errorCode: number, errorMessage: string, operationCode: number) => void;
+};
+
+interface PhotonProbeLoadBalancingClientCtor {
+    new (protocol: number, appId: string, appVersion: string): PhotonProbeClientLike;
+    State?: Record<string, number>;
+    StateToName?: (state: number) => string;
+}
+
+interface PhotonProbeModuleLike {
+    ConnectionProtocol: {
+        Wss: number;
+    };
+    PhotonPeer?: {
+        setWebSocketImpl?: (impl: unknown) => void;
+    };
+    LoadBalancing: {
+        LoadBalancingClient: PhotonProbeLoadBalancingClientCtor;
+    };
+}
+
+let photonProbeModulePromise: Promise<PhotonProbeModuleLike> | null = null;
+
+const loadPhotonProbeModule = async (): Promise<PhotonProbeModuleLike> => {
+    if (!photonProbeModulePromise) {
+        photonProbeModulePromise = import('photon-realtime').then((loaded) => {
+            const resolved = (loaded as { default?: unknown }).default ?? loaded;
+            return resolved as PhotonProbeModuleLike;
+        });
+    }
+    return photonProbeModulePromise;
+};
+
+const sumLobbyPlayers = (roomInfos: PhotonProbeRoomLike[] | null | undefined): number => {
+    if (!Array.isArray(roomInfos)) {
+        return 0;
+    }
+    return roomInfos.reduce((sum, room) => {
+        if (!room || room.removed) {
+            return sum;
+        }
+        const count = typeof room.playerCount === 'number' ? room.playerCount : 0;
+        return sum + Math.max(0, count);
+    }, 0);
+};
+
+const fetchPhotonConcurrentCount = async (appId: string): Promise<number | null> => {
+    const normalizedAppId = appId.trim();
+    if (!normalizedAppId) {
+        return null;
+    }
+
+    try {
+        const photonModule = await loadPhotonProbeModule();
+        if (
+            typeof window !== 'undefined' &&
+            typeof window.WebSocket === 'function' &&
+            photonModule.PhotonPeer?.setWebSocketImpl
+        ) {
+            photonModule.PhotonPeer.setWebSocketImpl(window.WebSocket);
+        }
+
+        const LBC = photonModule.LoadBalancing.LoadBalancingClient;
+        const client = new LBC(
+            photonModule.ConnectionProtocol.Wss,
+            normalizedAppId,
+            PHOTON_PROBE_APP_VERSION
+        );
+
+        client.setUserId?.(`minechess-count-${Math.random().toString(36).slice(2, 10)}`);
+
+        return await new Promise<number | null>((resolve) => {
+            let settled = false;
+            let roomSnapshot: PhotonProbeRoomLike[] = [];
+            let settleTimer: ReturnType<typeof setTimeout> | null = null;
+            const timeoutTimer = setTimeout(() => {
+                finish(null);
+            }, ONLINE_COUNT_FETCH_TIMEOUT_MS);
+
+            const finish = (value: number | null) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                clearTimeout(timeoutTimer);
+                if (settleTimer) {
+                    clearTimeout(settleTimer);
+                    settleTimer = null;
+                }
+                try {
+                    client.disconnect();
+                } catch {
+                    // no-op
+                }
+                resolve(value);
+            };
+
+            const updateRoomSnapshot = (rooms: PhotonProbeRoomLike[] | null | undefined) => {
+                if (Array.isArray(rooms)) {
+                    roomSnapshot = rooms;
+                }
+            };
+
+            const finalizeFromSnapshot = () => {
+                if (roomSnapshot.length === 0 && typeof client.availableRooms === 'function') {
+                    updateRoomSnapshot(client.availableRooms());
+                }
+                const onlineCount = Math.min(MAX_PLATFORM_ONLINE_COUNT, sumLobbyPlayers(roomSnapshot));
+                finish(onlineCount);
+            };
+
+            client.onRoomList = (rooms) => {
+                updateRoomSnapshot(rooms);
+            };
+
+            client.onRoomListUpdate = (rooms) => {
+                updateRoomSnapshot(rooms);
+            };
+
+            client.onError = () => {
+                finish(null);
+            };
+
+            client.onOperationResponse = (errorCode: number) => {
+                if (errorCode) {
+                    finish(null);
+                }
+            };
+
+            const joinedLobbyState = LBC.State?.JoinedLobby;
+            client.onStateChange = (state: number) => {
+                const stateName = typeof LBC.StateToName === 'function' ? LBC.StateToName(state) : '';
+                const isJoinedLobby = (
+                    (typeof joinedLobbyState === 'number' && state === joinedLobbyState) ||
+                    stateName === 'JoinedLobby'
+                );
+                if (!isJoinedLobby) {
+                    return;
+                }
+                settleTimer = setTimeout(() => {
+                    finalizeFromSnapshot();
+                }, ONLINE_COUNT_LOBBY_SETTLE_MS);
+            };
+
+            const connected = client.connectToRegionMaster(PHOTON_PROBE_REGION);
+            if (!connected) {
+                finish(null);
+            }
+        });
+    } catch {
+        return null;
+    }
+};
 
 const getPhotonAppIdRank = (appId: string): number => {
     if (appId === OFFICIAL_SITE_PHOTON_APP_ID) {
@@ -354,6 +528,10 @@ const GameModals: React.FC<GameModalsProps> = ({
     const [showAdvancedNetworkInfo, setShowAdvancedNetworkInfo] = useState(false);
     const [expandedLobbyName, setExpandedLobbyName] = useState<string | null>(null);
     const [preferredPhotonAppId, setPreferredPhotonAppIdState] = useState<string>(() => getPreferredPhotonAppId());
+    const [crossAppOnlineCounts, setCrossAppOnlineCounts] = useState<Record<string, number | null>>(() => ({
+        [OFFICIAL_SITE_PHOTON_APP_ID]: null,
+        [ITCH_IO_PHOTON_APP_ID]: null
+    }));
     const helloSentKeyRef = useRef('');
     const photonLobbyProbeRef = useRef(false);
     const lastHostLobbyStatusRef = useRef<'waiting_players' | 'waiting_start' | 'playing' | null>(null);
@@ -457,6 +635,18 @@ const GameModals: React.FC<GameModalsProps> = ({
         getPhotonAppIdRank(a) - getPhotonAppIdRank(b) || a.localeCompare(b)
     ));
     const preferredPhotonAppLabel = getPhotonAppIdDisplayName(preferredPhotonAppId, isZh);
+    const platformOnlineSummary = useMemo(() => ([
+        {
+            appId: OFFICIAL_SITE_PHOTON_APP_ID,
+            label: getPhotonAppIdDisplayName(OFFICIAL_SITE_PHOTON_APP_ID, isZh),
+            count: crossAppOnlineCounts[OFFICIAL_SITE_PHOTON_APP_ID]
+        },
+        {
+            appId: ITCH_IO_PHOTON_APP_ID,
+            label: getPhotonAppIdDisplayName(ITCH_IO_PHOTON_APP_ID, isZh),
+            count: crossAppOnlineCounts[ITCH_IO_PHOTON_APP_ID]
+        }
+    ]), [crossAppOnlineCounts, isZh]);
     const normalizedCreateRoomName = createRoomName.trim();
     const isOnlineRoomNameValid = networkMode !== 'photon' || isOnlineMatchRoomName(normalizedCreateRoomName);
     const lobbyPreviewRooms = networkMode === 'photon'
@@ -526,6 +716,51 @@ const GameModals: React.FC<GameModalsProps> = ({
         }
         setPreferredPhotonAppIdState(getPreferredPhotonAppId());
     }, [networkMode, showJoinModal, showAdvancedNetworkInfo]);
+
+    useEffect(() => {
+        if (!showJoinModal || networkMode !== 'photon') {
+            return;
+        }
+
+        let canceled = false;
+        let inFlight = false;
+        let refreshTimer: ReturnType<typeof setInterval> | null = null;
+        setCrossAppOnlineCounts({
+            [OFFICIAL_SITE_PHOTON_APP_ID]: null,
+            [ITCH_IO_PHOTON_APP_ID]: null
+        });
+
+        const refreshCrossAppOnlineCounts = async () => {
+            if (inFlight) {
+                return;
+            }
+            inFlight = true;
+            const [officialCount, itchCount] = await Promise.all([
+                fetchPhotonConcurrentCount(OFFICIAL_SITE_PHOTON_APP_ID),
+                fetchPhotonConcurrentCount(ITCH_IO_PHOTON_APP_ID)
+            ]);
+            inFlight = false;
+            if (canceled) {
+                return;
+            }
+            setCrossAppOnlineCounts({
+                [OFFICIAL_SITE_PHOTON_APP_ID]: officialCount,
+                [ITCH_IO_PHOTON_APP_ID]: itchCount
+            });
+        };
+
+        void refreshCrossAppOnlineCounts();
+        refreshTimer = setInterval(() => {
+            void refreshCrossAppOnlineCounts();
+        }, ONLINE_COUNT_REFRESH_INTERVAL_MS);
+
+        return () => {
+            canceled = true;
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+        };
+    }, [networkMode, showJoinModal]);
 
     useEffect(() => {
         if (networkMode !== 'photon') {
@@ -1145,11 +1380,26 @@ const GameModals: React.FC<GameModalsProps> = ({
                             </button>
 
                             <div className="w-full lg:w-2/3 border-b lg:border-b-0 lg:border-r border-slate-700/80 bg-slate-900/60 flex flex-col min-h-0">
-                                <div className="p-5 border-b border-slate-700/80 bg-slate-800/40">
+                                <div className="p-5 border-b border-slate-700/80 bg-slate-800/40 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                     <h2 className="text-3xl font-black text-white flex items-center gap-2">
                                         <Users size={24} className="text-cyan-400" />
                                         {uiText.lobbyList}
                                     </h2>
+                                    {networkMode === 'photon' && (
+                                        <div className="flex flex-wrap items-center gap-2 justify-start md:justify-end">
+                                            {platformOnlineSummary.map((platform) => (
+                                                <div
+                                                    key={platform.appId}
+                                                    className="rounded-md border border-cyan-500/30 bg-slate-900/65 px-2.5 py-1 text-[10px] font-mono text-cyan-100"
+                                                >
+                                                    <span className="text-slate-300">{platform.label}</span>
+                                                    <span className="ml-1.5 font-bold text-cyan-100">
+                                                        {platform.count === null ? '?' : platform.count}/{MAX_PLATFORM_ONLINE_COUNT}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                     {lobbyPreviewCards.map(room => {
