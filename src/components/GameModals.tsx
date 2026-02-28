@@ -5,7 +5,12 @@ import { Language } from '../i18n';
 import { FlaskConical, Cpu, DoorOpen, Swords, X, ArrowRight, HelpCircle, Crown, Bomb, Users, Info, Settings } from '../icons';
 import Tutorial from './Tutorial';
 import CircularMeteorShower from './CircularMeteorShower';
-import { useConnection } from '../network/ConnectionProvider';
+import {
+    getNetworkMode,
+    setPreferredNetworkMode,
+    type NetworkMode,
+    useConnection
+} from '../network/ConnectionProvider';
 import { AuthResultPayload } from '../network/protocol';
 import developerLogOverviewRaw from '../../遊戲文章總覽.MD?raw';
 import ReactMarkdown from 'react-markdown';
@@ -149,6 +154,47 @@ const isAuthResultPayload = (payload: unknown): payload is AuthResultPayload => 
     );
 };
 
+const formatConnectionError = (message: string, isZh: boolean): string => {
+    const normalized = message.trim();
+    const lower = normalized.toLowerCase();
+
+    if (lower.includes('does not exist')) {
+        return isZh ? '房間不存在，請確認房間 ID。' : 'Room does not exist. Check the Room ID.';
+    }
+    if (lower.includes('is full')) {
+        return isZh ? '房間已滿，請更換房間。' : 'Room is full. Please choose another room.';
+    }
+    if (lower.includes('is closed')) {
+        return isZh ? '房間已關閉，暫時無法加入。' : 'Room is closed and cannot be joined now.';
+    }
+    if (lower.includes('already exists')) {
+        return isZh ? '房間 ID 已存在，請更換一組。' : 'Room ID already exists. Pick another one.';
+    }
+    if (lower.includes('photon authentication failed')) {
+        return isZh ? 'Photon 驗證失敗，請檢查 App ID 設定。' : 'Photon authentication failed. Check your App ID config.';
+    }
+    if (lower.includes('photon region is invalid')) {
+        return isZh ? 'Photon 區域設定錯誤，請檢查 VITE_PHOTON_REGION。' : 'Photon region is invalid. Check VITE_PHOTON_REGION.';
+    }
+    if (lower.includes('network connection lost') || lower.includes('trying to reconnect')) {
+        return isZh ? '連線中斷，系統正在嘗試自動重連。' : 'Connection lost. Trying to reconnect automatically.';
+    }
+
+    return normalized;
+};
+
+const isJoinFlowFatalError = (message: string): boolean => {
+    const lower = message.toLowerCase();
+    return (
+        lower.includes('does not exist') ||
+        lower.includes('is full') ||
+        lower.includes('is closed') ||
+        lower.includes('already exists') ||
+        lower.includes('not allowed to join') ||
+        lower.includes('already joined')
+    );
+};
+
 const GameModals: React.FC<GameModalsProps> = ({
     view,
     gameState,
@@ -169,6 +215,7 @@ const GameModals: React.FC<GameModalsProps> = ({
     detailMode,
     t
 }) => {
+    const networkMode = typeof getNetworkMode === 'function' ? getNetworkMode() : 'peerjs';
     // Dynamically derive DEVELOPER_LOGS to support localization from i18n.ts
     const derivedLogs: DeveloperLogEntry[] = (() => {
         // If the language is Traditional Chinese, always use the raw markdown file
@@ -215,6 +262,8 @@ const GameModals: React.FC<GameModalsProps> = ({
     const [showPveDifficultyPanel, setShowPveDifficultyPanel] = useState(false);
     const [showDeveloperLogModal, setShowDeveloperLogModal] = useState(false);
     const [delayedConnectionError, setDelayedConnectionError] = useState<string | null>(null);
+    const [switchingNetworkMode, setSwitchingNetworkMode] = useState<NetworkMode | null>(null);
+    const [showAdvancedNetworkInfo, setShowAdvancedNetworkInfo] = useState(false);
     const helloSentKeyRef = useRef('');
 
     const {
@@ -235,6 +284,12 @@ const GameModals: React.FC<GameModalsProps> = ({
     } = useConnection();
 
     const isZh = language === 'zh_tw' || language === 'zh_cn';
+    const networkModeLabel = networkMode === 'photon'
+        ? (isZh ? 'Photon 雲端' : 'Photon Cloud')
+        : 'PeerJS';
+    const normalizedConnectionError = connectionError
+        ? formatConnectionError(connectionError, isZh)
+        : null;
     const peerIdValidationText = isZh
         ? 'Room ID 必須是 4 位數字。'
         : 'Room ID must be exactly 4 digits.';
@@ -252,9 +307,14 @@ const GameModals: React.FC<GameModalsProps> = ({
         startGame: isZh ? '開始對戰' : 'Start Game',
         waitingForHost: isZh ? '等待房主開始遊戲' : 'Waiting for host to start game',
         reconnect: isZh ? '重新連線' : 'Reconnect',
-        lanConnection: isZh ? '區域網路連線' : 'LAN Connection',
+        switchMode: isZh ? '切換連線模式' : 'Switch Connection Mode',
+        lanConnection: networkMode === 'photon'
+            ? (isZh ? '雲端連線 (Photon)' : 'Cloud Connection (Photon)')
+            : (isZh ? '區域網路連線' : 'LAN Connection'),
         enterRoomCode: isZh ? '輸入房間碼' : 'Enter Room Code',
-        inputRoomHint: isZh ? '輸入 4 位數房間 ID 加入' : 'Input a 4-digit room ID to join',
+        inputRoomHint: networkMode === 'photon'
+            ? (isZh ? '輸入 4 位數房間 ID 加入雲端房間' : 'Input a 4-digit room ID to join a cloud room')
+            : (isZh ? '輸入 4 位數房間 ID 加入' : 'Input a 4-digit room ID to join'),
         roomPassword: isZh ? '房間密碼' : 'Room Password',
         joinPasswordHint: isZh ? '若房間有密碼，請輸入密碼' : 'Enter password if room is protected',
         requirePassword: isZh ? '需要密碼' : 'Require Password',
@@ -272,6 +332,13 @@ const GameModals: React.FC<GameModalsProps> = ({
         createLobby: isZh ? '創建大廳' : 'Create Room',
         refreshId: isZh ? '重產 ID' : 'New',
         status: isZh ? '連線狀態' : 'Status',
+        connectionMode: isZh ? '連線模式' : 'Mode',
+        modePhoton: isZh ? 'Photon 雲端' : 'Photon Cloud',
+        modePeerjs: isZh ? 'PeerJS 區域' : 'PeerJS LAN',
+        switchModeHint: isZh ? '切換後會自動重新整理。' : 'Switching mode will reload the page.',
+        switchingMode: isZh ? '正在切換模式...' : 'Switching mode...',
+        moreInfo: isZh ? '查看更多資訊' : 'View More Info',
+        hideInfo: isZh ? '隱藏資訊' : 'Hide Info',
         localPeer: isZh ? '本機 Peer ID' : 'Local Peer ID',
         remotePeer: isZh ? '遠端 Peer ID' : 'Remote Peer ID',
         joinedRoom: isZh ? '已加入房間' : 'Joined Room',
@@ -282,20 +349,44 @@ const GameModals: React.FC<GameModalsProps> = ({
     const latestDeveloperLog = derivedLogs[0] ?? null;
     const isLowDetail = detailMode === 'low';
     const isUltraLowDetail = detailMode === 'ultra_low';
+    const roomIdPreview = roomId || (joinMode === 'join' ? roomCode.trim() : createRoomId.trim()) || '-';
     const visibleConnectionError = networkUiError || delayedConnectionError;
 
     useEffect(() => {
         setDelayedConnectionError(null);
-        if (!connectionError || isConnected || connectionStatus === 'connected') {
+        if (!normalizedConnectionError || isConnected || connectionStatus === 'connected') {
             return;
         }
 
         const timer = window.setTimeout(() => {
-            setDelayedConnectionError(connectionError);
+            setDelayedConnectionError(normalizedConnectionError);
         }, 2000);
 
         return () => window.clearTimeout(timer);
-    }, [connectionError, isConnected, connectionStatus]);
+    }, [connectionStatus, isConnected, normalizedConnectionError]);
+
+    useEffect(() => {
+        if (!roomId || isHost) {
+            return;
+        }
+        if (connectionStatus !== 'error') {
+            return;
+        }
+
+        const fallbackMessage = networkUiError || normalizedConnectionError;
+        if (!fallbackMessage || !isJoinFlowFatalError(fallbackMessage)) {
+            return;
+        }
+
+        disconnect();
+        setRoomCode(roomId);
+        setRoomId(null);
+        setJoinedRoomName('');
+        setJoinMode('join');
+        setShowJoinModal(true);
+        setNetworkUiError(fallbackMessage);
+        helloSentKeyRef.current = '';
+    }, [connectionStatus, disconnect, isHost, networkUiError, normalizedConnectionError, roomId, setRoomId]);
 
     useEffect(() => {
         if (joinMode !== 'create') {
@@ -414,6 +505,57 @@ const GameModals: React.FC<GameModalsProps> = ({
         setRoomCode('');
         setJoinRoomPassword('');
         helloSentKeyRef.current = '';
+    };
+
+    const handleSwitchNetworkMode = (mode: NetworkMode) => {
+        if (switchingNetworkMode || mode === networkMode) {
+            return;
+        }
+
+        setSwitchingNetworkMode(mode);
+        resetLobbyNetworkState();
+        if (typeof setPreferredNetworkMode === 'function') {
+            setPreferredNetworkMode(mode);
+        }
+        if (typeof window !== 'undefined') {
+            window.location.reload();
+        }
+    };
+
+    const renderNetworkModeSwitcher = () => {
+        const isSwitching = Boolean(switchingNetworkMode);
+        return (
+            <div className="rounded border border-slate-700 bg-slate-950/70 p-3 text-[11px] font-mono text-cyan-200">
+                <div className="text-slate-300">{uiText.switchMode}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button
+                        onClick={() => handleSwitchNetworkMode('photon')}
+                        disabled={isSwitching || networkMode === 'photon'}
+                        className={`rounded border px-2 py-1.5 text-[11px] font-bold transition-colors ${
+                            networkMode === 'photon'
+                                ? 'border-cyan-400 bg-cyan-600/30 text-cyan-100'
+                                : 'border-slate-600 bg-slate-900 text-slate-300 hover:border-cyan-500/70 hover:text-cyan-200'
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                        {uiText.modePhoton}
+                    </button>
+                    <button
+                        onClick={() => handleSwitchNetworkMode('peerjs')}
+                        disabled={isSwitching || networkMode === 'peerjs'}
+                        className={`rounded border px-2 py-1.5 text-[11px] font-bold transition-colors ${
+                            networkMode === 'peerjs'
+                                ? 'border-cyan-400 bg-cyan-600/30 text-cyan-100'
+                                : 'border-slate-600 bg-slate-900 text-slate-300 hover:border-cyan-500/70 hover:text-cyan-200'
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                        {uiText.modePeerjs}
+                    </button>
+                </div>
+                <div className="mt-2 text-[10px] text-slate-400">
+                    {isSwitching ? uiText.switchingMode : uiText.switchModeHint}
+                </div>
+            </div>
+        );
     };
 
     const handleCreateRoom = async () => {
@@ -644,8 +786,13 @@ const GameModals: React.FC<GameModalsProps> = ({
                     </div>
                 ) : (
                     <div className="relative z-10 mt-8 flex flex-col items-center gap-4">
+                        <div className="w-full min-w-[320px] md:min-w-[420px]">
+                            {renderNetworkModeSwitcher()}
+                        </div>
                         <div className="rounded-2xl border border-cyan-500/60 bg-cyan-950/60 p-4 text-sm font-mono text-cyan-100 min-w-[320px] md:min-w-[420px]">
                             <div>{uiText.status}: {connectionStatus}</div>
+                            <div>{uiText.connectionMode}: {networkModeLabel}</div>
+                            <div className="break-all">{uiText.roomId}: {roomId || '-'}</div>
                             <div className="break-all">{uiText.roomName}: {joinedRoomName || '-'}</div>
                             <div className="break-all">{uiText.localPeer}: {localPeerId || '-'}</div>
                             <div className="break-all">{uiText.remotePeer}: {remotePeerId || '-'}</div>
@@ -696,7 +843,7 @@ const GameModals: React.FC<GameModalsProps> = ({
                 {roomId && (
                     <div className="absolute top-4 left-4 z-20 bg-cyan-900/80 border border-cyan-500 px-4 py-2 rounded-full text-cyan-200 font-bold backdrop-blur-sm shadow-lg shadow-cyan-500/20 flex items-center gap-2">
                         <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        {uiText.joinedRoom}: {roomId}{joinedRoomName ? ` (${joinedRoomName})` : ''}
+                        {uiText.joinedRoom}: {roomId}{joinedRoomName ? ` (${joinedRoomName})` : ''} · {networkModeLabel}
                     </div>
                 )}
 
@@ -769,146 +916,164 @@ const GameModals: React.FC<GameModalsProps> = ({
                             <div className="w-full lg:w-1/3 bg-slate-950/80 flex flex-col items-center justify-start p-6 pt-10 relative overflow-hidden">
                                 <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, cyan 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
 
-                                <div className="relative z-10 w-full max-w-sm space-y-4">
-                                    <div className="rounded border border-slate-700 bg-slate-950/70 p-3 text-[11px] font-mono text-cyan-200">
-                                        <div>{uiText.status}: {connectionStatus}</div>
-                                        <div className="break-all">{uiText.localPeer}: {localPeerId || '-'}</div>
-                                        <div className="break-all">{uiText.remotePeer}: {remotePeerId || '-'}</div>
-                                    </div>
+                                <div className="relative z-10 w-full max-w-sm h-full min-h-0 flex flex-col">
+                                    <div className="space-y-4">
+                                        {showAdvancedNetworkInfo && (
+                                            <>
+                                                {renderNetworkModeSwitcher()}
+                                                <div className="rounded border border-slate-700 bg-slate-950/70 p-3 text-[11px] font-mono text-cyan-200">
+                                                    <div>{uiText.status}: {connectionStatus}</div>
+                                                    <div>{uiText.connectionMode}: {networkModeLabel}</div>
+                                                    <div className="break-all">{uiText.roomId}: {roomIdPreview}</div>
+                                                    <div className="break-all">{uiText.localPeer}: {localPeerId || '-'}</div>
+                                                    <div className="break-all">{uiText.remotePeer}: {remotePeerId || '-'}</div>
+                                                </div>
+                                            </>
+                                        )}
 
-                                    {visibleConnectionError && (
-                                        <div className="rounded border border-red-500/50 bg-red-950/40 p-2 text-xs text-red-200">
-                                            {visibleConnectionError}
-                                        </div>
-                                    )}
-
-                                    {joinMode === 'join' ? (
-                                        <div className="space-y-4">
-                                            <div className="text-center">
-                                                <h3 className="text-3xl font-black text-white mb-1">{uiText.enterRoomCode}</h3>
-                                                <p className="text-xs text-slate-400">{uiText.inputRoomHint}</p>
+                                        {visibleConnectionError && (
+                                            <div className="rounded border border-red-500/50 bg-red-950/40 p-2 text-xs text-red-200">
+                                                {visibleConnectionError}
                                             </div>
+                                        )}
 
-                                            <input
-                                                type="text"
-                                                value={roomCode}
-                                                onChange={(event) => setRoomCode(normalizePeerIdInput(event.target.value))}
-                                                className="w-full bg-slate-900 border-2 border-slate-700 rounded-lg p-4 text-white font-black text-center focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.3)] outline-none text-2xl tracking-[0.2em] transition-all"
-                                                placeholder="____"
-                                                inputMode="numeric"
-                                                pattern="[0-9]{4}"
-                                                maxLength={4}
-                                            />
+                                        {joinMode === 'join' ? (
+                                            <div className="space-y-4">
+                                                <div className="text-center">
+                                                    <h3 className="text-3xl font-black text-white mb-1">{uiText.enterRoomCode}</h3>
+                                                    <p className="text-xs text-slate-400">{uiText.inputRoomHint}</p>
+                                                </div>
 
-                                            <input
-                                                type="password"
-                                                value={joinRoomPassword}
-                                                onChange={(event) => setJoinRoomPassword(event.target.value)}
-                                                className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white"
-                                                placeholder={uiText.joinPasswordHint}
-                                                maxLength={32}
-                                            />
-
-                                            <button
-                                                onClick={handleJoinRoom}
-                                                disabled={!isValidPeerId(roomCode.trim())}
-                                                className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg font-black text-white text-lg shadow-lg shadow-cyan-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                            >
-                                                {uiText.joinRoom}
-                                                <ArrowRight size={18} />
-                                            </button>
-
-                                            <div className="flex items-center justify-center gap-2 pt-3 border-t border-slate-800/50">
-                                                <span className="text-xs text-slate-500">{uiText.noRoomYet}</span>
-                                                <button
-                                                    onClick={() => setJoinMode('create')}
-                                                    className="text-xs font-bold text-cyan-400 hover:text-cyan-300 underline"
-                                                >
-                                                    {uiText.createLobby}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <div className="text-center">
-                                                <h3 className="text-2xl font-black text-white mb-1">{uiText.createLobby}</h3>
-                                                <p className="text-xs text-slate-400">{uiText.lanConnection}</p>
-                                            </div>
-
-                                            <div className="flex gap-2">
                                                 <input
                                                     type="text"
-                                                    value={createRoomId}
-                                                    onChange={(event) => setCreateRoomId(normalizePeerIdInput(event.target.value))}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white font-mono"
-                                                    placeholder={uiText.roomId}
+                                                    value={roomCode}
+                                                    onChange={(event) => setRoomCode(normalizePeerIdInput(event.target.value))}
+                                                    className="w-full bg-slate-900 border-2 border-slate-700 rounded-lg p-4 text-white font-black text-center focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(34,211,238,0.3)] outline-none text-2xl tracking-[0.2em] transition-all"
+                                                    placeholder="____"
                                                     inputMode="numeric"
                                                     pattern="[0-9]{4}"
                                                     maxLength={4}
                                                 />
-                                                <button
-                                                    onClick={() => setCreateRoomId(generatePeerId())}
-                                                    className="px-3 py-2 rounded border border-slate-600 text-xs font-bold hover:bg-slate-800"
-                                                >
-                                                    {uiText.refreshId}
-                                                </button>
-                                            </div>
-                                            <input
-                                                type="text"
-                                                value={createRoomName}
-                                                onChange={(event) => setCreateRoomName(event.target.value)}
-                                                className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white"
-                                                placeholder={uiText.roomName}
-                                            />
-                                            <label className="flex items-center justify-between rounded border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-200">
-                                                <span>{uiText.requirePassword}</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={createRoomNeedsPassword}
-                                                    onChange={(event) => {
-                                                        const nextChecked = event.target.checked;
-                                                        setCreateRoomNeedsPassword(nextChecked);
-                                                        if (!nextChecked) {
-                                                            setCreateRoomPassword('');
-                                                        }
-                                                    }}
-                                                    className="h-4 w-4 accent-cyan-500"
-                                                />
-                                            </label>
-                                            <label className="flex items-center justify-between rounded border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-200">
-                                                <span>{uiText.allowDevToolsInPvpRoom}</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={allowDevToolsInPvpRoom}
-                                                    onChange={(event) => setAllowDevToolsInPvpRoom(event.target.checked)}
-                                                    className="h-4 w-4 accent-cyan-500"
-                                                />
-                                            </label>
-                                            {createRoomNeedsPassword && (
+
                                                 <input
                                                     type="password"
-                                                    value={createRoomPassword}
-                                                    onChange={(event) => setCreateRoomPassword(event.target.value)}
+                                                    value={joinRoomPassword}
+                                                    onChange={(event) => setJoinRoomPassword(event.target.value)}
                                                     className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white"
-                                                    placeholder={uiText.roomPassword}
+                                                    placeholder={uiText.joinPasswordHint}
                                                     maxLength={32}
                                                 />
-                                            )}
-                                            <button
-                                                onClick={handleCreateRoom}
-                                                disabled={!isValidPeerId(createRoomId.trim()) || !createRoomName.trim() || (createRoomNeedsPassword && !createRoomPassword.trim())}
-                                                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-black disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                {uiText.createRoom}
-                                            </button>
-                                            <button
-                                                onClick={() => setJoinMode('join')}
-                                                className="w-full py-2 text-cyan-300 text-sm underline"
-                                            >
-                                                {uiText.joinExistingRoom}
-                                            </button>
-                                        </div>
-                                    )}
+
+                                                <button
+                                                    onClick={handleJoinRoom}
+                                                    disabled={!isValidPeerId(roomCode.trim())}
+                                                    className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg font-black text-white text-lg shadow-lg shadow-cyan-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                                >
+                                                    {uiText.joinRoom}
+                                                    <ArrowRight size={18} />
+                                                </button>
+
+                                                <div className="flex items-center justify-center gap-2 pt-3 border-t border-slate-800/50">
+                                                    <span className="text-xs text-slate-500">{uiText.noRoomYet}</span>
+                                                    <button
+                                                        onClick={() => setJoinMode('create')}
+                                                        className="text-xs font-bold text-cyan-400 hover:text-cyan-300 underline"
+                                                    >
+                                                        {uiText.createLobby}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div className="text-center">
+                                                    <h3 className="text-2xl font-black text-white mb-1">{uiText.createLobby}</h3>
+                                                    <p className="text-xs text-slate-400">{uiText.lanConnection}</p>
+                                                </div>
+
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={createRoomId}
+                                                        onChange={(event) => setCreateRoomId(normalizePeerIdInput(event.target.value))}
+                                                        className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white font-mono"
+                                                        placeholder={uiText.roomId}
+                                                        inputMode="numeric"
+                                                        pattern="[0-9]{4}"
+                                                        maxLength={4}
+                                                    />
+                                                    <button
+                                                        onClick={() => setCreateRoomId(generatePeerId())}
+                                                        className="px-3 py-2 rounded border border-slate-600 text-xs font-bold hover:bg-slate-800"
+                                                    >
+                                                        {uiText.refreshId}
+                                                    </button>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={createRoomName}
+                                                    onChange={(event) => setCreateRoomName(event.target.value)}
+                                                    className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white"
+                                                    placeholder={uiText.roomName}
+                                                />
+                                                <label className="flex items-center justify-between rounded border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-200">
+                                                    <span>{uiText.requirePassword}</span>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={createRoomNeedsPassword}
+                                                        onChange={(event) => {
+                                                            const nextChecked = event.target.checked;
+                                                            setCreateRoomNeedsPassword(nextChecked);
+                                                            if (!nextChecked) {
+                                                                setCreateRoomPassword('');
+                                                            }
+                                                        }}
+                                                        className="h-4 w-4 accent-cyan-500"
+                                                    />
+                                                </label>
+                                                <label className="flex items-center justify-between rounded border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-200">
+                                                    <span>{uiText.allowDevToolsInPvpRoom}</span>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={allowDevToolsInPvpRoom}
+                                                        onChange={(event) => setAllowDevToolsInPvpRoom(event.target.checked)}
+                                                        className="h-4 w-4 accent-cyan-500"
+                                                    />
+                                                </label>
+                                                {createRoomNeedsPassword && (
+                                                    <input
+                                                        type="password"
+                                                        value={createRoomPassword}
+                                                        onChange={(event) => setCreateRoomPassword(event.target.value)}
+                                                        className="w-full bg-slate-900 border border-slate-700 rounded p-3 text-white"
+                                                        placeholder={uiText.roomPassword}
+                                                        maxLength={32}
+                                                    />
+                                                )}
+                                                <button
+                                                    onClick={handleCreateRoom}
+                                                    disabled={!isValidPeerId(createRoomId.trim()) || !createRoomName.trim() || (createRoomNeedsPassword && !createRoomPassword.trim())}
+                                                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-black disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {uiText.createRoom}
+                                                </button>
+                                                <button
+                                                    onClick={() => setJoinMode('join')}
+                                                    className="w-full py-2 text-cyan-300 text-sm underline"
+                                                >
+                                                    {uiText.joinExistingRoom}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-auto pt-3 border-t border-slate-800/60 flex justify-center">
+                                        <button
+                                            onClick={() => setShowAdvancedNetworkInfo((current) => !current)}
+                                            className="text-[11px] text-cyan-300 hover:text-cyan-200 underline underline-offset-2"
+                                        >
+                                            {showAdvancedNetworkInfo ? uiText.hideInfo : uiText.moreInfo}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
