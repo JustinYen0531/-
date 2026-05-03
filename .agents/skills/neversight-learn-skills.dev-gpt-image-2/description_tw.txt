@@ -1,0 +1,1 @@
+在 RunComfy 上使用 OpenAI GPT Image 2 (ChatGPT Images 2.0) 產生和編輯影像。記錄 GPT Image 2 的優勢（嵌入文字、標誌、多語言排版、指令精度）、其 3 種固定尺寸、保留編輯語言以及何時路由到同級（Flux 2 / Nano Banana Pro / Seedream）。透過本地 RunComfy CLI 調用“runco​​mfy run openai/gpt-image-2/text-to-image”或“/edit”。在「gpt image 2」、「gpt-image-2」、「ChatGPT Images 2」、「image 2」或任何使用此模型產生或編輯的明確要求上觸發。
